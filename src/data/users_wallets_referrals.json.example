@@ -1,0 +1,23 @@
+[
+  {
+    user_id: "00000001-aaaa-aaaa-aaaa-c0dec0dec0de",
+    polygon_wallet_address: "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+    referral_code: "abcDEF123yZ",
+    referred_by_user_id: "",
+    referred_user_ids: "[null]",
+  },
+  {
+    user_id: "00000002-bbbb-bbbb-bbbb-deadbeefbabe",
+    polygon_wallet_address: "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96046",
+    referral_code: "GHIjkl456xX",
+    referred_by_user_id: "",
+    referred_user_ids: '["00000003-cccc-cccc-cccc-c0ffeec0ffee"]',
+  },
+  {
+    user_id: "00000003-cccc-cccc-cccc-c0ffeec0ffee",
+    polygon_wallet_address: "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96047",
+    referral_code: "aaAAbbBB420",
+    referred_by_user_id: "00000002-bbbb-bbbb-bbbb-deadbeefbabe",
+    referred_user_ids: "[null]",
+  },
+];
