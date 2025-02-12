@@ -40,7 +40,7 @@ This codebase uses the Jest framework for TypeScript testing. Tests exist for ea
 To run the tests, first ensure you are using the correct node version:
 
 ```bash
-nvm use 20
+nvm use 18
 ```
 
 Install dependencies:
@@ -108,3 +108,22 @@ The sync script may need to be terminated before running the main application. A
 ```bash
 yarn sync <chainId> <startBlock>
 ```
+
+## Running with Docker and Makefile
+
+## Prerequisites
+- Docker installed on your system
+- Make installed on your system
+
+## Quick Start
+1. Build the Docker image:
+```bash
+make build
+```
+
+2. Start an interactive development session:
+```bash
+make up
+```
+
+Once inside the container, you need to run `yarn` once to install dependencies.
