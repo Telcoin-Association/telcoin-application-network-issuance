@@ -24,6 +24,9 @@ import { Address, createPublicClient, http } from "viem";
 import { addressResolverAbi } from "viem/_types/constants/abis";
 import { polygon } from "viem/chains";
 
+// Track active database connections
+let activeBlocksDatabases: BlocksDatabase[] = [];
+
 /**
  * @notice This is the main entrypoint for the application.
  * @dev We initialize datasources and pass them to calculators.
@@ -51,6 +54,8 @@ async function main() {
   // blocks databases fetch and store block data on disk
   console.log("Initializing blocks databases...");
   const polygonBlocksDatabase = new BlocksDatabase(ChainId.Polygon);
+  // track active database for cleanup
+  activeBlocksDatabases.push(polygonBlocksDatabase);
 
   // TokenTransferHistory fetches and stores ERC20 transfer events
   console.log("Initializing token transfer history...");
@@ -65,6 +70,8 @@ async function main() {
     polygonEndBlock,
     optimizededPublicClient
   );
+
+  console.log("Fetching token transfers...");
   await polygonTokenTransferHistory.init();
 
   // SimplePlugin fetches claimableIncreased events from a SimplePlugin contract for the referral calculator
@@ -125,4 +132,35 @@ async function main() {
   );
 }
 
-main().catch(console.error);
+/**
+ * Handles graceful shutdown of the application
+ * Ensures all database connections are closed
+ * and pending operations are complete
+ */
+async function gracefulShutdown(signal: string) {
+  console.log(`\nReceived ${signal}. Starting graceful shutdown...`);
+
+  try {
+    // Close all BlocksDatabase connections
+    if (activeBlocksDatabases.length > 0) {
+      console.log('Closing blocks databases...');
+      await Promise.all(activeBlocksDatabases.map(db => db.close()));
+      console.log('Successfully closed blocks databases');
+    }
+
+    console.log('Shutdown complete. Exiting...');
+    process.exit(0);
+  } catch (error) {
+    console.error('Error during shutdown:', error);
+    process.exit(1);
+  }
+}
+
+// Register shutdown handlers
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+main().catch(async (error) => {
+  console.error('error:', error);
+  await gracefulShutdown('ERROR');
+});
