@@ -120,4 +120,14 @@ export class BlocksDatabase extends BaseBlocksDatabase {
   protected fetchData(blockNumber: bigint): Promise<Block> {
     return this.client.getBlock({ blockNumber, includeTransactions: true });
   }
+
+  /// Close the database connection.
+  async close(): Promise<void> {
+    try {
+      await this._db.close();
+    } catch (error) {
+      console.error(`Error closing blocks database for chain ${this.chain}:`, error);
+      throw error;
+    }
+  }
 }
