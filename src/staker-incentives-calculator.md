@@ -115,11 +115,6 @@ For each validated user fee transfer, the `fetchUserFeeTransfers()` function als
 
 - `0x4eB4A35257458C1a87A4124CE02B3329Ed6b8D5a`
 
-> **To be Deprecated:**
-
-- `0x5c4Bb7067199f91a432Ae5F90C742967CfDF7E50`
-- `0xfBBB07E82c771489f2256f82060CAB17DB14c18f`
-
 #### **Staking Contract**
 
 - Locks staked TEL for all `Stakers` and `Referrers`:
@@ -127,14 +122,8 @@ For each validated user fee transfer, the `fetchUserFeeTransfers()` function als
 
 #### **Staking Plugins**
 
-- `SimplePlugin` contracts emit `ClaimableIncreased` events for deriving `Referrer <-> Referee` relationships:
-- Awaiting deployment to production
-
-> **To be Deprecated:**
-
-- `0x2f3378850a8fD5a0428a3967c2Ef6aAA025a4E1D`
-- `0xe24f8d36405704e85945a639fdaCEc47bA2a7c88`
+- `0xd8e7a80570d37D3fBe6eD5228c75475c81cEd094`
 
 #### **TANIssuanceHistory**
 
-- Awaiting deployment to production
+- `0xfAf4E75BF9CD392e56Bffb574820126ce4212744`

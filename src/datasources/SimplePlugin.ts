@@ -103,11 +103,8 @@ export class SimplePlugin extends BaseSimplePlugin {
     const logs = await publicClient.getLogs({
       address: this.pluginAddress,
       event: this.claimableIncreasedEvent,
-      // },
-      // this.chain,
       fromBlock: this.startBlock,
       toBlock: this.endBlock,
-      // this.showLogs
     });
 
     return logs.map((log) => ({

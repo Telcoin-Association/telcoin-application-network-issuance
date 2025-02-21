@@ -11,17 +11,10 @@ export type TanIssuanceHistory = {
 
 export const tanIssuanceHistories = [
   {
-    //todo: mock polygon TANIssuanceHistory (for testing only, remove and replace with prod deployment)
     chain: ChainId.Polygon,
-    address: "0xcAE9a3227C93905418500498F65f5d2baB235511",
+    address: "0xfAf4E75BF9CD392e56Bffb574820126ce4212744",
     abi: TanIssuanceHistoryAbi,
   },
-  // {
-  //   // prod polygon TANIssuanceHistory
-  //   chain: ChainId.Polygon,
-  //   address: "todo: awaiting prod deployment of new plugin to prod StakingModule & increaser role set to TanIssuanceHistory",
-  //   abi: TanIssuanceHistoryAbi,
-  // },
 ].map((tanIssuanceHistory) => {
   return {
     ...tanIssuanceHistory,
