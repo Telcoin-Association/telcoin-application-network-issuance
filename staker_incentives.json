@@ -2,526 +2,194 @@
   "blockRanges": [
     {
       "network": "polygon",
-      "startBlock": "67090000",
-      "endBlock": "67353000"
+      "startBlock": "68093124",
+      "endBlock": "68318774"
     }
   ],
   "stakerIncentives": [
     {
-      "address": "0xC6B5338601Fea42e176E0BDF0537D116aeB13D12",
-      "incentive": "77"
+      "address": "0xAcF543A44c24aAdF47B50e5cc05c628f3F2A5046",
+      "incentive": "5038958"
     },
     {
-      "address": "0x7011467e458B4cEEED928bac3E178Ce7EB892F2d",
-      "incentive": "8951828"
+      "address": "0x426d787930A93314048488c4D10946FCeD265Cc7",
+      "incentive": "18186034"
     },
     {
-      "address": "0x746F83FF7eAdA9d0fB03DbAbcAF2600ee513DCDB",
-      "incentive": "6143724"
+      "address": "0x096454fa85d4bD21CBB9134966c417f2e40C288C",
+      "incentive": "6062011"
     },
     {
-      "address": "0x73A4386890268E835d8d01598D06A44d47A489d8",
-      "incentive": "871707"
+      "address": "0xaE8f06402E8e67023b13f2F132Dc34422aFA6189",
+      "incentive": "3851"
     },
     {
-      "address": "0x1A24A8CDa46ACac40606af1D233dAfF9AEe66e2f",
-      "incentive": "12719"
+      "address": "0xb91406Ea49418Ff04F73231BA48930278bCef631",
+      "incentive": "713177"
+    },
+    {
+      "address": "0xc1c106e16cF229be127C30406c598b07986c06BA",
+      "incentive": "10969816"
+    },
+    {
+      "address": "0x5B74F5c8A2C00fea77cAED166Eb4F71BCe7d38bC",
+      "incentive": "143134"
+    },
+    {
+      "address": "0xe05DDFB83A8b66Df42f06BfB5517Fb5d6857a8ce",
+      "incentive": "1426355"
+    },
+    {
+      "address": "0x16CaEA275D4F7cF454537b121915D92Bc5CB8C16",
+      "incentive": "3334106"
+    },
+    {
+      "address": "0x7308fC774925316052AD22Fbdc21f2a7FF4bDA49",
+      "incentive": "7203096"
+    },
+    {
+      "address": "0x721D683cBd00c78Eb2676fBA03e8c03FDF07f5dC",
+      "incentive": "10697667"
+    },
+    {
+      "address": "0x82983a034CD8811b62fbdEcDEb300b46947fCC45",
+      "incentive": "1782944"
+    },
+    {
+      "address": "0xdFdf143A6a12185023e01ddC61092Ac97eCB6c05",
+      "incentive": "1782944"
+    },
+    {
+      "address": "0x0603709F92A47D5367Cc93f5b587A29fA286ADbB",
+      "incentive": "12514844"
+    },
+    {
+      "address": "0xb8e441ad9cA68bf92Da52A40BFBb03Bc6454ABB4",
+      "incentive": "55271282"
     },
     {
       "address": "0x9B73f16958aD4dF607E8B58aA2f407d66e9FA543",
-      "incentive": "89709"
+      "incentive": "178294"
     },
     {
       "address": "0x681ee9C08368ED5e30519f146cF3A27b24471Dc6",
       "incentive": "1890"
     },
     {
-      "address": "0x71c951E44E3D907dfa99D590cd7e6A235190dff4",
-      "incentive": "15052"
-    },
-    {
-      "address": "0x26763e975D773f46E8bA6AF80C09D9C90A07E14D",
-      "incentive": "15052"
-    },
-    {
-      "address": "0x98085d3327429Fc85f875e6baE8498EbC336eD97",
-      "incentive": "5329910"
-    },
-    {
-      "address": "0xF56A7C0C4f08356F9987Ef2C02f2034FD7F8608C",
-      "incentive": "5329910"
-    },
-    {
-      "address": "0x9D89f9451C4B7e04bd58616dbC72e924088AFF21",
-      "incentive": "3188330"
-    },
-    {
-      "address": "0x9342fD3f10101019Cf9e6774640957fa1d7A78B2",
-      "incentive": "734746"
-    },
-    {
-      "address": "0x94B72396b6B40e19C2a04c28c8aE93dE08b12733",
-      "incentive": "16055033"
-    },
-    {
-      "address": "0x721D683cBd00c78Eb2676fBA03e8c03FDF07f5dC",
-      "incentive": "2000842"
-    },
-    {
-      "address": "0xb78b932C7FA6f818D2c46aD42B38c4E9289660E4",
-      "incentive": "100000000"
-    },
-    {
-      "address": "0xFa544d034dC07aD4Fa185ba769031a29Fbef5e36",
-      "incentive": "2870"
-    },
-    {
-      "address": "0xa427746a2606c82afaa69cE757E0705c2c8081a1",
-      "incentive": "3129949"
-    },
-    {
-      "address": "0x18fc6c299B7aA35C8f59537b4b67c23D93E782ea",
-      "incentive": "1556854"
-    },
-    {
-      "address": "0xe05DDFB83A8b66Df42f06BfB5517Fb5d6857a8ce",
-      "incentive": "789867"
-    },
-    {
-      "address": "0x040f62A18EB5D5ca87A08E41A22D004ee7A26380",
-      "incentive": "211363"
-    },
-    {
-      "address": "0x4875A533B4c348a38731E38a8ddB1d89e5f8F361",
-      "incentive": "5635"
-    },
-    {
       "address": "0xF197552b64740Ff554D2887B59CD299d7b853Df3",
       "incentive": "1001000"
     },
     {
-      "address": "0x8f437d47c7723C7AB5ab896D59549D547181BecB",
-      "incentive": "3071774"
-    },
-    {
-      "address": "0x4D9f368d71531c6eE7225e5C6BC83Da37EE26200",
-      "incentive": "5635"
-    },
-    {
-      "address": "0x3e666FADbdC565692DEc4aB6A95CaaA708d28d76",
-      "incentive": "1984092"
-    },
-    {
-      "address": "0x9F20AB479C311059cc1b4C24837Ce2B38d260e0E",
-      "incentive": "127112"
+      "address": "0xe2e039dD3206870FE6Ad4B88DDf74730c355B2e5",
+      "incentive": "392247"
     },
     {
       "address": "0x6BF81D0d4f4e606C3cB09C45f6FA29f8743c72DE",
-      "incentive": "756367"
+      "incentive": "1000000"
     },
     {
-      "address": "0x8CC22B89CaD2Fae4365063f9F4238D4E316D0D62",
-      "incentive": "500000"
-    },
-    {
-      "address": "0x77Fb1AeEEC6e3F3Cfe3a1f3aB87E7cB74872Db5D",
-      "incentive": "104260"
-    },
-    {
-      "address": "0x84E4F13636D3D15e79CCCC6d7daC2d71eE3503bF",
-      "incentive": "422847"
-    },
-    {
-      "address": "0xa63C9B5F146391A5572d2445a4dEFd67554ce7d5",
-      "incentive": "422847"
-    },
-    {
-      "address": "0x3F465e310bB874249337353b1D704e6f02DFF9cd",
-      "incentive": "80327"
-    },
-    {
-      "address": "0x31D167b99FF574edfF7205bde0bF3D0555351574",
-      "incentive": "353783"
-    },
-    {
-      "address": "0x8D126B25f7e648938F95A97261C4A4Cf48D0df17",
-      "incentive": "1067"
-    },
-    {
-      "address": "0xd9a2078c93792cd2f968737092ae7da44eAF64D0",
-      "incentive": "1067"
-    },
-    {
-      "address": "0xBBF6951084154eB73b77f9A9BA943e478bFa06c4",
-      "incentive": "618663"
-    },
-    {
-      "address": "0xAcF543A44c24aAdF47B50e5cc05c628f3F2A5046",
-      "incentive": "618663"
-    },
-    {
-      "address": "0x22D93B96fcf17f472f82267413e27f511ADd7b2e",
-      "incentive": "6970669"
-    },
-    {
-      "address": "0x7FE5f529a5A70C019752EB0bC25A41434781dd2d",
-      "incentive": "5281"
-    },
-    {
-      "address": "0xB318309e50C1f09825f903B5773c45b0d2930f28",
-      "incentive": "53028"
-    },
-    {
-      "address": "0xE5d3b6737c87c922A0D6D4Abe4C76A8D6C70C628",
-      "incentive": "318169"
-    },
-    {
-      "address": "0xa5086DeBa52099aDAe5c7f70b56ea494AACdfCa1",
-      "incentive": "318169"
-    },
-    {
-      "address": "0xA53aFB483Fa417B9491C3a7AEAeDF463Ab687E29",
-      "incentive": "744828"
-    },
-    {
-      "address": "0x126f38D7Dda782e2a33f2061556524C3aA9cE30B",
-      "incentive": "744828"
-    },
-    {
-      "address": "0x5766ee90ab6f2Cd995CA845d09b2AeC45E870EC9",
-      "incentive": "78538"
-    },
-    {
-      "address": "0x41382710CB3320194F0fb9Ef8e8531e0E291D740",
-      "incentive": "333597"
-    },
-    {
-      "address": "0xAa00788779C2bB3C012BA6914A26cA5B23E02371",
-      "incentive": "333597"
-    },
-    {
-      "address": "0xCdDca3b68166cB76442B5D69cB6B800fD7fc67c0",
-      "incentive": "58642"
-    },
-    {
-      "address": "0x48A7209DD07Bc7409bF3f61820E1Ee9409F462e9",
-      "incentive": "58642"
-    },
-    {
-      "address": "0x60999E23eccfa3f5e3361ABAb7DA635f2aBf891e",
-      "incentive": "675509"
-    },
-    {
-      "address": "0x1e08bba24EeaB34dCc15Bc335c2638D40E1e3BD5",
-      "incentive": "675509"
-    },
-    {
-      "address": "0x94008096a40d195FB0907562531D7077419B278F",
-      "incentive": "12695633"
-    },
-    {
-      "address": "0xf242eC48E2A06F603A005aB1130a8532Ab2235B6",
-      "incentive": "732603"
-    },
-    {
-      "address": "0xd5d071b3A56381308F4B9Fa560AAd7876Df292c7",
-      "incentive": "7077"
-    },
-    {
-      "address": "0xa7B320Ea5368EC4990Ec76E1C1719aFddeE876d6",
-      "incentive": "1509418"
-    },
-    {
-      "address": "0x75ac9574e8142636654713A984365e3E3427E31b",
-      "incentive": "103440"
-    },
-    {
-      "address": "0xEbbabF54e68354253E41f2D0F1C543FEc5Bcfffa",
-      "incentive": "7077"
-    },
-    {
-      "address": "0xD957cc84a2B565e7572a8F02A39e487466c3bFF7",
-      "incentive": "164910"
-    },
-    {
-      "address": "0xFdEC4840b313115EC4DfDD7EfA4FE156C8C61475",
-      "incentive": "2962"
-    },
-    {
-      "address": "0x9dAaF515C4Bf267a38952d9b45ffBD4169cf64aA",
-      "incentive": "2962"
-    },
-    {
-      "address": "0x82983a034CD8811b62fbdEcDEb300b46947fCC45",
-      "incentive": "1567700"
-    },
-    {
-      "address": "0x47502539673c93B2ACDC9059B36360f76D3548BB",
-      "incentive": "1983704"
-    },
-    {
-      "address": "0x7262886374d498d6af9d03a234578B017A8601FC",
-      "incentive": "30289"
-    },
-    {
-      "address": "0x3287DAFDe97C70e1b564933D9BF6a5fC44e1Cc4C",
-      "incentive": "37982"
-    },
-    {
-      "address": "0xcFf9490e51524c67555C6f6896bB5ccF09751F06",
-      "incentive": "145438"
-    },
-    {
-      "address": "0xf0a8596541F839EBcC9f0A9d1442c15f43A2836E",
-      "incentive": "8816"
+      "address": "0x74c0d21e8ffC5b83dce1A0BB6abCD061D071E85a",
+      "incentive": "5038958"
     },
     {
       "address": "0xE3060D70A15f2EdFb390D66e60467Da6F5ECA1C7",
-      "incentive": "88210"
+      "incentive": "361795"
     },
     {
-      "address": "0x942E746C384bec88Dfa6164e8d699858E9988FeB",
-      "incentive": "147347"
-    },
-    {
-      "address": "0x38538aa93bAec7c0d26EC1Ea1C9Ec1dAd7833B0b",
-      "incentive": "55976"
-    },
-    {
-      "address": "0xd8F99Ed87B63b959354a60bade853FddddF9d965",
-      "incentive": "15349"
-    },
-    {
-      "address": "0xbE68d65f491CaCc7f4eaa49b813A92DfFa001DBc",
-      "incentive": "592835"
-    },
-    {
-      "address": "0x883c4BF5F45e8E75C59DdeA8B2ba3Cd40e81047D",
-      "incentive": "174229"
-    },
-    {
-      "address": "0x0603709F92A47D5367Cc93f5b587A29fA286ADbB",
-      "incentive": "798457"
-    },
-    {
-      "address": "0xF336C5e15E672F6606CA8CDe3D4FaF95fE1C63Bb",
-      "incentive": "145438"
-    },
-    {
-      "address": "0xff9aE836c989360f013A4d2F184b5f7e59aD6C11",
-      "incentive": "330946"
-    },
-    {
-      "address": "0xE17Aa7A67B0834823F56f01260b1E0965f14Eb4c",
-      "incentive": "330946"
-    },
-    {
-      "address": "0x86d04b2FA806dce57fF1b99971FF524d0484a2EC",
-      "incentive": "73270"
-    },
-    {
-      "address": "0x41c1a44B0608309714f0C5ee544f84262E510198",
-      "incentive": "5903"
-    },
-    {
-      "address": "0x99D5f1d103A892A191aCF6897CE4b65f2F627a28",
-      "incentive": "293189"
-    },
-    {
-      "address": "0x8364044ee8062F0F6C9835f7dfC26da4CE433BB8",
-      "incentive": "293189"
-    },
-    {
-      "address": "0x4e300F965ACE7aBF11A53662419F9A2D27dE3B1d",
-      "incentive": "990985"
-    },
-    {
-      "address": "0xf0eeE0837e8F4feaC444412991f7005B8dFFa305",
-      "incentive": "147347"
-    },
-    {
-      "address": "0xd9C0e53199290dF3BFB223033f3eb6C16429af0e",
-      "incentive": "161128"
-    },
-    {
-      "address": "0x7a8b381f5E107dc45E3888e7AaBF1E9aB464a1A8",
-      "incentive": "92474"
-    },
-    {
-      "address": "0x4922dc29D2d0c725F542f5021D9353F3872F2dFF",
-      "incentive": "105547"
-    },
-    {
-      "address": "0xF473Ea7dc6E82C348530FDE410bFF035bCe0B269",
-      "incentive": "105547"
-    },
-    {
-      "address": "0x6125f56E1a0939B72eC7D78791F7939E0faC5CA9",
-      "incentive": "291952"
-    },
-    {
-      "address": "0x44dDf2A9375EF552A77973588E3964b9BBBe8191",
-      "incentive": "1790723"
-    },
-    {
-      "address": "0x46d47D232d27bdF83FEA707ffd9Ce3e175B2D1dE",
-      "incentive": "7038623"
+      "address": "0xD7Be7655070f986B3E311EE04cc9aa87Cd11ab5d",
+      "incentive": "361795"
     },
     {
       "address": "0xe5C5B9C648a3e66A2A7b8a3f2dA48e76e8309A2C",
-      "incentive": "81988"
+      "incentive": "356588"
     },
     {
-      "address": "0x426d787930A93314048488c4D10946FCeD265Cc7",
-      "incentive": "8307"
+      "address": "0x262ba7354bA2946de8f90dCe06883FaFebB6f043",
+      "incentive": "14263556"
     },
     {
-      "address": "0x7f9b52eB7f161cA663eD3679D79332967Bd487f7",
-      "incentive": "5243021"
+      "address": "0x4DF1C6c7973f4E6e3B22149f7b8eFc4389f97C56",
+      "incentive": "14263556"
     },
     {
-      "address": "0x7223B8615036db8C2A959af80bcB41E5C2f42a65",
-      "incentive": "1000"
+      "address": "0x4B3D17974c2F79fEf5D495F082e9eC7d1FD95a06",
+      "incentive": "6062011"
     },
     {
-      "address": "0x4CaFc8E23616346de04DE62174B1e615D8E80c70",
-      "incentive": "168234"
-    },
-    {
-      "address": "0x9195C770DCe41eC211353afD92c8a0f0b28fB011",
-      "incentive": "11991"
-    },
-    {
-      "address": "0xC53Fa15adE563291bF8ba8d7E62a9B0959e6aE30",
-      "incentive": "11425"
-    },
-    {
-      "address": "0xD6C80eeC795F0564D20d517dd742dC6cD2Bf2EE0",
-      "incentive": "99403"
-    },
-    {
-      "address": "0x5C9A07e59Bdc264d0579530b4e08338122833942",
-      "incentive": "32064"
-    },
-    {
-      "address": "0x9C0557216e919eDaCCc56037c66A5fAC1D41D82a",
-      "incentive": "1047004"
-    },
-    {
-      "address": "0x4e0F1063F13d020B1316791Ae56ea5a826aba501",
-      "incentive": "32792"
-    },
-    {
-      "address": "0xDA9e27051edceb149021f81437A6de9959c11eDf",
-      "incentive": "500000"
-    },
-    {
-      "address": "0x340eAB7488e336fDc588F1da47452f02945E80b3",
-      "incentive": "205884"
-    },
-    {
-      "address": "0x5eE2FC3425b4e3C908C6d6BcaDf3dce444BE8617",
-      "incentive": "11991"
-    },
-    {
-      "address": "0xEFd18e4ACb4EB424e3A9f9EEa8834a1612546131",
-      "incentive": "43207"
-    },
-    {
-      "address": "0x54d91C29f9647773d6767F7255208C72B5CD606a",
-      "incentive": "181710"
+      "address": "0x3d1F678EBd71CA033f21D6B1B5B0781a66537447",
+      "incentive": "3815501"
     },
     {
       "address": "0xB6e85e12331BdEA6fF03b25d3dE68a892C99C5D4",
-      "incentive": "206456"
+      "incentive": "891472"
     },
     {
-      "address": "0xe2e039dD3206870FE6Ad4B88DDf74730c355B2e5",
-      "incentive": "730814"
+      "address": "0xE2D8A9f98072298241651a1c899907892860A1f5",
+      "incentive": "100000"
     },
     {
-      "address": "0xD4588f639D5C9E922a3283E013D58a115911c63c",
-      "incentive": "228735"
+      "address": "0x040f62A18EB5D5ca87A08E41A22D004ee7A26380",
+      "incentive": "891472"
     },
     {
-      "address": "0x8Dca7891aAb1d43b8402d23e2Ca88B0399Ed542E",
-      "incentive": "16969057"
+      "address": "0x18fc6c299B7aA35C8f59537b4b67c23D93E782ea",
+      "incentive": "47069"
     },
     {
-      "address": "0x48682644c1e8529338e46e7DdabA4383C1fceBb1",
-      "incentive": "3061769"
+      "address": "0x5C9A07e59Bdc264d0579530b4e08338122833942",
+      "incentive": "2317827"
     },
     {
-      "address": "0x11AbA9ACdFbAaB8e7C1Dc4d92b8B2467FD5d0e3B",
-      "incentive": "16969057"
+      "address": "0x4994A7059A2921398780818c203F83613A9Bf743",
+      "incentive": "17829446"
     },
     {
-      "address": "0xb71A9245bC9D0f6b78c7b38527e939C4A0a2fa53",
-      "incentive": "522286"
+      "address": "0xe9052daAC8667a27B38369aD37BEE63A8CD80Fc7",
+      "incentive": "143134"
     },
     {
-      "address": "0x425F2F1287045bC9d04C0f933E7FdEdA4A2e5765",
-      "incentive": "522286"
+      "address": "0x8f437d47c7723C7AB5ab896D59549D547181BecB",
+      "incentive": "17374082"
     },
     {
-      "address": "0x430cB4360cE341a6Ad0Dfa18b9aD1Ae2cFa9AD18",
-      "incentive": "88380"
+      "address": "0xA742150Bb2b4e5DfCC4E6df0E577237Fceb797b2",
+      "incentive": "500000"
     },
     {
-      "address": "0xdA23591f3b3aA7B09E4bC85a47Abb22380180A4d",
-      "incentive": "229294"
+      "address": "0x9D89f9451C4B7e04bd58616dbC72e924088AFF21",
+      "incentive": "2496122"
     },
     {
-      "address": "0x395eEB786dF7115b84Db4295C4576822e5D9379c",
-      "incentive": "135321"
+      "address": "0x94B72396b6B40e19C2a04c28c8aE93dE08b12733",
+      "incentive": "1108064"
     },
     {
-      "address": "0xdF8Df47E5109Adc155E436C0712adB78f53A418c",
-      "incentive": "707044"
+      "address": "0x4CaFc8E23616346de04DE62174B1e615D8E80c70",
+      "incentive": "8277926"
     },
     {
-      "address": "0xF054d867FEA9866a266cCA678cB30Fe5d9F68bA5",
-      "incentive": "16919"
+      "address": "0x6f9A5457e35FF98FCcA68b71c2D1bf7aAAeB714E",
+      "incentive": "46"
     },
     {
-      "address": "0x03b114a54280ea14562E86CCB32D7BD26E919321",
-      "incentive": "11814"
+      "address": "0x0b3d82e9b1D9163a1fe71DC2bc60C6Fb7fb13863",
+      "incentive": "487671"
     },
     {
-      "address": "0x1Ce9aCdd550e245B65233252F91541467695f3f3",
-      "incentive": "3535220"
+      "address": "0xb12042f547d28da37E88d7Db7A2CBAaf8CD88F68",
+      "incentive": "1782944"
     },
     {
-      "address": "0x7229aE5d9fa64DAe6C47d360023FfE683f0517F0",
-      "incentive": "472595"
+      "address": "0xDF6F220E72A6320E87576c5075899Be34212f97D",
+      "incentive": "145060"
     },
     {
-      "address": "0xEB16065429271bC05bf4A95E644f2057D6AFCB8F",
-      "incentive": "72839"
+      "address": "0x3E3309ab5312f6875b6e9bE672b9A43EFb70D760",
+      "incentive": "8914723"
     },
     {
-      "address": "0xd19d505d3618A142E85bd1A2A8C0878cD2b1089d",
-      "incentive": "1414088"
-    },
-    {
-      "address": "0xE204A9A022Fa3450d645E5B279930Ebd25f5Deb9",
-      "incentive": "305669"
-    },
-    {
-      "address": "0xD676f03c1B7c9208c5fc9bcb4DE9dF1c29e805a5",
-      "incentive": "26386"
-    },
-    {
-      "address": "0x6D6622204309fe69628D9104e424BBcFB8F1c234",
-      "incentive": "26386"
-    },
-    {
-      "address": "0x8D2d2a52598283f22F308aecbBeA7984c910B8c8",
-      "incentive": "618663"
-    },
-    {
-      "address": "0xE77dF488D556c00355342b8Be573702011C86750",
-      "incentive": "159961"
+      "address": "0x47502539673c93B2ACDC9059B36360f76D3548BB",
+      "incentive": "2496122"
     }
   ]
 }

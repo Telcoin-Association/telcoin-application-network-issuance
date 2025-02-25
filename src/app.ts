@@ -87,11 +87,6 @@ async function main() {
   );
   await Promise.all(polygonSimplePlugins.map((plugin) => plugin.init()));
 
-  // User registry keeps track of users and their id, type, and addresses
-  console.log("Initializing user registry...");
-  const userRegistry = new LocalFileUserRegistry();
-  await userRegistry.init();
-
   /**
    * @dev Initialize Calculators
    */
@@ -143,24 +138,24 @@ async function gracefulShutdown(signal: string) {
   try {
     // Close all BlocksDatabase connections
     if (activeBlocksDatabases.length > 0) {
-      console.log('Closing blocks databases...');
-      await Promise.all(activeBlocksDatabases.map(db => db.close()));
-      console.log('Successfully closed blocks databases');
+      console.log("Closing blocks databases...");
+      await Promise.all(activeBlocksDatabases.map((db) => db.close()));
+      console.log("Successfully closed blocks databases");
     }
 
-    console.log('Shutdown complete. Exiting...');
+    console.log("Shutdown complete. Exiting...");
     process.exit(0);
   } catch (error) {
-    console.error('Error during shutdown:', error);
+    console.error("Error during shutdown:", error);
     process.exit(1);
   }
 }
 
 // Register shutdown handlers
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 main().catch(async (error) => {
-  console.error('error:', error);
-  await gracefulShutdown('ERROR');
+  console.error("error:", error);
+  await gracefulShutdown("ERROR");
 });
