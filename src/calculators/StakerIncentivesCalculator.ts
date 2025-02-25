@@ -173,9 +173,10 @@ export class StakerIncentivesCalculator implements ICalculator {
    * @returns A map of staker addresses eligible for issuance rewards to their issuance reward amount for the [startBlock:endBlock] period
    */
   async calculateRewardsPerStaker(): Promise<Map<Address, bigint>> {
+    console.log("Fetching UserFeeTransfers...");
     const userFeeTransfers = await this.fetchUserFeeTransfers();
 
-    // fetch onchain rewards data for eligible (ie staked) users
+    console.log("Fetching onchain data for eligible (staked) users");
     // note `eligibleStakerSwaps` includes swaps for unstaked users who are referees since we need their fees
     // but `addressToRewardDatas` will only include staked users
     const [eligibleStakerSwaps, addressToRewardDatas] =
@@ -183,6 +184,7 @@ export class StakerIncentivesCalculator implements ICalculator {
 
     // calculate volume of total fee eligibility per user by summing user fees along protocol rules
     const stakerToStakerFeeTotal = new Map<Address, bigint>();
+    console.log("Calculating volume of total fee eligibility per user...");
     for (const eligibleSwap of eligibleStakerSwaps) {
       // user collisions are expected and summed agnostically provided they are staked
       // because userFees for staked Referees are double counted: once for themselves and again for their referrer (if staked)
@@ -196,6 +198,7 @@ export class StakerIncentivesCalculator implements ICalculator {
 
     // derive reward caps
     const addressToRewardCap = new Map<Address, bigint>();
+    console.log("Deriving rewards caps...");
     Array.from(addressToRewardDatas.keys()).forEach((address) => {
       const onchainDatas = addressToRewardDatas.get(address);
 
@@ -224,6 +227,7 @@ export class StakerIncentivesCalculator implements ICalculator {
     // perform calculation: the ratio of a user's total fees to the total of all fees for the period is equal to the ratio of a user's reward amount to the period's issuance amount
     const stakerToReward = new Map<Address, bigint>();
     const decimalScale = 1_000_000_000_000_000n;
+    console.log("Calculating rewards and applying caps if appropriate...");
     for (const [staker, stakerFeeTotal] of stakerToStakerFeeTotal) {
       // address rounding and precision loss for cases where vars are unbalanced
       const scaledIncentive =
@@ -484,7 +488,13 @@ export class StakerIncentivesCalculator implements ICalculator {
   private parseToUserFeeSwaps(
     tokenTransfers: TokenTransferWithCalldata[]
   ): UserFeeSwap[] {
+    const defiSwapSelector = "0x9a249c41";
+
     return tokenTransfers
+      .filter((transfer) => {
+        // include only transactions where `transfer.calldata[0:4] == AmirX.defiSwap.selector`
+        return transfer.calldata.startsWith(defiSwapSelector);
+      })
       .map((transfer) => {
         const { args } = decodeFunctionData({
           abi: AmirXAbi,
