@@ -300,16 +300,22 @@ export class StakerIncentivesCalculator implements ICalculator {
         // populate a map of Address => newStakeAmount which will be used to skip RPC calls to `StakingModule::stakedByAt()`
         const accountToLowestStake = new Map<Address, bigint>();
         stakeChangedEvents.forEach((stakeChange) => {
-          const { account, newStake } = stakeChange.args as {
+          const { account, oldStake, newStake } = stakeChange.args as {
             account: Address;
+            oldStake: bigint;
             newStake: bigint;
           };
+          const currentLowerStake = oldStake < newStake ? oldStake : newStake;
+
           const existingLowestStake = accountToLowestStake.get(account);
-          if (!existingLowestStake || newStake < existingLowestStake) {
+          if (
+            existingLowestStake == undefined ||
+            currentLowerStake < existingLowestStake
+          ) {
             console.log(
-              `StakeChanged event found for ${account} with a new stake of: ${newStake}`
+              `StakeChanged event found for ${account} for stake amount ${oldStake} to ${newStake}`
             );
-            accountToLowestStake.set(account, newStake);
+            accountToLowestStake.set(account, currentLowerStake);
           }
         });
 
