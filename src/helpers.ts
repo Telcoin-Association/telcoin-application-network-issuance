@@ -2,6 +2,8 @@ import * as dotenv from "dotenv";
 import { Observable } from "rxjs";
 dotenv.config();
 
+import fs from "fs";
+import path from "path";
 import * as viem from "viem";
 import * as cliProgress from "cli-progress";
 import { writeFile } from "fs/promises";
@@ -24,6 +26,26 @@ export function getStartAndEndTimestampsForWeek(week: bigint) {
     config.weekZeroStartTimestamp + week * config.secondsPerWeek;
   const endTimestamp = startTimestamp + config.secondsPerWeek;
   return { startTimestamp, endTimestamp };
+}
+
+/**
+ * Ensures data directory exists and creates it if not
+ */
+export function ensureDataDirectory(directory: string) {
+  if (!fs.existsSync(directory)) {
+    fs.mkdirSync(directory, { recursive: true });
+  }
+}
+
+/**
+ * Creates data file if it doesn't exist
+ */
+export function ensureDataFile(dataFilePath: string, defaultData: any) {
+  // create file with default empty array
+  if (!fs.existsSync(dataFilePath)) {
+    fs.writeFileSync(dataFilePath, JSON.stringify(defaultData, null, 2));
+    console.log(`Created default file at ${dataFilePath}`);
+  }
 }
 
 export function jsonParse(s: string) {

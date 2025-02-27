@@ -1,6 +1,7 @@
+import fs from "fs";
 import { Address } from "viem";
 import { ChainId } from "../config";
-import { DeepReadonly } from "../helpers";
+import { DeepReadonly, ensureDataDirectory, ensureDataFile } from "../helpers";
 
 /**
  * @dev This enum is used to differentiate users based on their referral status
@@ -96,7 +97,7 @@ export abstract class BaseUserRegistry {
    */
   getUserByAddressAndChain(
     address: Address,
-    chain: ChainId,
+    chain: ChainId
   ): DeepReadonly<User> | undefined {
     this.whenInitialized();
     const usersByAddress = this._usersByAddressAndChain.get(chain);
@@ -129,6 +130,7 @@ export abstract class BaseUserRegistry {
  * This class fetches and stores users from a local TAN-generated file
  */
 import UserEntry from "../data/UserEntry";
+import path from "path";
 
 export class LocalFileUserRegistry extends BaseUserRegistry {
   async fetchUsers(): Promise<User[]> {
@@ -146,7 +148,7 @@ export class LocalFileUserRegistry extends BaseUserRegistry {
 
         // TAN backend uses single `null` member for empty `referred_user_ids`
         const filteredReferredUserIds = referredUserIds.filter(
-          (id) => id !== null,
+          (id) => id !== null
         );
         // after filtering null referee ids, determine this user type
         const userType =
@@ -164,7 +166,7 @@ export class LocalFileUserRegistry extends BaseUserRegistry {
           referral_code: entry.referral_code,
           referred_by_user_id: entry.referred_by_user_id,
           referred_user_ids: referredUserIds.map((refereeId) =>
-            refereeId ? refereeId : undefined,
+            refereeId ? refereeId : undefined
           ),
         };
 
@@ -178,48 +180,28 @@ export class LocalFileUserRegistry extends BaseUserRegistry {
   }
 }
 
-import fs from "fs";
-import path from "path";
-/**
- * Ensures the data directory exists and creates it if it doesn't
- */
-function ensureDataDirectory() {
-  const dataDir = path.join(__dirname, "data");
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-  }
-}
-
-const DEFAULT_USER_DATA: UserEntry[] = [];
-const DATA_FILE_PATH = path.join(__dirname, '../data', 'users_wallets_referrals.json');
-/**
- * Creates the default data file if it doesn't exist
- */
-function ensureDataFile() {
-  // create file with default empty array
-  if (!fs.existsSync(DATA_FILE_PATH)) {
-      fs.writeFileSync(
-        DATA_FILE_PATH,
-        JSON.stringify(DEFAULT_USER_DATA, null, 2),
-      );
-    console.log(`Created default users file at ${DATA_FILE_PATH}`);
-  }
-}
-
 /**
  * Gets user data from the JSON file, creating it if it doesn't exist
  */
 export function getUserEntries(): UserEntry[] {
+  const DATA_DIRECTORY = path.join(__dirname, "data");
+  const DATA_FILE_PATH = path.join(
+    __dirname,
+    "../data",
+    "users_wallets_referrals.json"
+  );
+  const DEFAULT_USER_DATA: UserEntry[] = [];
+
   try {
-    ensureDataDirectory();
-    ensureDataFile();
+    ensureDataDirectory(DATA_DIRECTORY);
+    ensureDataFile(DATA_FILE_PATH, DEFAULT_USER_DATA);
 
     const fileContent = fs.readFileSync(DATA_FILE_PATH, "utf-8");
     return JSON.parse(fileContent) as UserEntry[];
   } catch (error) {
     console.warn(
       "Error reading user data, falling back to empty array:",
-      error,
+      error
     );
     return DEFAULT_USER_DATA;
   }
