@@ -11,9 +11,7 @@ import {
   parseAndSanitizeCLIArgs,
   writeIncentivesToFile,
 } from "./helpers";
-import { DeveloperIncentivesCalculator } from "./calculators/DeveloperIncentivesCalculator";
 import { SimplePlugin } from "./datasources/SimplePlugin";
-import { LocalFileUserRegistry } from "./datasources/UserRegistry";
 import { TokenTransferHistory } from "./datasources/TokenTransferHistory";
 import { StakerIncentivesCalculator } from "./calculators/StakerIncentivesCalculator";
 import { aggregators } from "./data/aggregators";
@@ -21,7 +19,6 @@ import { amirXs } from "./data/amirXs";
 import { stakingModules } from "./data/stakingModules";
 import { tanIssuanceHistories } from "./data/tanIssuanceHistories";
 import { Address, createPublicClient, http } from "viem";
-import { addressResolverAbi } from "viem/_types/constants/abis";
 import { polygon } from "viem/chains";
 
 // Track active database connections
@@ -50,12 +47,6 @@ async function main() {
   // the executor registry keeps track of each developer's executors
   console.log("Initializing executor registry...");
   const executorRegistry = new LocalFileExecutorRegistry();
-
-  // blocks databases fetch and store block data on disk
-  console.log("Initializing blocks databases...");
-  const polygonBlocksDatabase = new BlocksDatabase(ChainId.Polygon);
-  // track active database for cleanup
-  activeBlocksDatabases.push(polygonBlocksDatabase);
 
   // TokenTransferHistory fetches and stores ERC20 transfer events
   console.log("Initializing token transfer history...");
@@ -95,7 +86,6 @@ async function main() {
   // This calculator calculates the referrals incentives for each staker
   console.log("Initializing stakers incentives calculator...");
   const polygonStakerIncentivesCalculator = new StakerIncentivesCalculator(
-    [polygonBlocksDatabase],
     [polygonTokenTransferHistory],
     aggregators,
     stakingModules,
@@ -128,6 +118,7 @@ async function main() {
 }
 
 /**
+ * Not currently used but kept for future use of BlocksDBs
  * Handles graceful shutdown of the application
  * Ensures all database connections are closed
  * and pending operations are complete

@@ -4,6 +4,7 @@ import {
   createPublicClient,
   decodeFunctionData,
   getAbiItem,
+  getAddress,
   PublicClient,
   zeroAddress,
 } from "viem";
@@ -21,6 +22,7 @@ import { AmirX } from "../data/amirXs";
 import { StakingModule } from "../data/stakingModules";
 import { AmirXAbi, StakingModuleAbi, TanIssuanceHistoryAbi } from "../abi/abi";
 import { TanIssuanceHistory } from "../data/tanIssuanceHistories";
+import { getTransaction } from "viem/_types/actions/public/getTransaction";
 /**
  * This class calculates TAN stakers' referrals incentives.
  *
@@ -50,7 +52,6 @@ type OnchainRewardData = {
 
 export class StakerIncentivesCalculator implements ICalculator {
   constructor(
-    private readonly _blocksDbs: BaseBlocksDatabase[],
     private readonly _tokenTransferHistories: TokenTransferHistory[],
     private readonly _aggregators: Aggregator[],
     private readonly _stakingModules: StakingModule[],
@@ -62,14 +63,7 @@ export class StakerIncentivesCalculator implements ICalculator {
     private readonly _endBlocks: Partial<{ [chain in ChainId]: bigint }>
   ) {
     // arity checks for initialization in multichain context
-    const blocksChains = _blocksDbs.map((db) => db.chain);
     const transfersChains = _tokenTransferHistories.map((db) => db.token.chain);
-    // token transfer history and blocks dbs must match
-    if (!transfersChains.every((chain) => blocksChains.includes(chain)))
-      throw new Error(
-        "Blocks databases and token transfer histories must be for the same chains"
-      );
-
     const aggregatorsChains = _aggregators.map(
       (aggregator) => aggregator.chain
     );
@@ -78,7 +72,6 @@ export class StakerIncentivesCalculator implements ICalculator {
     );
     const amirXsChains = _amirXs.map((amirX) => amirX.chain);
     const arrays = [
-      blocksChains,
       transfersChains,
       aggregatorsChains,
       stakingModulesChains,
@@ -86,7 +79,7 @@ export class StakerIncentivesCalculator implements ICalculator {
     ];
     if (
       !arrays.every((chains) =>
-        chains.every((chain) => blocksChains.includes(chain))
+        chains.every((chain) => transfersChains.includes(chain))
       )
     ) {
       throw new Error("All input arrays must have the same chains.");
@@ -94,7 +87,7 @@ export class StakerIncentivesCalculator implements ICalculator {
 
     // Ensure start and end blocks are specified for each chain
     if (
-      ![...blocksChains].every((chain) => {
+      ![...transfersChains].every((chain) => {
         const chainId: ChainId = chain;
         return (
           _startBlocks[chainId] !== undefined &&
@@ -112,57 +105,42 @@ export class StakerIncentivesCalculator implements ICalculator {
    * @returns An array of user fee payments, represented as `TokenTransfer`s
    */
   async fetchUserFeeTransfers(): Promise<TokenTransferWithCalldata[]> {
-    // search all transfers in TokenTransferHistorys for transfers from aggregators to AmirX
-    const filteredTransfers = this._tokenTransferHistories
-      .map((history) => {
-        return history.transfers.filter((transfer) => {
-          // explicitly return result of boolean eval for `to === amirX && from === aggregator`
-          return (
-            this._amirXs.map((amirX) => amirX.address).includes(transfer.to) &&
-            this._aggregators
-              .map((aggregator) => aggregator.address)
-              .includes(transfer.from)
-          );
-        });
-      })
-      .flat();
-
-    // fetch executor addresses as Set
-    const executorSet = new Set<Address>(
+    // fetch aggregator, amirX, executor addresses as Set
+    const aggregators = new Set(
+      this._aggregators.map((aggregator) => aggregator.address)
+    );
+    const amirXs = new Set(this._amirXs.map((amirX) => amirX.address));
+    const executors = new Set<Address>(
       this._executorRegistry.executors.map((executor) => executor.address)
     );
 
-    // get all tx hashes and input calldatas of all executor EOAs
+    const filteredTransfers: TokenTransfer[] = [];
     let executorTxHashToCalldata = new Map<`0x${string}`, `0x${string}`>();
-    for (const db of this._blocksDbs) {
-      // fetch all executors' transactions within `[startBlock:endBlock]` range
-      const txMap = await db.getTransactionsOfEOASet(
-        executorSet,
-        this._startBlocks[db.chain]!,
-        this._endBlocks[db.chain]!
-      );
+    for (const history of this._tokenTransferHistories) {
+      const client = history.client;
+      // search all transfers in TokenTransferHistorys for transfers from aggregators to AmirX
+      for (const transfer of history.transfers) {
+        if (aggregators.has(transfer.from) && amirXs.has(transfer.to)) {
+          const tx = await client.getTransaction({ hash: transfer.txHash });
 
-      // extract executor tx hashes and input calldata from executor txs into map
-      for (const transactions of txMap.values()) {
-        transactions.forEach((tx) => {
-          executorTxHashToCalldata.set(tx.hash, tx.input);
-        });
+          // select txs originating from executors and extract tx hash => calldata into map
+          if (executors.has(getAddress(tx.from))) {
+            filteredTransfers.push(transfer);
+            executorTxHashToCalldata.set(tx.hash, tx.input);
+          }
+        }
       }
     }
 
-    // select for `TokenTransfer`s resulting from executor txs only
-    const verifiedFeeTransfers = filteredTransfers.filter((transfer) => {
-      return executorTxHashToCalldata.has(transfer.txHash);
-    });
-
     // append calldata to `TokenTransfer`s to construct `TokenTransferWithCalldata`s
-    const userFeeTransfers: TokenTransferWithCalldata[] =
-      verifiedFeeTransfers.map((transfer) => {
+    const userFeeTransfers: TokenTransferWithCalldata[] = filteredTransfers.map(
+      (transfer) => {
         return {
           ...transfer,
           calldata: executorTxHashToCalldata.get(transfer.txHash)!,
         };
-      });
+      }
+    );
 
     return userFeeTransfers;
   }
