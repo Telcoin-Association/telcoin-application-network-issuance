@@ -2,7 +2,6 @@ import {
   TokenTransferHistory,
   TokenTransferWithCalldata,
 } from "../datasources/TokenTransferHistory";
-import { BlocksDatabase } from "../datasources/persistent/BlocksDatabase";
 import {
   BaseExecutorRegistry,
   LocalFileExecutorRegistry,
@@ -33,7 +32,6 @@ import {
   zeroAddress,
 } from "viem";
 import { tanIssuanceHistories } from "../data/tanIssuanceHistories";
-import { randomInt } from "node:crypto";
 import AmirXAbi from "../abi/AmirXAbi";
 import {
   mockDefiSwap,
@@ -51,9 +49,8 @@ import { polygon } from "viem/chains";
 const arbitraryStartBlock = 66660433n;
 const arbitraryEndBlock = 66660821n;
 
-// use prod executors
+// use prod executor
 const executor1 = executors[0].address;
-const executor2 = executors[1].address;
 
 // signals for simplified asserts
 const stakerSignal = "0x11111111";
@@ -108,26 +105,6 @@ function createTestTransfers(
  * Mocks
  */
 
-// mock the blocks DB for testing
-jest.mock("../datasources/persistent/BlocksDatabase", () => {
-  return {
-    BlocksDatabase: jest.fn().mockImplementation(() => ({
-      chain: ChainId.Polygon,
-      getTransactionsOfEOASet: jest // only this function used in tests
-        .fn()
-        .mockResolvedValue(
-          new Map([
-            [executor1, mockTransferTransactions],
-            [executor2, []], // executor2 did not initiate any TXs in the dummydata
-          ])
-        ),
-      sync: jest.fn(), // placeholder jest functions
-      getTransactionsOfEOA: jest.fn(),
-      getValue: jest.fn(),
-    })),
-  };
-});
-
 // mock the TokenTransferHistory with actual data to save on RPC calls to API
 jest.mock("../datasources/TokenTransferHistory", () => {
   return {
@@ -155,7 +132,6 @@ describe("StakerIncentivesCalculator", () => {
 
   // mocked constructor args
   let mockTokenTransferHistorys: jest.Mocked<TokenTransferHistory>[];
-  let mockBlocksDbs: jest.Mocked<BlocksDatabase>[];
   // prod constructor args
   let executorRegistry: LocalFileExecutorRegistry;
 
@@ -170,16 +146,11 @@ describe("StakerIncentivesCalculator", () => {
     expect((await mockTokenTransferHistory.fetchTransfers()).length).toBe(123);
     mockTokenTransferHistorys = [mockTokenTransferHistory];
 
-    mockBlocksDbs = [
-      new BlocksDatabase(ChainId.Polygon),
-    ] as jest.Mocked<BlocksDatabase>[];
-
     // use prod user and executor registries
     executorRegistry = new LocalFileExecutorRegistry();
 
     // instantiate calculator
     calculator = new StakerIncentivesCalculator(
-      mockBlocksDbs,
       mockTokenTransferHistorys,
       aggregators,
       stakingModules,
@@ -260,12 +231,30 @@ describe("StakerIncentivesCalculator", () => {
   });
 
   it("should return an empty array if no transfers match executor transactions", async () => {
-    // amend mocked DB to return a transaction for a non-executor address
-    mockBlocksDbs[0].getTransactionsOfEOASet.mockResolvedValue(
-      new Map([["0xNOTexecutor", [transactionTemplate as Transaction]]])
+    const impossibleExecutorRegistry = new LocalFileExecutorRegistry();
+    Object.defineProperty(impossibleExecutorRegistry, "executors", {
+      get: jest.fn().mockReturnValue([
+        {
+          developerName: "Impossible",
+          developerAddress: "0x0000000000000000000000000000000000000000",
+          address: "0x0000000000000000000000000000000000000000",
+        },
+      ]),
+    });
+    // instantiate new calculator with impossible executor
+    const impossibleCalculator = new StakerIncentivesCalculator(
+      mockTokenTransferHistorys,
+      aggregators,
+      stakingModules,
+      tanIssuanceHistories,
+      amirXs,
+      impossibleExecutorRegistry,
+      1000n,
+      { [ChainId.Polygon]: arbitraryStartBlock },
+      { [ChainId.Polygon]: arbitraryEndBlock }
     );
 
-    const result = await calculator.fetchUserFeeTransfers();
+    const result = await impossibleCalculator.fetchUserFeeTransfers();
     expect(result).toEqual([]);
   });
 

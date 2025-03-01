@@ -311,10 +311,6 @@ describe("StakerIncentivesCalculatorForkTest", () => {
     await testClient.mine({ blocks: 1 });
 
     // calculator constructor args
-    const polygonBlocksDatabase = new BlocksDatabase(
-      ChainId.Polygon,
-      testClient.extend(publicActions)
-    );
     const tokenTransferHistory = new TokenTransferHistory(
       config.telToken[ChainId.Polygon],
       startBlock,
@@ -359,7 +355,6 @@ describe("StakerIncentivesCalculatorForkTest", () => {
 
     // instantiate new calculator with localhost rpc and mock constructor args
     const forkedCalculator = new StakerIncentivesCalculator(
-      [polygonBlocksDatabase],
       [tokenTransferHistory],
       [aggregator],
       [stakingModule],
