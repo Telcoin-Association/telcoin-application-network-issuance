@@ -33,6 +33,12 @@ While multiple incentive programs are planned for the future, the Staker Incenti
     - Referred users' fees paid
 - **TAN Maximum Weekly TEL Issuance Rule:** Throughout the entire period, total staked TEL must exceed (Lifetime TEL issuance + Current week TEL issuance)
 
+## Viewing the official rewards
+
+For community members wishing to view the official published rewards for each TANIP-1 period (weeks starting Feb 19 at 00:00 UTC), refer to the `rewards` directory and consult the file for the period, for example `rewards/staker_rewards_period_0.json`. These rewards files list the supported networks, start and end blocks, and a map of each address to its rewards for the period.
+
+### Note that the rewards amounts are denominated in EVM-recognizable numbers so the TEL decimals transformation must be applied. This means all listed amounts must be divided by 100 to get the reward amount in TEL which has a decimal precision of 2.
+
 ## Running the Tests
 
 This codebase uses the Jest framework for TypeScript testing. Tests exist for each of the calculators; however, as mentioned, the StakerIncentivesCalculator is currently the only calculator in production, pending the approval of more TANIPs.

@@ -201,6 +201,9 @@ export class StakerIncentivesCalculator implements ICalculator {
       },
       0n
     );
+    console.log(
+      `Total issuance amount for this period after applying rewards caps: ${totalFees}`
+    );
 
     // perform calculation: the ratio of a user's total fees to the total of all fees for the period is equal to the ratio of a user's reward amount to the period's issuance amount
     const stakerToReward = new Map<Address, bigint>();
