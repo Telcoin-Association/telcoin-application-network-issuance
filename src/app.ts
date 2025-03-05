@@ -5,9 +5,7 @@ import { LocalFileExecutorRegistry } from "./datasources/ExecutorRegistry";
 import { BlocksDatabase } from "./datasources/persistent/BlocksDatabase";
 import { ChainId, config } from "./config";
 import {
-  getLastSettlementBlockAndLatestBlock,
   getStartAndEndBlocks,
-  NetworkConfig,
   parseAndSanitizeCLIArgs,
   writeIncentivesToFile,
 } from "./helpers";
@@ -18,7 +16,7 @@ import { aggregators } from "./data/aggregators";
 import { amirXs } from "./data/amirXs";
 import { stakingModules } from "./data/stakingModules";
 import { tanIssuanceHistories } from "./data/tanIssuanceHistories";
-import { Address, createPublicClient, http } from "viem";
+import { createPublicClient, http } from "viem";
 import { polygon } from "viem/chains";
 
 // Track active database connections

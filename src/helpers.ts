@@ -11,6 +11,7 @@ import { ChainId, config } from "./config";
 import { Address, getContract, zeroAddress } from "viem";
 import { tanIssuanceHistories } from "./data/tanIssuanceHistories";
 import { randomInt } from "crypto";
+import * as xlsx from "xlsx";
 
 export interface Update<T> {
   progress: number;
@@ -335,11 +336,75 @@ export async function writeIncentivesToFile(
   const json = JSON.stringify(data, null, 2);
 
   try {
-    await writeFile(filePath, json, "utf8");
+    await writeFile(filePath, JSON.stringify(data, null, 2), "utf8");
     console.log(`Incentives written to ${filePath}`);
+    convertIncentivesFileToExcel(data);
   } catch (err) {
     console.error(`Error writing to file: ${err}`);
   }
+}
+
+function convertIncentivesFileToExcel(data: any) {
+  // Process data to include the new column with formatted values
+  const stakerIncentives = data.stakerIncentives.map(
+    (entry: { address: string; incentive: number }) => ({
+      address: entry.address,
+      "incentive - script output": Number(entry.incentive),
+      "incentive (TEL)": Number(entry.incentive) / 100,
+    })
+  );
+
+  // Calculate totals
+  const totalIncentive = stakerIncentives.reduce(
+    (sum: number, entry: { [x: string]: number }) =>
+      sum + entry["incentive - script output"],
+    0
+  );
+  const totalIncentiveTel = stakerIncentives.reduce(
+    (sum: number, entry: { [x: string]: number }) =>
+      sum + entry["incentive (TEL)"],
+    0
+  );
+
+  // Add total row
+  stakerIncentives.push({
+    address: "Total",
+    "incentive - script output": totalIncentive,
+    "incentive (TEL)": totalIncentiveTel.toLocaleString(),
+  });
+
+  // Convert processed data to worksheet
+  const stakerIncentivesSheet = xlsx.utils.json_to_sheet(stakerIncentives);
+
+  // Define output file
+  const outputFile = "staker_incentives.xlsx";
+  let workbook;
+
+  // Check if file exists and load it, otherwise create a new workbook
+  if (fs.existsSync(outputFile)) {
+    workbook = xlsx.readFile(outputFile);
+  } else {
+    workbook = xlsx.utils.book_new();
+  }
+
+  // Generate sheet name based on block range
+  const sheetName = `Blocks ${data.blockRanges[0].startBlock} - ${data.blockRanges[0].endBlock}`;
+
+  // Remove existing sheet if it exists
+  if (workbook.Sheets[sheetName]) {
+    delete workbook.Sheets[sheetName];
+    workbook.SheetNames = workbook.SheetNames.filter(
+      (name) => name !== sheetName
+    );
+  }
+
+  // Append new sheet
+  xlsx.utils.book_append_sheet(workbook, stakerIncentivesSheet, sheetName);
+
+  // Save workbook
+  xlsx.writeFile(workbook, outputFile);
+
+  console.log(`Excel file updated/saved as ${outputFile}`);
 }
 
 export function calculateIncentivesFromVolumeOrSimilar(
