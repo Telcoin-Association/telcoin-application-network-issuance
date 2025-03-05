@@ -152,8 +152,8 @@ export function observableToProgressBar<T>(
 
 export interface NetworkConfig {
   network: string;
-  startBlock?: bigint;
-  endBlock?: bigint;
+  startBlock: bigint;
+  endBlock: bigint;
 }
 
 export function parseAndSanitizeCLIArgs(
@@ -173,30 +173,32 @@ export function parseAndSanitizeCLIArgs(
       console.error(`Invalid network specified: ${network}`);
       process.exit(1);
     }
+    if (!blockRange) {
+      console.error(
+        `Invalid blockRange specified for ${network}: ${blockRange}`
+      );
+    }
 
     let startBlock: bigint | undefined;
     let endBlock: bigint | undefined;
+    const [startBlockStr, endBlockStr] = blockRange.split(":");
 
-    if (blockRange) {
-      const [startBlockStr, endBlockStr] = blockRange.split(":");
+    if (startBlockStr && !isNaN(Number(startBlockStr))) {
+      startBlock = BigInt(startBlockStr);
+    } else {
+      console.error(
+        `Invalid start block specified for ${network}: ${blockRange}`
+      );
+      process.exit(1);
+    }
 
-      if (startBlockStr && !isNaN(Number(startBlockStr))) {
-        startBlock = BigInt(startBlockStr);
-      } else if (startBlockStr) {
-        console.error(
-          `Invalid start block specified for ${network}: ${blockRange}`
-        );
-        process.exit(1);
-      }
-
-      if (endBlockStr && !isNaN(Number(endBlockStr))) {
-        endBlock = BigInt(endBlockStr);
-      } else if (endBlockStr) {
-        console.error(
-          `Invalid end block specified for ${network}: ${blockRange}`
-        );
-        process.exit(1);
-      }
+    if (endBlockStr && !isNaN(Number(endBlockStr))) {
+      endBlock = BigInt(endBlockStr);
+    } else {
+      console.error(
+        `Invalid end block specified for ${network}: ${blockRange}`
+      );
+      process.exit(1);
     }
 
     networkConfigs.push({ network: networkLowerCase, startBlock, endBlock });
@@ -204,7 +206,7 @@ export function parseAndSanitizeCLIArgs(
 
   if (networkConfigs.length === 0) {
     console.log(
-      "Enter network configurations in the format `network`, `network=startBlock`, or `network=startBlock:endBlock` and separate multiple networks by space. Eg usage: `yarn start polygon` or `yarn start polygon=666000:667000 mainnet=100000:110000`"
+      "Enter network configurations in the format `network=startBlock:endBlock` and separate multiple networks by space. Eg usage: `yarn start polygon=666000:667000` or `yarn start polygon=666000:667000 mainnet=100000:110000`"
     );
 
     process.exit(1);
@@ -213,49 +215,56 @@ export function parseAndSanitizeCLIArgs(
   return networkConfigs;
 }
 
-export async function getStartAndEndBlocks(
+export async function validateStartAndEndBlocks(
   networkConfigs: NetworkConfig[]
-): Promise<[bigint, bigint, bigint, bigint]> {
-  // initialize to ensure type safety
-  let polygonLatestBlock;
-  let polygonStartBlock = 0n;
-  let polygonEndBlock = 0n;
-  let mainnetLatestBlock;
-  let mainnetStartBlock = 0n;
-  let mainnetEndBlock = 0n;
-
-  for (const { network, startBlock } of networkConfigs) {
-    if (network === "polygon") {
-      [polygonStartBlock, polygonLatestBlock] =
+) {
+  for (const networkConfig of networkConfigs) {
+    if (networkConfig.network === "polygon") {
+      const [lastSettlementBlock, latestBlock] =
         await getLastSettlementBlockAndLatestBlock(ChainId.Polygon);
-      polygonEndBlock =
-        polygonLatestBlock - config.reorgSafeDepth[ChainId.Polygon];
-      // overwrite startBlock if specified to prevent starting at block 0 on first runs
-      if (startBlock !== undefined) {
-        polygonStartBlock = startBlock;
+
+      // startBlock must match history contract's lastSettlementBlock or period 0/1 startBlock
+      if (
+        networkConfig.startBlock !== lastSettlementBlock &&
+        networkConfig.startBlock !== 68093124n && // period 0
+        networkConfig.startBlock !== 68374032n // period 1
+      ) {
+        console.log(networkConfig.startBlock);
+        console.error("Polygon startBlock doesn't match last settlement block");
+        process.exit(1);
       }
-      console.log("Processed Polygon start and end blocks");
+      // endBlock must be deeper than reorgSafeDepth
+      if (
+        networkConfig.endBlock >
+        latestBlock - config.reorgSafeDepth[ChainId.Polygon]
+      ) {
+        console.error("Polygon endBlock must be reorg safe");
+        process.exit(1);
+      }
     }
 
-    if (network === "mainnet") {
-      [mainnetStartBlock, mainnetLatestBlock] =
+    if (networkConfig.network === "mainnet") {
+      const [lastSettlementBlock, latestBlock] =
         await getLastSettlementBlockAndLatestBlock(ChainId.Mainnet);
-      mainnetEndBlock =
-        mainnetLatestBlock - config.reorgSafeDepth[ChainId.Mainnet];
-      // overwrite startBlock if specified to prevent starting at block 0 on first runs
-      if (startBlock !== undefined) {
-        mainnetStartBlock = startBlock;
+
+      // startBlock must match history contract's lastSettlementBlock or period 0 startBlock
+      if (
+        networkConfig.startBlock !== lastSettlementBlock
+        /*&& networkConfig.startBlock !=== xxx*/
+      ) {
+        console.error("Mainnet startBlock doesn't match last settlement block");
+        process.exit(1);
       }
-      console.log("Processed Mainnet start and end blocks");
+      // endBlock must be deeper than reorgSafeDepth
+      if (
+        networkConfig.endBlock >
+        latestBlock - config.reorgSafeDepth[ChainId.Mainnet]
+      ) {
+        console.error("Mainnet endBlock must be reorg safe");
+        process.exit(1);
+      }
     }
   }
-
-  return [
-    polygonStartBlock,
-    polygonEndBlock,
-    mainnetStartBlock,
-    mainnetEndBlock,
-  ];
 }
 
 export async function getLastSettlementBlockAndLatestBlock(
@@ -394,7 +403,7 @@ function writeIncentivesToExcel(data: any) {
   if (workbook.Sheets[sheetName]) {
     delete workbook.Sheets[sheetName];
     workbook.SheetNames = workbook.SheetNames.filter(
-      (name) => name !== sheetName
+      (name: string) => name !== sheetName
     );
   }
 
