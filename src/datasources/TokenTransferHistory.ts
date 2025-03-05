@@ -128,31 +128,36 @@ export class TokenTransferHistory extends BaseTokenTransferHistory {
           ? this.endBlock
           : currentStartBlockPlusChunk;
 
-      const logs = await this.client.getLogs({
-        address: this.token.address,
-        event: this._transferAbiItem,
-        fromBlock: currentStartBlock,
-        toBlock: currentEndBlock,
-      });
+      try {
+        const logs = await this.client.getLogs({
+          address: this.token.address,
+          event: this._transferAbiItem,
+          fromBlock: currentStartBlock,
+          toBlock: currentEndBlock,
+        });
 
-      const chunkTransfers = logs.map((log) => {
-        const from = log.args.from!;
-        const to = log.args.to!;
-        const amount = log.args.value!;
-        const txHash = log.transactionHash!;
-        const blockNumber = log.blockNumber!;
+        const chunkTransfers = logs.map((log) => {
+          const from = log.args.from!;
+          const to = log.args.to!;
+          const amount = log.args.value!;
+          const txHash = log.transactionHash!;
+          const blockNumber = log.blockNumber!;
 
-        return {
-          token: copyByJson(this.token) as Token,
-          from,
-          to,
-          amount,
-          txHash,
-          blockNumber,
-        };
-      });
+          return {
+            token: copyByJson(this.token) as Token,
+            from,
+            to,
+            amount,
+            txHash,
+            blockNumber,
+          };
+        });
 
-      transfers.push(...chunkTransfers);
+        transfers.push(...chunkTransfers);
+      } catch (err) {
+        console.error("Error fetching logs:", err);
+        process.exit(1);
+      }
 
       // move to next 2k block chunk which is 1 after the end block
       currentStartBlock = currentEndBlock + BigInt(1);
