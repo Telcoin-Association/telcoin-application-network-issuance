@@ -338,13 +338,13 @@ export async function writeIncentivesToFile(
   try {
     await writeFile(filePath, JSON.stringify(data, null, 2), "utf8");
     console.log(`Incentives written to ${filePath}`);
-    convertIncentivesFileToExcel(data);
+    writeIncentivesToExcel(data);
   } catch (err) {
     console.error(`Error writing to file: ${err}`);
   }
 }
 
-function convertIncentivesFileToExcel(data: any) {
+function writeIncentivesToExcel(data: any) {
   // Process data to include the new column with formatted values
   const stakerIncentives = data.stakerIncentives.map(
     (entry: { address: string; incentive: number }) => ({
