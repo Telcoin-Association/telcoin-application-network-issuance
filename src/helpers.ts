@@ -368,10 +368,30 @@ export async function writeIncentivesToFile(
 function writeIncentivesToExcel(data: any) {
   // Process data to include the new column with formatted values
   const stakerIncentives = data.stakerIncentives.map(
-    (entry: { address: string; incentive: number }) => ({
+    (entry: {
+      address: string;
+      incentive: { reward: string; uncappedAmount: string };
+    }) => ({
       address: entry.address,
-      "incentive - script output": Number(entry.incentive),
-      "incentive (TEL)": Number(entry.incentive) / 100,
+      "incentive - script output": Number(entry.incentive.reward),
+      "incentive (TEL)": (
+        Number(entry.incentive.reward) / 100
+      ).toLocaleString(),
+      "uncapped amount - script output": Number(entry.incentive.uncappedAmount),
+      "uncapped amount (TEL)": (
+        Number(entry.incentive.uncappedAmount) / 100
+      ).toLocaleString(),
+    })
+  );
+
+  const stakerIncentivesNumbers = data.stakerIncentives.map(
+    (entry: {
+      address: string;
+      incentive: { reward: string; uncappedAmount: string };
+    }) => ({
+      address: entry.address,
+      "incentive (TEL)": Number(entry.incentive.reward) / 100,
+      "uncapped amount (TEL)": Number(entry.incentive.uncappedAmount) / 100,
     })
   );
 
@@ -381,9 +401,19 @@ function writeIncentivesToExcel(data: any) {
       sum + entry["incentive - script output"],
     0
   );
-  const totalIncentiveTel = stakerIncentives.reduce(
+  const totalIncentiveTel = stakerIncentivesNumbers.reduce(
     (sum: number, entry: { [x: string]: number }) =>
       sum + entry["incentive (TEL)"],
+    0
+  );
+  const totalUncappedIncentive = stakerIncentives.reduce(
+    (sum: number, entry: { [x: string]: number }) =>
+      sum + entry["uncapped amount - script output"],
+    0
+  );
+  const totalUncappedIncentiveTel = stakerIncentivesNumbers.reduce(
+    (sum: number, entry: { [x: string]: number }) =>
+      sum + entry["uncapped amount (TEL)"],
     0
   );
 
@@ -392,6 +422,8 @@ function writeIncentivesToExcel(data: any) {
     address: "Total",
     "incentive - script output": totalIncentive,
     "incentive (TEL)": totalIncentiveTel.toLocaleString(),
+    "uncapped amount - script output": totalUncappedIncentive,
+    "uncapped amount (TEL)": totalUncappedIncentiveTel.toLocaleString(),
   });
 
   // Convert processed data to worksheet
