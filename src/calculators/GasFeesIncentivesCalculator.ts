@@ -22,7 +22,7 @@ import { calculateIncentivesFromVolumeOrSimilar } from "../helpers";
   const telcoinNetworkTransactionReceiptsDatabase = new TransactionReceiptsDatabase(ChainId.TelcoinNetwork);`
 */
 
-export class GasFeesIncentivesCalculator implements ICalculator {
+export class GasFeesIncentivesCalculator implements ICalculator<bigint> {
   /**
    * Constructor
    * @param _executorRegistry Executor registry

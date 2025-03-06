@@ -18,6 +18,7 @@ import { stakingModules } from "./data/stakingModules";
 import { tanIssuanceHistories } from "./data/tanIssuanceHistories";
 import { Address, createPublicClient, http } from "viem";
 import { polygon } from "viem/chains";
+import { UserRewardEntry } from "calculators/ICalculator";
 
 // Track active database connections
 let activeBlocksDatabases: BlocksDatabase[] = [];
@@ -103,6 +104,16 @@ async function main() {
   console.log("Calculating staker referrals incentives...");
   const polygonStakerIncentives =
     await polygonStakerIncentivesCalculator.calculate();
+
+  const totalIssuance = Array.from(polygonStakerIncentives.values()).reduce(
+    (accumulator: bigint, currentEntry: UserRewardEntry) => {
+      return accumulator + currentEntry.reward;
+    },
+    0n
+  );
+  console.log(
+    `Total issuance amount for this period after applying rewards caps: ${totalIssuance}`
+  );
 
   // log and store incentives in `./staker_incentives.json`
   await writeIncentivesToFile(

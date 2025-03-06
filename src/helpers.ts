@@ -12,6 +12,8 @@ import { Address, getContract, zeroAddress } from "viem";
 import { tanIssuanceHistories } from "./data/tanIssuanceHistories";
 import { randomInt } from "crypto";
 import * as xlsx from "xlsx";
+import { UserRewardEntry } from "calculators/ICalculator";
+import { addressResolverAbi } from "viem/_types/constants/abis";
 
 export interface Update<T> {
   progress: number;
@@ -223,14 +225,15 @@ export async function validateStartAndEndBlocks(
       const [lastSettlementBlock, latestBlock] =
         await getLastSettlementBlockAndLatestBlock(ChainId.Polygon);
 
-      // startBlock must match history contract's lastSettlementBlock or period 0/1 startBlock
+      // startBlock must match history contract's lastSettlementBlock or period 0 startBlock
       if (
         networkConfig.startBlock !== lastSettlementBlock &&
-        networkConfig.startBlock !== 68093124n && // period 0
-        networkConfig.startBlock !== 68374032n // period 1
+        networkConfig.startBlock !== 68093124n // period 0
       ) {
         console.log(networkConfig.startBlock);
-        console.error("Polygon startBlock doesn't match last settlement block");
+        console.error(
+          "Polygon startBlock doesn't match last settlement or period 0 block"
+        );
         process.exit(1);
       }
       // endBlock must be deeper than reorgSafeDepth
@@ -250,9 +253,11 @@ export async function validateStartAndEndBlocks(
       // startBlock must match history contract's lastSettlementBlock or period 0 startBlock
       if (
         networkConfig.startBlock !== lastSettlementBlock
-        /*&& networkConfig.startBlock !=== xxx*/
+        /* && networkConfig.startBlock !=== xxx //todo: mainnet period 0?*/
       ) {
-        console.error("Mainnet startBlock doesn't match last settlement block");
+        console.error(
+          "Mainnet startBlock doesn't match last settlement or period 0 block"
+        );
         process.exit(1);
       }
       // endBlock must be deeper than reorgSafeDepth
@@ -321,12 +326,19 @@ export async function getBlockByTimestamp(
 }
 
 export async function writeIncentivesToFile(
-  stakerIncentives: Map<Address, bigint>,
+  stakerIncentives: Map<Address, UserRewardEntry>,
   blockRanges: NetworkConfig[],
   filePath: string
 ) {
+  // serialize UserRewardEntrys
   const incentivesArray = Array.from(stakerIncentives.entries()).map(
-    ([address, incentive]) => ({ address, incentive: incentive.toString() })
+    ([address, incentive]) => ({
+      address,
+      incentive: {
+        reward: incentive.reward.toString(),
+        uncappedAmount: incentive.uncappedAmount.toString(),
+      },
+    })
   );
 
   // convert block numbers to string for JSON serialization
@@ -345,7 +357,7 @@ export async function writeIncentivesToFile(
   const json = JSON.stringify(data, null, 2);
 
   try {
-    await writeFile(filePath, JSON.stringify(data, null, 2), "utf8");
+    await writeFile(filePath, json, "utf8");
     console.log(`Incentives written to ${filePath}`);
     writeIncentivesToExcel(data);
   } catch (err) {

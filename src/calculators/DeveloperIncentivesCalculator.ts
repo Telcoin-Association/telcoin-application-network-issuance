@@ -22,7 +22,7 @@ import { ChainId, config } from "../config";
  *
  * This class works across multiple chains.
  */
-export class DeveloperIncentivesCalculator implements ICalculator {
+export class DeveloperIncentivesCalculator implements ICalculator<bigint> {
   /**
    * Constructor
    * @param _blocksDbs Blocks databases for each chain

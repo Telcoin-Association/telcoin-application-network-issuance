@@ -8,7 +8,7 @@ import {
   PublicClient,
   zeroAddress,
 } from "viem";
-import { ICalculator } from "./ICalculator";
+import { ICalculator, UserRewardEntry } from "./ICalculator";
 import { BaseBlocksDatabase } from "../datasources/persistent/BlocksDatabase";
 import { BaseExecutorRegistry } from "../datasources/ExecutorRegistry";
 import { ChainId, config, Token } from "../config";
@@ -50,7 +50,9 @@ type OnchainRewardData = {
   prevCumulativeRewards: bigint;
 };
 
-export class StakerIncentivesCalculator implements ICalculator {
+export class StakerIncentivesCalculator
+  implements ICalculator<UserRewardEntry>
+{
   constructor(
     private readonly _tokenTransferHistories: TokenTransferHistory[],
     private readonly _aggregators: Aggregator[],
@@ -150,7 +152,7 @@ export class StakerIncentivesCalculator implements ICalculator {
    * A user who is staked is *ALSO* eligible for rewards equal to the total sum of their referred users' fees (in addition to their own)
    * @returns A map of staker addresses eligible for issuance rewards to their issuance reward amount for the [startBlock:endBlock] period
    */
-  async calculateRewardsPerStaker(): Promise<Map<Address, bigint>> {
+  async calculateRewardsPerStaker(): Promise<Map<Address, UserRewardEntry>> {
     console.log("Fetching UserFeeTransfers...");
     const userFeeTransfers = await this.fetchUserFeeTransfers();
 
@@ -201,12 +203,9 @@ export class StakerIncentivesCalculator implements ICalculator {
       },
       0n
     );
-    console.log(
-      `Total issuance amount for this period after applying rewards caps: ${totalFees}`
-    );
 
     // perform calculation: the ratio of a user's total fees to the total of all fees for the period is equal to the ratio of a user's reward amount to the period's issuance amount
-    const stakerToReward = new Map<Address, bigint>();
+    const stakerToReward = new Map<Address, UserRewardEntry>();
     const decimalScale = 1_000_000_000_000_000n;
     console.log("Calculating rewards and applying caps if appropriate...");
     for (const [staker, stakerFeeTotal] of stakerToStakerFeeTotal) {
@@ -214,19 +213,24 @@ export class StakerIncentivesCalculator implements ICalculator {
       const scaledIncentive =
         (stakerFeeTotal * this._totalIncentiveAmount * decimalScale) /
         totalFees;
-      let stakerIncentive = scaledIncentive / decimalScale;
+      const uncappedAmount = scaledIncentive / decimalScale;
 
+      // addressToRewardCap will contain all relevant stakers since fetching is required for eligibility
+      const stakerRewardCap = addressToRewardCap.get(staker);
       // determine if reward cap is applicable; if so it results in a remainder for the period's issuance
-      if (addressToRewardCap.has(staker)) {
-        const stakerRewardCap = addressToRewardCap.get(staker);
-
-        // update reward cap if it is less than their derived pro-rata share of issuance
-        if (stakerRewardCap! < stakerIncentive) {
-          stakerIncentive = stakerRewardCap!;
-        }
+      let stakerReward = 0n;
+      if (uncappedAmount < stakerRewardCap!) {
+        stakerReward = uncappedAmount;
+      } else {
+        stakerReward = stakerRewardCap!;
       }
 
-      stakerToReward.set(staker, stakerIncentive);
+      const rewardEntry = {
+        userAddress: staker,
+        reward: stakerReward,
+        uncappedAmount: uncappedAmount,
+      };
+      stakerToReward.set(staker, rewardEntry);
     }
 
     return stakerToReward;
@@ -573,7 +577,7 @@ export class StakerIncentivesCalculator implements ICalculator {
   /**
    * @returns A map of developer addresses to the amount of incentives they should receive
    */
-  async calculate(): Promise<Map<Address, bigint>> {
+  async calculate(): Promise<Map<Address, UserRewardEntry>> {
     return await this.calculateRewardsPerStaker();
   }
 }
