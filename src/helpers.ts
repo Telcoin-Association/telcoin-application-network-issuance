@@ -11,6 +11,9 @@ import { ChainId, config } from "./config";
 import { Address, getContract, zeroAddress } from "viem";
 import { tanIssuanceHistories } from "./data/tanIssuanceHistories";
 import { randomInt } from "crypto";
+import * as xlsx from "xlsx";
+import { UserRewardEntry } from "calculators/ICalculator";
+import { addressResolverAbi } from "viem/_types/constants/abis";
 
 export interface Update<T> {
   progress: number;
@@ -151,8 +154,8 @@ export function observableToProgressBar<T>(
 
 export interface NetworkConfig {
   network: string;
-  startBlock?: bigint;
-  endBlock?: bigint;
+  startBlock: bigint;
+  endBlock: bigint;
 }
 
 export function parseAndSanitizeCLIArgs(
@@ -172,30 +175,32 @@ export function parseAndSanitizeCLIArgs(
       console.error(`Invalid network specified: ${network}`);
       process.exit(1);
     }
+    if (!blockRange) {
+      console.error(
+        `Invalid blockRange specified for ${network}: ${blockRange}`
+      );
+    }
 
     let startBlock: bigint | undefined;
     let endBlock: bigint | undefined;
+    const [startBlockStr, endBlockStr] = blockRange.split(":");
 
-    if (blockRange) {
-      const [startBlockStr, endBlockStr] = blockRange.split(":");
+    if (startBlockStr && !isNaN(Number(startBlockStr))) {
+      startBlock = BigInt(startBlockStr);
+    } else {
+      console.error(
+        `Invalid start block specified for ${network}: ${blockRange}`
+      );
+      process.exit(1);
+    }
 
-      if (startBlockStr && !isNaN(Number(startBlockStr))) {
-        startBlock = BigInt(startBlockStr);
-      } else if (startBlockStr) {
-        console.error(
-          `Invalid start block specified for ${network}: ${blockRange}`
-        );
-        process.exit(1);
-      }
-
-      if (endBlockStr && !isNaN(Number(endBlockStr))) {
-        endBlock = BigInt(endBlockStr);
-      } else if (endBlockStr) {
-        console.error(
-          `Invalid end block specified for ${network}: ${blockRange}`
-        );
-        process.exit(1);
-      }
+    if (endBlockStr && !isNaN(Number(endBlockStr))) {
+      endBlock = BigInt(endBlockStr);
+    } else {
+      console.error(
+        `Invalid end block specified for ${network}: ${blockRange}`
+      );
+      process.exit(1);
     }
 
     networkConfigs.push({ network: networkLowerCase, startBlock, endBlock });
@@ -203,7 +208,7 @@ export function parseAndSanitizeCLIArgs(
 
   if (networkConfigs.length === 0) {
     console.log(
-      "Enter network configurations in the format `network`, `network=startBlock`, or `network=startBlock:endBlock` and separate multiple networks by space. Eg usage: `yarn start polygon` or `yarn start polygon=666000:667000 mainnet=100000:110000`"
+      "Enter network configurations in the format `network=startBlock:endBlock` and separate multiple networks by space. Eg usage: `yarn start polygon=666000:667000` or `yarn start polygon=666000:667000 mainnet=100000:110000`"
     );
 
     process.exit(1);
@@ -212,49 +217,59 @@ export function parseAndSanitizeCLIArgs(
   return networkConfigs;
 }
 
-export async function getStartAndEndBlocks(
+export async function validateStartAndEndBlocks(
   networkConfigs: NetworkConfig[]
-): Promise<[bigint, bigint, bigint, bigint]> {
-  // initialize to ensure type safety
-  let polygonLatestBlock;
-  let polygonStartBlock = 0n;
-  let polygonEndBlock = 0n;
-  let mainnetLatestBlock;
-  let mainnetStartBlock = 0n;
-  let mainnetEndBlock = 0n;
-
-  for (const { network, startBlock } of networkConfigs) {
-    if (network === "polygon") {
-      [polygonStartBlock, polygonLatestBlock] =
+) {
+  for (const networkConfig of networkConfigs) {
+    if (networkConfig.network === "polygon") {
+      const [lastSettlementBlock, latestBlock] =
         await getLastSettlementBlockAndLatestBlock(ChainId.Polygon);
-      polygonEndBlock =
-        polygonLatestBlock - config.reorgSafeDepth[ChainId.Polygon];
-      // overwrite startBlock if specified to prevent starting at block 0 on first runs
-      if (startBlock !== undefined) {
-        polygonStartBlock = startBlock;
+
+      // startBlock must match history contract's lastSettlementBlock or period 0 startBlock
+      if (
+        networkConfig.startBlock !== lastSettlementBlock &&
+        networkConfig.startBlock !== 68093124n // period 0
+      ) {
+        console.log(networkConfig.startBlock);
+        console.error(
+          "Polygon startBlock doesn't match last settlement or period 0 block"
+        );
+        process.exit(1);
       }
-      console.log("Processed Polygon start and end blocks");
+      // endBlock must be deeper than reorgSafeDepth
+      if (
+        networkConfig.endBlock >
+        latestBlock - config.reorgSafeDepth[ChainId.Polygon]
+      ) {
+        console.error("Polygon endBlock must be reorg safe");
+        process.exit(1);
+      }
     }
 
-    if (network === "mainnet") {
-      [mainnetStartBlock, mainnetLatestBlock] =
+    if (networkConfig.network === "mainnet") {
+      const [lastSettlementBlock, latestBlock] =
         await getLastSettlementBlockAndLatestBlock(ChainId.Mainnet);
-      mainnetEndBlock =
-        mainnetLatestBlock - config.reorgSafeDepth[ChainId.Mainnet];
-      // overwrite startBlock if specified to prevent starting at block 0 on first runs
-      if (startBlock !== undefined) {
-        mainnetStartBlock = startBlock;
+
+      // startBlock must match history contract's lastSettlementBlock or period 0 startBlock
+      if (
+        networkConfig.startBlock !== lastSettlementBlock
+        /* && networkConfig.startBlock !=== xxx //todo: mainnet period 0?*/
+      ) {
+        console.error(
+          "Mainnet startBlock doesn't match last settlement or period 0 block"
+        );
+        process.exit(1);
       }
-      console.log("Processed Mainnet start and end blocks");
+      // endBlock must be deeper than reorgSafeDepth
+      if (
+        networkConfig.endBlock >
+        latestBlock - config.reorgSafeDepth[ChainId.Mainnet]
+      ) {
+        console.error("Mainnet endBlock must be reorg safe");
+        process.exit(1);
+      }
     }
   }
-
-  return [
-    polygonStartBlock,
-    polygonEndBlock,
-    mainnetStartBlock,
-    mainnetEndBlock,
-  ];
 }
 
 export async function getLastSettlementBlockAndLatestBlock(
@@ -311,12 +326,19 @@ export async function getBlockByTimestamp(
 }
 
 export async function writeIncentivesToFile(
-  stakerIncentives: Map<Address, bigint>,
+  stakerIncentives: Map<Address, UserRewardEntry>,
   blockRanges: NetworkConfig[],
   filePath: string
 ) {
+  // serialize UserRewardEntrys
   const incentivesArray = Array.from(stakerIncentives.entries()).map(
-    ([address, incentive]) => ({ address, incentive: incentive.toString() })
+    ([address, incentive]) => ({
+      address,
+      incentive: {
+        reward: incentive.reward.toString(),
+        uncappedAmount: incentive.uncappedAmount.toString(),
+      },
+    })
   );
 
   // convert block numbers to string for JSON serialization
@@ -337,9 +359,105 @@ export async function writeIncentivesToFile(
   try {
     await writeFile(filePath, json, "utf8");
     console.log(`Incentives written to ${filePath}`);
+    writeIncentivesToExcel(data);
   } catch (err) {
     console.error(`Error writing to file: ${err}`);
   }
+}
+
+function writeIncentivesToExcel(data: any) {
+  // Process data to include the new column with formatted values
+  const stakerIncentives = data.stakerIncentives.map(
+    (entry: {
+      address: string;
+      incentive: { reward: string; uncappedAmount: string };
+    }) => ({
+      address: entry.address,
+      "incentive - script output": Number(entry.incentive.reward),
+      "incentive (TEL)": (
+        Number(entry.incentive.reward) / 100
+      ).toLocaleString(),
+      "uncapped amount - script output": Number(entry.incentive.uncappedAmount),
+      "uncapped amount (TEL)": (
+        Number(entry.incentive.uncappedAmount) / 100
+      ).toLocaleString(),
+    })
+  );
+
+  const stakerIncentivesNumbers = data.stakerIncentives.map(
+    (entry: {
+      address: string;
+      incentive: { reward: string; uncappedAmount: string };
+    }) => ({
+      address: entry.address,
+      "incentive (TEL)": Number(entry.incentive.reward) / 100,
+      "uncapped amount (TEL)": Number(entry.incentive.uncappedAmount) / 100,
+    })
+  );
+
+  // Calculate totals
+  const totalIncentive = stakerIncentives.reduce(
+    (sum: number, entry: { [x: string]: number }) =>
+      sum + entry["incentive - script output"],
+    0
+  );
+  const totalIncentiveTel = stakerIncentivesNumbers.reduce(
+    (sum: number, entry: { [x: string]: number }) =>
+      sum + entry["incentive (TEL)"],
+    0
+  );
+  const totalUncappedIncentive = stakerIncentives.reduce(
+    (sum: number, entry: { [x: string]: number }) =>
+      sum + entry["uncapped amount - script output"],
+    0
+  );
+  const totalUncappedIncentiveTel = stakerIncentivesNumbers.reduce(
+    (sum: number, entry: { [x: string]: number }) =>
+      sum + entry["uncapped amount (TEL)"],
+    0
+  );
+
+  // Add total row
+  stakerIncentives.push({
+    address: "Total",
+    "incentive - script output": totalIncentive,
+    "incentive (TEL)": totalIncentiveTel.toLocaleString(),
+    "uncapped amount - script output": totalUncappedIncentive,
+    "uncapped amount (TEL)": totalUncappedIncentiveTel.toLocaleString(),
+  });
+
+  // Convert processed data to worksheet
+  const stakerIncentivesSheet = xlsx.utils.json_to_sheet(stakerIncentives);
+
+  // Define output file
+  const outputFile = "staker_incentives.xlsx";
+  let workbook;
+
+  // Check if file exists and load it, otherwise create a new workbook
+  if (fs.existsSync(outputFile)) {
+    workbook = xlsx.readFile(outputFile);
+  } else {
+    workbook = xlsx.utils.book_new();
+  }
+
+  // Generate sheet name based on block range
+  const sheetName = `Blocks ${data.blockRanges[0].startBlock} - ${data.blockRanges[0].endBlock}`;
+
+  // Remove existing sheet if it exists
+  if (workbook.Sheets[sheetName]) {
+    delete workbook.Sheets[sheetName];
+    workbook.SheetNames = workbook.SheetNames.filter(
+      (name: string) => name !== sheetName
+    );
+  }
+
+  // Append new sheet
+  xlsx.utils.book_append_sheet(workbook, stakerIncentivesSheet, sheetName);
+
+  // Save workbook
+  xlsx.writeFile(workbook, outputFile);
+
+  console.log(`Excel file updated/saved as ${outputFile}`);
 }
 
 export function calculateIncentivesFromVolumeOrSimilar(

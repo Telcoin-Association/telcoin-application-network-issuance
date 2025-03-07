@@ -5,10 +5,8 @@ import { LocalFileExecutorRegistry } from "./datasources/ExecutorRegistry";
 import { BlocksDatabase } from "./datasources/persistent/BlocksDatabase";
 import { ChainId, config } from "./config";
 import {
-  getLastSettlementBlockAndLatestBlock,
-  getStartAndEndBlocks,
-  NetworkConfig,
   parseAndSanitizeCLIArgs,
+  validateStartAndEndBlocks,
   writeIncentivesToFile,
 } from "./helpers";
 import { SimplePlugin } from "./datasources/SimplePlugin";
@@ -20,6 +18,7 @@ import { stakingModules } from "./data/stakingModules";
 import { tanIssuanceHistories } from "./data/tanIssuanceHistories";
 import { Address, createPublicClient, http } from "viem";
 import { polygon } from "viem/chains";
+import { UserRewardEntry } from "calculators/ICalculator";
 
 // Track active database connections
 let activeBlocksDatabases: BlocksDatabase[] = [];
@@ -32,13 +31,10 @@ let activeBlocksDatabases: BlocksDatabase[] = [];
 async function main() {
   const networkArgs = process.argv.slice(2);
   const networks = parseAndSanitizeCLIArgs(networkArgs);
-
-  const [
-    polygonStartBlock,
-    polygonEndBlock,
-    mainnetStartBlock,
-    mainnetEndBlock,
-  ] = await getStartAndEndBlocks(networks);
+  await validateStartAndEndBlocks(networks);
+  const polygonConfig = networks.find(
+    (networkConfig) => networkConfig.network === "polygon"
+  );
 
   /**
    * @dev Initialize Datasources
@@ -57,8 +53,8 @@ async function main() {
   });
   const polygonTokenTransferHistory = new TokenTransferHistory(
     config.telToken[ChainId.Polygon],
-    polygonStartBlock,
-    polygonEndBlock,
+    polygonConfig!.startBlock,
+    polygonConfig!.endBlock,
     optimizededPublicClient
   );
 
@@ -72,8 +68,8 @@ async function main() {
       new SimplePlugin(
         ChainId.Polygon,
         address,
-        polygonStartBlock,
-        polygonEndBlock
+        polygonConfig!.startBlock,
+        polygonConfig!.endBlock
       )
   );
   await Promise.all(polygonSimplePlugins.map((plugin) => plugin.init()));
@@ -94,10 +90,10 @@ async function main() {
     executorRegistry,
     config.incentivesAmounts.stakerIncentivesAmount,
     {
-      [ChainId.Polygon]: polygonStartBlock,
+      [ChainId.Polygon]: polygonConfig!.startBlock,
     },
     {
-      [ChainId.Polygon]: polygonEndBlock,
+      [ChainId.Polygon]: polygonConfig!.endBlock,
     }
   );
 
@@ -108,6 +104,16 @@ async function main() {
   console.log("Calculating staker referrals incentives...");
   const polygonStakerIncentives =
     await polygonStakerIncentivesCalculator.calculate();
+
+  const totalIssuance = Array.from(polygonStakerIncentives.values()).reduce(
+    (accumulator: bigint, currentEntry: UserRewardEntry) => {
+      return accumulator + currentEntry.reward;
+    },
+    0n
+  );
+  console.log(
+    `Total issuance amount for this period after applying rewards caps: ${totalIssuance}`
+  );
 
   // log and store incentives in `./staker_incentives.json`
   await writeIncentivesToFile(

@@ -1,5 +1,10 @@
 import { Address } from "viem";
 
-export interface ICalculator {
-  calculate(): Promise<Map<Address, bigint>>;
+export type UserRewardEntry = {
+  reward: bigint;
+  uncappedAmount: bigint;
+};
+
+export interface ICalculator<T = UserRewardEntry> {
+  calculate(): Promise<Map<Address, T>>;
 }
