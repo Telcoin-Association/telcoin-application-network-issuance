@@ -12,7 +12,7 @@ export type TanIssuanceHistory = {
 export const tanIssuanceHistories = [
   {
     chain: ChainId.Polygon,
-    address: "0xfAf4E75BF9CD392e56Bffb574820126ce4212744",
+    address: "0xE533911F00f1C3B58BB8D821131C9B6E2452Fc27",
     abi: TanIssuanceHistoryAbi,
   },
 ].map((tanIssuanceHistory) => {

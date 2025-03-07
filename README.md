@@ -35,9 +35,9 @@ While multiple incentive programs are planned for the future, the Staker Incenti
 
 ## Viewing the official rewards
 
-For community members wishing to view the official published rewards for each TANIP-1 period (weeks starting Feb 19 at 00:00 UTC), refer to the `rewards` directory and consult the file for the period, for example `rewards/staker_rewards_period_0.json`. These rewards files list the supported networks, start and end blocks, and a map of each address to its rewards for the period.
+For community members wishing to view the official published rewards for each TANIP-1 period (weeks starting Feb 19 at 00:00 UTC), refer to the `rewards` directory and consult the file for the period, for example `rewards/staker_rewards_period_0.xlsx` or `rewards/staker_rewards_period_0.json`. These rewards files list the supported networks, start and end blocks, and a map of each address to its rewards for the period.
 
-### Note that the rewards amounts are denominated in EVM-recognizable numbers so the TEL decimals transformation must be applied. This means all listed amounts must be divided by 100 to get the reward amount in TEL which has a decimal precision of 2.
+### Note that the rewards amounts are denominated using human-readable format in the Excel file but using EVM-recognizable numbers in the JSON file so the TEL decimals transformation must be applied to the JSON. This means all listed amounts in the JSON must be divided by 100 to get the reward amount in TEL which has a decimal precision of 2.
 
 ## Running the Tests
 
@@ -116,6 +116,18 @@ yarn start polygon mainnet
 # calculate based on Polygon and Mainnet with specified start blocks for each.
 yarn start polygon=67070000:67078000 mainnet=21740000:21739790
 ```
+
+### Onchain Deployments used by the StakerIncentivesCalculator
+
+The full list of contracts used by the calculator can be found in `staker-incentives-calculator.md`, though the main two relied on are as follows:
+
+#### **Staking Plugins**
+
+- `0xCAa823Fd48bec0134c8285Fd3C34F9D95CF3280f`
+
+#### **TANIssuanceHistory**
+
+- `0xE533911F00f1C3B58BB8D821131C9B6E2452Fc27`
 
 ### Note on Performance
 

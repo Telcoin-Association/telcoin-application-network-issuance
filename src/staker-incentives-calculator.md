@@ -122,8 +122,8 @@ For each validated user fee transfer, the `fetchUserFeeTransfers()` function als
 
 #### **Staking Plugins**
 
-- `0xd8e7a80570d37D3fBe6eD5228c75475c81cEd094`
+- `0xCAa823Fd48bec0134c8285Fd3C34F9D95CF3280f`
 
 #### **TANIssuanceHistory**
 
-- `0xfAf4E75BF9CD392e56Bffb574820126ce4212744`
+- `0xE533911F00f1C3B58BB8D821131C9B6E2452Fc27`
