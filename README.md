@@ -41,21 +41,39 @@ For community members wishing to view the official published rewards for each TA
 
 ## Running the Tests
 
-This codebase uses the Jest framework for TypeScript testing. Tests exist for each of the calculators; however, as mentioned, the StakerIncentivesCalculator is currently the only calculator in production, pending the approval of more TANIPs.
-
 To run the tests, first ensure you are using the correct node version:
 
 ```bash
 nvm use 18
 ```
 
-Install dependencies:
+Then install dependencies:
 
 ```bash
 yarn install
 ```
 
-Make sure to edit `src/config.ts` to fit your requirements, such as the staker incentives amounts, and set the `.env` with RPC endpoints.
+### Contract tests
+
+This codebase uses the Foundry framework for smart contract testing.
+
+Running the contract tests requires a `.env` file with a node provider API endpoint entry for `POLYGON_RPC_URL`. Once the `.env` is set, run the tests using:
+
+```bash
+forge test
+```
+
+### Backend tests
+
+This codebase uses the Jest framework for TypeScript backend testing. Tests exist for each of the calculators; however, as mentioned, the StakerIncentivesCalculator is currently the only calculator in production, pending the approval of more TANIPs.
+
+Running the backend tests require a `.env` file with a node provider API endpoint entry for `POLYGON_RPC_URL`. Once the `.env` is set, run the tests using:
+
+```bash
+yarn jest
+```
+
+#### Backend fork test
 
 The `src/test/StakerIncentivesCalculatorFork.test.ts` features an extensive end-to-end fork simulation test of an entire period's worth of staking, TAN trading, and user fees; these actions are fuzzed using randomly generated users, stakes, fees, and referral relationships. Because this test executes on-chain actions on a local fork, it requires running a local anvil fork of the Polygon mainnet alongside the test.
 
@@ -71,7 +89,7 @@ If Foundry is not installed or the fork test is not desired (~20s), disable it b
 it.skip("should return the correct reward amounts per staker and referrer", async () => {
 ```
 
-Then run all the tests:
+Then run the tests with the Anvil fork of Polygon running on port 8545:
 
 ```bash
 yarn jest
@@ -95,6 +113,8 @@ Install dependencies:
 yarn install
 ```
 
+Make sure to edit `src/config.ts` to fit your requirements, such as the staker incentives amounts, and set the `.env` with RPC endpoints.
+
 Then build the project:
 
 ```bash
@@ -115,16 +135,6 @@ yarn start polygon mainnet
 
 # calculate based on Polygon and Mainnet with specified start blocks for each.
 yarn start polygon=67070000:67078000 mainnet=21740000:21739790
-```
-
-### Note on Performance
-
-Since the script has to fetch _every single block in range_ to scan for transactions initiated by a certain set of EOAs, the application typically runs slowly. To remedy this, there is an auxiliary script called `sync` (`src/sync.ts`) which takes a chain ID and start block number. The sync script will run continuously to ensure that the local blocks and transaction receipts databases are up to date, starting at the specified start block. It is recommended to keep this script running on whatever machine will be calculating the incentives every week.
-
-The sync script may need to be terminated before running the main application. Afterward, the sync script can be restarted from the same start block, or the `db` directory can be deleted and the sync can be restarted from a new starting point. The latter strategy is useful when the `db` directory gets very large.
-
-```bash
-yarn sync <chainId> <startBlock>
 ```
 
 ## Running with Docker and Makefile
