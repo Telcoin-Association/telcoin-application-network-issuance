@@ -36,15 +36,11 @@ Current user activity can currently be easily encompassed by the EVM gas limit, 
 
 The `TANIssuanceHistory` contract is designed to serve the role of an `Increaser` for a pre-existing Telcoin staking contract implementation called the `SimplePlugin`. This is a modular contract designed to modularize TEL staking and rewards programs which attaches to the TEL staking hub contract called the `StakingModule`.
 
-Both are already audited so the relationship between the `SimplePlugin` and `StakingModule` are not within scope for this audit however the relationship between the `TANIssuanceHistory` and the `SimplePlugin` are.
-
-Auditors should thus focus on `SimplePlugin::increaseClaimableBy()` and how it is invoked by `TANIssuanceHistory::increaseClaimableByBatched()` during their security review. Other functionality within the `SimplePlugin` is less relevant though still within scope and any issues found there are valid.
-
-[The previous audit report for the `SimplePlugin` can be found here](https://github.com/Telcoin-Association/telcoin-laboratories-contracts/blob/main/docs/v1_Sherlock_Staking.pdf)
-
 ## Audit
 
 A completed audit report of the `TANIssuanceHistory` contract and its paired `SimplePlugin` for which it serves the "Increaser" role can be found in the `../audit` directory.
+
+[The `SimplePlugin` contract has been audited twice and its previous audit report can be found here](https://github.com/Telcoin-Association/telcoin-laboratories-contracts/blob/main/docs/v1_Sherlock_Staking.pdf)
 
 ## TANIP-1 Spec and Implementation
 
