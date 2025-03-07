@@ -562,6 +562,11 @@
   resolved "https://registry.yarnpkg.com/@noble/hashes/-/hashes-1.7.0.tgz#5d9e33af2c7d04fee35de1519b80c958b2e35e39"
   integrity sha512-HXydb0DgzTpDPwbVeDGCG1gIu7X6+AuU6Zl6av/E/KG8LMsvPntvq+w17CHRpKBmN6Ybdrt1eP3k4cj8DJa78w==
 
+"@openzeppelin/contracts@^5.2.0":
+  version "5.2.0"
+  resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-5.2.0.tgz#bd020694218202b811b0ea3eec07277814c658da"
+  integrity sha512-bxjNie5z89W1Ea0NZLZluFh8PrFNn9DH8DQlujEok2yjsOlraUPKID5p1Wk3qdNbf6XkQ1Os2RvfiHrrXLHWKA==
+
 "@scure/base@~1.2.1":
   version "1.2.1"
   resolved "https://registry.yarnpkg.com/@scure/base/-/base-1.2.1.tgz#dd0b2a533063ca612c17aa9ad26424a2ff5aa865"
@@ -1389,6 +1394,10 @@ flat@^5.0.2:
   version "5.0.2"
   resolved "https://registry.npmjs.org/flat/-/flat-5.0.2.tgz"
   integrity sha512-b6suED+5/3rTpUBdG1gupIl8MPFCAMA0QXwmljLhvCUKcUvdE4gWky9zpuGCcXHOsz4J9wPGNWq6OKpmIzz3hQ==
+
+"forge-std@https://github.com/foundry-rs/forge-std.git":
+  version "1.9.6"
+  resolved "https://github.com/foundry-rs/forge-std.git#8ba9031ffcbe25aa0d1224d3ca263a995026e477"
 
 frac@~1.1.2:
   version "1.1.2"
@@ -2522,6 +2531,11 @@ slash@^3.0.0:
   version "3.0.0"
   resolved "https://registry.npmjs.org/slash/-/slash-3.0.0.tgz"
   integrity sha512-g9Q1haeby36OSStwb4ntCGGGaKsaVSjQ68fBxoQcutl5fS1vuY18H3wSt3jFyFtrkx+Kz0V1G85A4MyAdDMi2Q==
+
+solady@^0.1.11:
+  version "0.1.11"
+  resolved "https://registry.yarnpkg.com/solady/-/solady-0.1.11.tgz#50241a84d5cf3d5ab03630a45ff29d68ad520fc5"
+  integrity sha512-LsvFPqmkWBmt+dncp7GfoDV3cUhVa/L/atXfr1HdYmQ+HvyOLHIv30xbjYTV2O1a16W+HMgzuNj/hD9Vb1s8YA==
 
 source-map-support@0.5.13:
   version "0.5.13"
