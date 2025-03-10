@@ -14,7 +14,7 @@ contract TANIssuanceHistoryForkTest is Test {
     uint256 polygonFork;
 
     Deployments deployments;
-    
+
     // read from deployments.json
     ISimplePlugin public plugin;
     TANIssuanceHistory public tanIssuanceHistory;
@@ -24,7 +24,7 @@ contract TANIssuanceHistoryForkTest is Test {
     address public stakingModule;
     address public tanSafe;
     address public executor;
-    
+
     // testing addresses
     address public defiAgg;
     address public user;
