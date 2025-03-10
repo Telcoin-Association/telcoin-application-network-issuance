@@ -159,3 +159,20 @@ make up
 ```
 
 Once inside the container, you need to run `yarn` once to install dependencies.
+
+## Running the SafeTxArrayBuilder script
+
+Because the TANIssuanceHistory contract is owned by the Telcoin Application Network Council governance safe, distributions should be performed via the Safe UI for secure multisig operation. This way transaction checks and simulation can be validated across councilmembers ahead of signing.
+
+#### The TAN Safe to use is deployed to `0x8Dcf8d134F22aC625A7aFb39514695801CD705b5` on Polygon and the transaction should target the `TANIssuanceHistory` contract's `increaseClaimableByBatch()` function, which is also deployed on Polygon at `0xe533911f00f1c3b58bb8d821131c9b6e2452fc27`.
+
+#### The TANIssuanceHistory ABI can be found in `backend/abi/TanIssuanceHistoryAbi.ts` or fetched from PolygonScan
+
+The `backend/safeTxArrayBuilder.ts` script builds the function parameters which must be supplied to the Safe UI for `TANIssuanceHistory::increaseClaimableByBatch()`. These are:
+
+- an array of Solidity `IssuanceReward` structs defined within `TANIssuanceHistory.sol`, called `rewards`
+- the settlement chain's end block used for the period's calculation run, aptly called `endBlock`
+
+To run the calculator, use:
+
+`yarn ts-node backend/safeTxArrayBuilder.ts`
