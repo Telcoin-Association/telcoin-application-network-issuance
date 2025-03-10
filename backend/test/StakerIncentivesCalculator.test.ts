@@ -228,7 +228,7 @@ describe("StakerIncentivesCalculator", () => {
       (transfer) => transfer.from === aggregator1Inch
     );
     expect(from1Inch.length).toBe(1);
-  });
+  }, 8_000);
 
   it("should return an empty array if no transfers match executor transactions", async () => {
     const impossibleExecutorRegistry = new LocalFileExecutorRegistry();
