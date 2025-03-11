@@ -221,53 +221,42 @@ export async function validateStartAndEndBlocks(
   networkConfigs: NetworkConfig[]
 ) {
   for (const networkConfig of networkConfigs) {
-    if (networkConfig.network === "polygon") {
-      const [lastSettlementBlock, latestBlock] =
-        await getLastSettlementBlockAndLatestBlock(ChainId.Polygon);
+    let chainId;
+    let period0StartBlock;
+    let period1StartBlock;
 
-      // startBlock must match history contract's lastSettlementBlock or period 0 startBlock
-      if (
-        networkConfig.startBlock !== lastSettlementBlock &&
-        networkConfig.startBlock !== 68093124n // period 0
-      ) {
-        console.log(networkConfig.startBlock);
-        console.error(
-          "Polygon startBlock doesn't match last settlement or period 0 block"
-        );
-        process.exit(1);
-      }
-      // endBlock must be deeper than reorgSafeDepth
-      if (
-        networkConfig.endBlock >
-        latestBlock - config.reorgSafeDepth[ChainId.Polygon]
-      ) {
-        console.error("Polygon endBlock must be reorg safe");
-        process.exit(1);
-      }
+    if (networkConfig.network === "polygon") {
+      chainId = ChainId.Polygon;
+      period0StartBlock = 68093124n;
+      period1StartBlock = 68374032n; // same as period0EndBlock
+    } else if (networkConfig.network === "mainnet") {
+      chainId = ChainId.Mainnet;
+      // TANIP-1 is not currently live on mainnet
+      period0StartBlock = 0n;
+      period1StartBlock = 0n;
+    } else {
+      console.error(`Unsupported network: ${networkConfig.network}`);
+      process.exit(1);
     }
 
-    if (networkConfig.network === "mainnet") {
-      const [lastSettlementBlock, latestBlock] =
-        await getLastSettlementBlockAndLatestBlock(ChainId.Mainnet);
+    const [lastSettlementBlock, latestBlock] =
+      await getLastSettlementBlockAndLatestBlock(chainId);
 
-      // startBlock must match history contract's lastSettlementBlock or period 0 startBlock
-      if (
-        networkConfig.startBlock !== lastSettlementBlock
-        /* && networkConfig.startBlock !=== xxx //todo: mainnet period 0?*/
-      ) {
-        console.error(
-          "Mainnet startBlock doesn't match last settlement or period 0 block"
-        );
-        process.exit(1);
-      }
-      // endBlock must be deeper than reorgSafeDepth
-      if (
-        networkConfig.endBlock >
-        latestBlock - config.reorgSafeDepth[ChainId.Mainnet]
-      ) {
-        console.error("Mainnet endBlock must be reorg safe");
-        process.exit(1);
-      }
+    // startBlock must match history contract's lastSettlementBlock period 0, or period 1 startBlock
+    if (
+      networkConfig.startBlock !== lastSettlementBlock &&
+      networkConfig.startBlock !== period0StartBlock &&
+      networkConfig.startBlock !== period1StartBlock
+    ) {
+      console.error(
+        `${networkConfig.network} startBlock ${networkConfig.network} doesn't match last settlement or period 0 block`
+      );
+      process.exit(1);
+    }
+    // endBlock must be deeper than reorgSafeDepth
+    if (networkConfig.endBlock > latestBlock - config.reorgSafeDepth[chainId]) {
+      console.error("Polygon endBlock must be reorg safe");
+      process.exit(1);
     }
   }
 }
