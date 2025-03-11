@@ -228,7 +228,7 @@ export async function validateStartAndEndBlocks(
     if (networkConfig.network === "polygon") {
       chainId = ChainId.Polygon;
       period0StartBlock = 68093124n;
-      period1StartBlock = 68374032n; // same as period0EndBlock
+      period1StartBlock = 68374033n;
     } else if (networkConfig.network === "mainnet") {
       chainId = ChainId.Mainnet;
       // TANIP-1 is not currently live on mainnet
@@ -343,7 +343,7 @@ export async function writeIncentivesToFile(
     blockRanges: blockRangesForJson,
     stakerIncentives: incentivesArray,
   };
-  const json = JSON.stringify(data, null, 2);
+  const json = JSON.stringify(data, null, 2) + "\n";
 
   try {
     await writeFile(filePath, json, "utf8");
