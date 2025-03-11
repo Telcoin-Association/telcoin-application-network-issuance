@@ -25,7 +25,7 @@ export const transactionTemplate: Transaction = {
 /**
  * @dev All transactions which emitted Telcoin::Transfer events between block 66660433 and 66660821
  * Used as dummy data in the BlocksDB for testing filtration of user fees & executor tx hashes
- * where `from === 0xAggregatorIntermediary` && `to === AmirX` on Polygon
+ * where `from === aggregator` && `to === AmirX` on Polygon
  * @notice See `mockTransfers.ts::` for the matching user fee Transfer events
  */
 export const mockTransferTransactions: Transaction[] = [

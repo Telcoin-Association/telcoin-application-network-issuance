@@ -17,7 +17,6 @@ import {
   TokenTransferWithCalldata,
   TokenTransferHistory,
 } from "../datasources/TokenTransferHistory";
-import { Aggregator } from "../data/aggregators";
 import { AmirX } from "../data/amirXs";
 import { StakingModule } from "../data/stakingModules";
 import { AmirXAbi, StakingModuleAbi, TanIssuanceHistoryAbi } from "../abi/abi";
@@ -55,7 +54,6 @@ export class StakerIncentivesCalculator
 {
   constructor(
     private readonly _tokenTransferHistories: TokenTransferHistory[],
-    private readonly _aggregators: Aggregator[],
     private readonly _stakingModules: StakingModule[],
     private readonly _tanIssuanceHistories: TanIssuanceHistory[],
     private readonly _amirXs: AmirX[],
@@ -66,19 +64,11 @@ export class StakerIncentivesCalculator
   ) {
     // arity checks for initialization in multichain context
     const transfersChains = _tokenTransferHistories.map((db) => db.token.chain);
-    const aggregatorsChains = _aggregators.map(
-      (aggregator) => aggregator.chain
-    );
     const stakingModulesChains = _stakingModules.map(
       (stakingModule) => stakingModule.chain
     );
     const amirXsChains = _amirXs.map((amirX) => amirX.chain);
-    const arrays = [
-      transfersChains,
-      aggregatorsChains,
-      stakingModulesChains,
-      amirXsChains,
-    ];
+    const arrays = [transfersChains, stakingModulesChains, amirXsChains];
     if (
       !arrays.every((chains) =>
         chains.every((chain) => transfersChains.includes(chain))
@@ -102,15 +92,11 @@ export class StakerIncentivesCalculator
   }
 
   /**
-   * @dev First identifies multichain user fees over the period, ie transfer events from agg to AmirX
+   * @dev First identifies multichain user fees over the period, ie transfer events to AmirX
    * @dev Then ensures all txs were initiated by executors so nobody can falsify user fees
    * @returns An array of user fee payments, represented as `TokenTransfer`s
    */
   async fetchUserFeeTransfers(): Promise<TokenTransferWithCalldata[]> {
-    // fetch aggregator, amirX, executor addresses as Set
-    const aggregators = new Set(
-      this._aggregators.map((aggregator) => aggregator.address)
-    );
     const amirXs = new Set(this._amirXs.map((amirX) => amirX.address));
     const executors = new Set<Address>(
       this._executorRegistry.executors.map((executor) => executor.address)
@@ -120,9 +106,9 @@ export class StakerIncentivesCalculator
     let executorTxHashToCalldata = new Map<`0x${string}`, `0x${string}`>();
     for (const history of this._tokenTransferHistories) {
       const client = history.client;
-      // search all transfers in TokenTransferHistorys for transfers from aggregators to AmirX
+      // search all transfers in TokenTransferHistorys for transfers to AmirX
       for (const transfer of history.transfers) {
-        if (aggregators.has(transfer.from) && amirXs.has(transfer.to)) {
+        if (amirXs.has(transfer.to)) {
           const tx = await client.getTransaction({ hash: transfer.txHash });
 
           // select txs originating from executors and extract tx hash => calldata into map

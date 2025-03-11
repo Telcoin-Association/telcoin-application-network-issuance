@@ -8,7 +8,6 @@ import {
 } from "../datasources/ExecutorRegistry";
 import { ChainId, config } from "../config";
 import { executors } from "../data/executors";
-import { aggregators } from "../data/aggregators";
 import { amirXs } from "../data/amirXs";
 import { stakingModules } from "../data/stakingModules";
 import { StakerIncentivesCalculator } from "../calculators/StakerIncentivesCalculator";
@@ -40,6 +39,7 @@ import {
   generateRandomReferralRelationships,
 } from "../helpers";
 import { polygon } from "viem/chains";
+import { TransformStreamDefaultController } from "stream/web";
 
 /**
  * Config
@@ -152,7 +152,6 @@ describe("StakerIncentivesCalculator", () => {
     // instantiate calculator
     calculator = new StakerIncentivesCalculator(
       mockTokenTransferHistorys,
-      aggregators,
       stakingModules,
       tanIssuanceHistories,
       amirXs,
@@ -208,26 +207,19 @@ describe("StakerIncentivesCalculator", () => {
    */
 
   it("should return transfers initiated by executor EOAs", async () => {
-    const result = await calculator.fetchUserFeeTransfers();
-    expect(result).toEqual(expectedUserFeeTransfers);
-    expect(result.length).toBe(15);
+    const transfers = await calculator.fetchUserFeeTransfers();
+    expect(transfers).toEqual(expectedUserFeeTransfers);
+    expect(transfers.length).toBe(15);
 
-    // pull expected aggregator addresses
-    const aggregator0xSettler = aggregators.find(
-      (aggregator) => aggregator.aggregatorName === "0x"
-    )?.address;
-    const aggregator1Inch = aggregators.find(
-      (aggregator) => aggregator.aggregatorName === "1Inch"
-    )?.address;
-    // ensure transfer `from` attribute matches expected aggregators
-    const from0x = result.filter(
-      (transfer) => transfer.from === aggregator0xSettler
+    const executorAddrs = executorRegistry.executors.map(
+      (executor) => executor.address
     );
-    expect(from0x.length).toBe(14);
-    const from1Inch = result.filter(
-      (transfer) => transfer.from === aggregator1Inch
-    );
-    expect(from1Inch.length).toBe(1);
+
+    expect(
+      transfers.every((transfer) => {
+        return executorAddrs.includes(transfer.from);
+      })
+    ).toBe(true);
   }, 8_000);
 
   it("should return an empty array if no transfers match executor transactions", async () => {
@@ -244,7 +236,6 @@ describe("StakerIncentivesCalculator", () => {
     // instantiate new calculator with impossible executor
     const impossibleCalculator = new StakerIncentivesCalculator(
       mockTokenTransferHistorys,
-      aggregators,
       stakingModules,
       tanIssuanceHistories,
       amirXs,

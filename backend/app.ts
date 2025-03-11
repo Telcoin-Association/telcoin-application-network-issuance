@@ -12,7 +12,6 @@ import {
 import { SimplePlugin } from "./datasources/SimplePlugin";
 import { TokenTransferHistory } from "./datasources/TokenTransferHistory";
 import { StakerIncentivesCalculator } from "./calculators/StakerIncentivesCalculator";
-import { aggregators } from "./data/aggregators";
 import { amirXs } from "./data/amirXs";
 import { stakingModules } from "./data/stakingModules";
 import { tanIssuanceHistories } from "./data/tanIssuanceHistories";
@@ -83,7 +82,6 @@ async function main() {
   console.log("Initializing stakers incentives calculator...");
   const polygonStakerIncentivesCalculator = new StakerIncentivesCalculator(
     [polygonTokenTransferHistory],
-    aggregators,
     stakingModules,
     tanIssuanceHistories,
     amirXs,
