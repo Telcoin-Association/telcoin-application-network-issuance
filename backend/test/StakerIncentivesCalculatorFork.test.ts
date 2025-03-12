@@ -356,7 +356,6 @@ describe("StakerIncentivesCalculatorForkTest", () => {
     // instantiate new calculator with localhost rpc and mock constructor args
     const forkedCalculator = new StakerIncentivesCalculator(
       [tokenTransferHistory],
-      [aggregator],
       [stakingModule],
       [tanIssuanceHistory],
       [amirX],

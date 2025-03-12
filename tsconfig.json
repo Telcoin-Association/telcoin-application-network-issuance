@@ -5,11 +5,11 @@
     "strict": true,
     "resolveJsonModule": true,
     "esModuleInterop": true,
-    "baseUrl": "./src",
+    "baseUrl": "./backend",
     "allowJs": true,
     "paths": { "*": ["./*"] }
   },
-  "include": ["src/**/*.ts"],
+  "include": ["backend/**/*.ts"],
   "exclude": ["node_modules", "dist"],
   "strict": true
 }

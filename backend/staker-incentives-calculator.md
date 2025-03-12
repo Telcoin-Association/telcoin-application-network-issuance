@@ -24,7 +24,7 @@ Historical rewards checkpoints are persisted by the `TANIssuanceHistory` contrac
 
 ### **Multichain Support:** The `StakerIncentivesCalculator` class works across multiple chains.
 
-This is achieved by instantiating and providing each chain's `BaseBlocksDatabase`, `TokenTransferHistory`, `Aggregator` set, `StakingModule`, `TanIssuanceHistory`, and `AmirX` contract. Data from each chain is abstracted by one degree by summing amounts to a multichain aggregate. For example, users' total fees, stake and cumulative rewards are fetched from all chains and summed together before performing calculations.
+This is achieved by instantiating and providing each chain's `BaseBlocksDatabase`, `TokenTransferHistory`, `StakingModule`, `TanIssuanceHistory`, and `AmirX` contract. Data from each chain is abstracted by one degree by summing amounts to a multichain aggregate. For example, users' total fees, stake and cumulative rewards are fetched from all chains and summed together before performing calculations.
 
 ### **Automatic and Manual Time Periods:** The `StakerIncentivesCalculator` supports both automatic time period fetching from each chain as well as any custom time period accepted via CLI input.
 
@@ -40,11 +40,11 @@ Likewise it will automatically determine the period's `endBlock` if run without 
 
 The calculator examines all calls to `AmirX::defiSwap()` from `Executor` addresses to ensure they originated from the TAN backend and extracts the user wallet and referrer address from the transaction's calldata. This improves performance as the calculator need only care about the referral relationships relevant for the time period.
 
-### **Onchain User Fees:** User fees are identified as TEL sent to AmirX from aggregators and filtered within `fetchUserFeeTransfers()`
+### **Onchain User Fees:** User fees are identified as TEL sent to AmirX as a part of txs initiated by `Executors`, and filtered within `fetchUserFeeTransfers()`
 
 To determine user fee eligibility, the calculator uses populates and iterates over a `TokenTransferHistory` for each chain, which contains `ERC20::Transfer` events for the TEL token.
 
-Using `fetchUserFeeTransfers()`, it filters these down to identify transfers from the configured `Aggregator` addresses to the configured `AmirX` contracts. If these transfers were emitted as a part of an `Executor` transaction, these represent the user fee which may be eligible for issuance rewards if associated with a `Staker` or `Referrer`.
+Using `fetchUserFeeTransfers()`, it filters these down to identify TEL transfers to the configured `AmirX` contracts. If these transfer events were emitted as a part of an `Executor` transaction, these represent the user fee which may be eligible for issuance rewards if associated with a `Staker` or `Referrer`.
 
 ### **Executor Transactions:** All legitimate user fee payments must be part of transactions initiated by the TAN backend, represented as `Executor` EOAs (Externally Owned Accounts)
 
@@ -64,8 +64,10 @@ For each validated user fee transfer, the `fetchUserFeeTransfers()` function als
 
 ### 3. **StakerIncentivesCalculator::fetchUserFeeTransfers()**
 
-- Identify multichain user fees over the period, defined as TEL transfer events from the DeFi aggregator address to the AmirX contract.
-- Ensure all txs were initiated by executors so nobody can falsify user fees
+- Identify multichain user fees over the period,
+- User fees are defined as TEL transfer events to the AmirX contract as a part of its interaction with a DeFi aggregator such as 0x or 1inch.
+- Ensure all user fee txs calldata begin with AmirX's `AmirX::defiSwap()` function selector, because that is its flow for interaction with DeFI aggregators
+- Ensure all user fee txs were initiated by executors so nobody can falsify user fees
 
 ### 4. **StakerIncentivesCalculator::fetchOnchainData()**
 
@@ -105,12 +107,6 @@ For each validated user fee transfer, the `fetchUserFeeTransfers()` function als
 - `0x0082CaF47363bD42917947d81f4d4E0395257267`
 - `0xA64B745351EC40bdb3147FF99db2ae21cf93E6E3`
 
-#### **Aggregator**
-
-- The Telcoin Application Network utilizes 1inch and 0x aggregators for DeFi trades:
-  - `0x1111111254EEB25477B68fb85Ed929f73A960582`
-  - `0xDef1C0ded9bec7F1a1670819833240f027b25EfF`
-
 #### **AmirX**
 
 - `0x4eB4A35257458C1a87A4124CE02B3329Ed6b8D5a`
@@ -122,8 +118,8 @@ For each validated user fee transfer, the `fetchUserFeeTransfers()` function als
 
 #### **Staking Plugins**
 
-- `0xd8e7a80570d37D3fBe6eD5228c75475c81cEd094`
+- `0xCAa823Fd48bec0134c8285Fd3C34F9D95CF3280f`
 
 #### **TANIssuanceHistory**
 
-- `0xfAf4E75BF9CD392e56Bffb574820126ce4212744`
+- `0xE533911F00f1C3B58BB8D821131C9B6E2452Fc27`

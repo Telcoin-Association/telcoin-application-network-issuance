@@ -28,7 +28,7 @@ export const config = {
   incentivesAmounts: {
     telcoinNetworkGasFeesIncentivesAmount: 100000000n,
     developerIncentivesAmount: 100000000n,
-    stakerIncentivesAmount: 641025640n, //todo: doubled for first period (2wk), revert for period 2
+    stakerIncentivesAmount: 320512820n,
   },
   simplePlugins: {
     // list of SimplePlugins, for use with the DeveloperIncentivesCalculator
