@@ -1,7 +1,7 @@
 import { Address } from "viem";
 import * as fs from "fs/promises";
 import * as path from "path";
-import { NetworkConfig } from "helpers";
+import { jsonStringify, NetworkConfig } from "./helpers";
 import { ChainId, config } from "./config";
 
 // interface for the incentives output JSON file, eg `staker_incentives.json`
@@ -47,19 +47,19 @@ async function main() {
     }
 
     // distribution must include a transfer of the total TEL rewards to increaser (TANIssuanceHistory)
-    let totalAmount: number = 0;
+    let totalAmount: bigint = BigInt(0);
 
     // build array of `TANIssuanceHistory::IssuanceReward` structs, to be JSON.stringified for Safe UI
-    const issuanceRewards: Array<[string, number]> = [];
+    const issuanceRewards: Array<[string, string]> = [];
     for (const stakerIncentive of jsonData.stakerIncentives) {
       const rewardee = stakerIncentive.address;
-      const reward = Number(stakerIncentive.incentive.reward);
+      const reward = BigInt(stakerIncentive.incentive.reward);
       totalAmount += reward;
 
-      issuanceRewards.push([rewardee, reward]);
+      issuanceRewards.push([rewardee, reward.toString()]);
     }
 
-    const telDecimals = 10 ** Number(config.telToken[ChainId.Polygon].decimals);
+    const telDecimals = 10n ** config.telToken[ChainId.Polygon].decimals;
     console.log(
       `Total amount to transfer to increaser (TANIssuanceHistory):
       ${totalAmount / telDecimals} ERC20 TEL (decimals applied)
