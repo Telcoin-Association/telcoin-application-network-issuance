@@ -162,17 +162,21 @@ Once inside the container, you need to run `yarn` once to install dependencies.
 
 ## Running the SafeTxArrayBuilder script
 
+### Note that TANIP-1 periods must be settled in chronological order. Ie, do not submit a transaction for period 5 before settling ALL transactions & chunks for period 4.
+
 Because the TANIssuanceHistory contract is owned by the Telcoin Application Network Council governance safe, distributions should be performed via the Safe UI for secure multisig operation. This way transaction checks and simulation can be validated across councilmembers ahead of signing.
 
 #### The TAN Safe to use is deployed to `0x8Dcf8d134F22aC625A7aFb39514695801CD705b5` on Polygon and the transaction should target the `TANIssuanceHistory` contract's `increaseClaimableByBatch()` function, which is also deployed on Polygon at `0xe533911f00f1c3b58bb8d821131c9b6e2452fc27`.
 
 #### The TANIssuanceHistory ABI can be found in `backend/abi/TanIssuanceHistoryAbi.ts` or fetched from PolygonScan
 
-The `backend/safeTxArrayBuilder.ts` script builds the function parameters which must be supplied to the Safe UI for `TANIssuanceHistory::increaseClaimableByBatch()`. These are:
+The `backend/safeTxArrayBuilder.ts` script builds the function parameters which must be supplied to the Safe UI for distribution. These are:
 
 - an array of Solidity `IssuanceReward` structs defined within `TANIssuanceHistory.sol`, called `rewards`
 - the settlement chain's end block used for the period's calculation run, aptly called `endBlock`
 
-To run the calculator, use:
+#### The builder script prints the total amount of TEL needed to be transferred from the TANSafe to the history contract (and then to the plugin), as well as the `endBlock` for all networks in `rewards/staker_rewards_period_x.json`. The `rewards` array parameter is often too long to view in a terminal and sometimes too long to perform the period's distribution in a single transaction, so it is written to a series of chunks at`backend/temp/safe_param_period_x_chunk_y.json` file for the corresponding period number.
 
-`yarn ts-node backend/safeTxArrayBuilder.ts`
+To run the script, use:
+
+`yarn ts-node backend/safeTxArrayBuilder.ts --period $DESIRED_PERIOD`
