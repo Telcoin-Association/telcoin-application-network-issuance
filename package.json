@@ -20,7 +20,7 @@
     "ts-node": "^10.9.1",
     "typescript": "^5.0.2",
     "viem": "^2.22.8",
-    "xlsx": "^0.18.5"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "scripts": {
     "build": "tsc",
