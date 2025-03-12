@@ -2,6 +2,7 @@ import { Address } from "viem";
 import * as fs from "fs/promises";
 import * as path from "path";
 import { NetworkConfig } from "helpers";
+import { ChainId, config } from "./config";
 
 // interface for the incentives output JSON file, eg `staker_incentives.json`
 interface IncentivesJson {
@@ -35,8 +36,15 @@ async function main() {
 
     const periodNumber = args[periodIndex + 1];
     const fileForPeriod = `rewards/staker_rewards_period_${periodNumber}.json`;
-    const data = await fs.readFile(fileForPeriod, "utf-8");
-    const jsonData: IncentivesJson = JSON.parse(data);
+    let jsonData: IncentivesJson;
+    try {
+      jsonData = JSON.parse(await fs.readFile(fileForPeriod, "utf-8"));
+    } catch (err) {
+      console.error(
+        `Unable to parse file at ${fileForPeriod}, did you provide correct value to --period flag?`
+      );
+      process.exit(1);
+    }
 
     // distribution must include a transfer of the total TEL rewards to increaser (TANIssuanceHistory)
     let totalAmount: number = 0;
@@ -51,10 +59,11 @@ async function main() {
       issuanceRewards.push([rewardee, reward]);
     }
 
+    const telDecimals = 10 ** Number(config.telToken[ChainId.Polygon].decimals);
     console.log(
       `Total amount to transfer to increaser (TANIssuanceHistory):
-      ${totalAmount / 100} TEL (decimals applied)
-      ${totalAmount} (decimals not applied)`
+      ${totalAmount / telDecimals} ERC20 TEL (decimals applied)
+      ${totalAmount} native/wrapped TEL (decimals not applied)`
     );
 
     // relevant endBlock must be used in settlement transaction on the settlement chain
@@ -62,7 +71,8 @@ async function main() {
       "Select the `endBlock` for the settlement chain and pass to TANIssuanceHistory::increaseClaimableByBatched()"
     );
     jsonData.blockRanges.map((config) => {
-      console.log(`${config.network} endBlock: ${config.endBlock}`);
+      console.log(`${config.network} endBlock:
+        ${config.endBlock}`);
     });
 
     // write Safe TX info as chunks to gitignored `temp` directory, creating if it doesn't exist
