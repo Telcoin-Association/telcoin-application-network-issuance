@@ -7,6 +7,7 @@ import { ChainId, config } from "./config";
 import {
   parseAndSanitizeCLIArgs,
   validateStartAndEndBlocks,
+  writeIncentivesToExcel,
   writeIncentivesToFile,
 } from "./helpers";
 import { SimplePlugin } from "./datasources/SimplePlugin";
@@ -113,11 +114,18 @@ async function main() {
     `Total issuance amount for this period after applying rewards caps: ${totalIssuance}`
   );
 
-  // log and store incentives in `./staker_incentives.json`
+  // write incentives to `./staker_incentives.json`
   await writeIncentivesToFile(
     polygonStakerIncentives,
     networks,
     "./staker_incentives.json"
+  );
+
+  // write incentives to `./staker_incentives.xlsx`
+  writeIncentivesToExcel(
+    polygonStakerIncentives,
+    networks,
+    "staker_incentives.xlsx"
   );
 }
 

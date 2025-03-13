@@ -45,11 +45,90 @@ export const mockThreeTransfers: TokenTransfer[] = [
   },
 ];
 
+// list of `expectedUserFeeTransfer.txHash` and their executors
+export const executorTxHashes = [
+  {
+    txHash:
+      "0x590a064d633f5ef3fb8335555637233ee76cd363254f031415f91a004b359340",
+    executor: "0x0082caf47363bd42917947d81f4d4e0395257267",
+  },
+  {
+    txHash:
+      "0x1269dc8e87eeb103ac240680951f1c31d6424c93377e26dc6cf4be5c103f81bb",
+    executor: "0x0082caf47363bd42917947d81f4d4e0395257267",
+  },
+  {
+    txHash:
+      "0x8d942aedc031739bd2a67b9fae5ded8c95b16bfb0aaf0a3cc978b5903dfe412f",
+    executor: "0x0082caf47363bd42917947d81f4d4e0395257267",
+  },
+  {
+    txHash:
+      "0x6d806c1b8e1ecb447e44bad1d6484aff7ad3508f122df5b340df74c6a6fa72c6",
+    executor: "0x0082caf47363bd42917947d81f4d4e0395257267",
+  },
+  {
+    txHash:
+      "0xf6cb056e15e5348b515587c73f97da63257a59fa3275e615a183eab34d31eed0",
+    executor: "0x0082caf47363bd42917947d81f4d4e0395257267",
+  },
+  {
+    txHash:
+      "0x44d902b3e830190dc95e9e6456050e8e0444fe75fd5334dc1cea95adbbeab949",
+    executor: "0x0082caf47363bd42917947d81f4d4e0395257267",
+  },
+  {
+    txHash:
+      "0xe7bbdd91327d4d927049ea5012d80399558bb6821c34d770b279814dfcfd52f2",
+    executor: "0x0082caf47363bd42917947d81f4d4e0395257267",
+  },
+  {
+    txHash:
+      "0xb5d7b6abf7fbe4095b63045af1ccf06ea6336c97fefcdfdb484b32e300e09263",
+    executor: "0x0082caf47363bd42917947d81f4d4e0395257267",
+  },
+  {
+    txHash:
+      "0xfe813f70b61b0a49bde9cca20434f6abc2c0cff80967dca4191ecfe9b64a0865",
+    executor: "0x0082caf47363bd42917947d81f4d4e0395257267",
+  },
+  {
+    txHash:
+      "0x7a86c47d6e221e5a6879650d6065eec3019c6aefd7e9cf31ac62b98502555e3d",
+    executor: "0x0082caf47363bd42917947d81f4d4e0395257267",
+  },
+  {
+    txHash:
+      "0xbeadd8028e2552cf89b24f55f2cfb89c6bbc588689f02cb98c951e06af6df8ca",
+    executor: "0x0082caf47363bd42917947d81f4d4e0395257267",
+  },
+  {
+    txHash:
+      "0x1ee3ccdafea2945ca91e4a469a31fdb0064a55c8b47f3a48b83457a1d3183052",
+    executor: "0x0082caf47363bd42917947d81f4d4e0395257267",
+  },
+  {
+    txHash:
+      "0x88cade8aaa700ccbb1c196cc24e37ba5c86f1911e60169be387b0d05b6e14a45",
+    executor: "0x0082caf47363bd42917947d81f4d4e0395257267",
+  },
+  {
+    txHash:
+      "0xa5d79726bdaadd74acddcef8129b2b6ece9f7b83a66d46ad4094c2ed2ce10bd9",
+    executor: "0x0082caf47363bd42917947d81f4d4e0395257267",
+  },
+  {
+    txHash:
+      "0xe8a949b73cc5c32c02d0fb0c9f0d4a7839bdcc983936b9ecea4b5de4e34a29ee",
+    executor: "0x0082caf47363bd42917947d81f4d4e0395257267",
+  },
+];
+
 /**
  * @dev All valid user fee transfers events within `mockTelTransfers` below
  * @dev Densest distribution of user fee transfers found on Polygon, used for tests
  * Range of 388 blocks, from block 66660433 to 66660821 inclusive
- * Total user fee transfers: 14
+ * Total user fee transfers: 15
  */
 
 export const expectedUserFeeTransfers: TokenTransferWithCalldata[] = [
