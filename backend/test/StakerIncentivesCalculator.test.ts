@@ -15,6 +15,7 @@ import {
   mockToken,
   mockTelTransfers,
   expectedUserFeeTransfers,
+  executorTxHashes,
 } from "./dummydata/mockTransfers";
 import {
   transactionTemplate,
@@ -24,6 +25,7 @@ import {
   Address,
   createPublicClient,
   encodeFunctionData,
+  getAddress,
   http,
   PublicActions,
   PublicClient,
@@ -40,6 +42,7 @@ import {
 } from "../helpers";
 import { polygon } from "viem/chains";
 import { TransformStreamDefaultController } from "stream/web";
+import { entryPoint06Address } from "viem/_types/constants/address";
 
 /**
  * Config
@@ -215,11 +218,15 @@ describe("StakerIncentivesCalculator", () => {
       (executor) => executor.address
     );
 
-    expect(
-      transfers.every((transfer) => {
-        return executorAddrs.includes(transfer.from);
-      })
-    ).toBe(true);
+    const executorInitiated = transfers.every((transfer) => {
+      const entry = executorTxHashes.find((entry) => {
+        return entry.txHash === transfer.txHash;
+      });
+      const executor = entry!.executor;
+
+      return executorAddrs.includes(getAddress(executor!));
+    });
+    expect(executorInitiated).toBe(true);
   }, 8_000);
 
   it("should return an empty array if no transfers match executor transactions", async () => {

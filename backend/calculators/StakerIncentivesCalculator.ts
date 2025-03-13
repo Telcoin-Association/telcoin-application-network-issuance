@@ -8,7 +8,7 @@ import {
   PublicClient,
   zeroAddress,
 } from "viem";
-import { ICalculator, UserRewardEntry } from "./ICalculator";
+import { ICalculator, UserRewardEntry, UserMetadata } from "./ICalculator";
 import { BaseBlocksDatabase } from "../datasources/persistent/BlocksDatabase";
 import { BaseExecutorRegistry } from "../datasources/ExecutorRegistry";
 import { ChainId, config, Token } from "../config";
@@ -41,6 +41,7 @@ type UserFeeSwap = {
   txHash: `0x${string}`;
   userAddress: `0x${string}`;
   userFee: bigint;
+  isRefereeSwap: boolean; // true for `UserFeeSwap`s associated with a referrer, false for a wallet
 };
 
 type OnchainRewardData = {
@@ -143,22 +144,22 @@ export class StakerIncentivesCalculator
     const userFeeTransfers = await this.fetchUserFeeTransfers();
 
     console.log("Fetching onchain data for eligible (staked) users");
-    // note `eligibleStakerSwaps` includes swaps for unstaked users who are referees since we need their fees
-    // but `addressToRewardDatas` will only include staked users
     const [eligibleStakerSwaps, addressToRewardDatas] =
       await this.fetchOnchainData(userFeeTransfers);
 
     // calculate volume of total fee eligibility per user by summing user fees along protocol rules
-    const stakerToStakerFeeTotal = new Map<Address, bigint>();
+    const stakerToStakerFeeTotals = new Map<Address, UserMetadata>();
     console.log("Calculating volume of total fee eligibility per user...");
+    // ordered processing bc `updateStakerFeeTotals()` writes to shared state
     for (const eligibleSwap of eligibleStakerSwaps) {
       // user collisions are expected and summed agnostically provided they are staked
       // because userFees for staked Referees are double counted: once for themselves and again for their referrer (if staked)
-      this.updateStakerFeeTotal(
-        stakerToStakerFeeTotal,
+      this.updateStakerFeeTotals(
+        stakerToStakerFeeTotals,
         addressToRewardDatas,
         eligibleSwap.userAddress,
-        eligibleSwap.userFee
+        eligibleSwap.userFee,
+        eligibleSwap.isRefereeSwap
       );
     }
 
@@ -178,7 +179,7 @@ export class StakerIncentivesCalculator
           rewardCapAcrossChains += currentChainRewardCap;
       }
 
-      // set map of address to its reward cap; `updateStakerFeeTotal` not used for efficiency
+      // set map of address to its reward cap
       addressToRewardCap.set(address, rewardCapAcrossChains);
     });
 
@@ -194,12 +195,19 @@ export class StakerIncentivesCalculator
     const stakerToReward = new Map<Address, UserRewardEntry>();
     const decimalScale = 1_000_000_000_000_000n;
     console.log("Calculating rewards and applying caps if appropriate...");
-    for (const [staker, stakerFeeTotal] of stakerToStakerFeeTotal) {
+    for (const [staker, feeTotals] of stakerToStakerFeeTotals) {
+      const stakerFeeTotal = feeTotals.fees + feeTotals.refereeFees;
+
       // address rounding and precision loss for cases where vars are unbalanced
       const scaledIncentive =
         (stakerFeeTotal * this._totalIncentiveAmount * decimalScale) /
         totalFees;
       const uncappedAmount = scaledIncentive / decimalScale;
+      const userMetadata = {
+        uncappedAmount: uncappedAmount,
+        fees: feeTotals.fees,
+        refereeFees: feeTotals.refereeFees,
+      };
 
       // addressToRewardCap will contain all relevant stakers since fetching is required for eligibility
       const stakerRewardCap = addressToRewardCap.get(staker);
@@ -210,12 +218,15 @@ export class StakerIncentivesCalculator
       } else {
         stakerReward = stakerRewardCap!;
       }
+      // skip stakers capped to 0
+      if (stakerReward === 0n) continue;
 
       const rewardEntry = {
         userAddress: staker,
         reward: stakerReward,
-        uncappedAmount: uncappedAmount,
+        metadata: userMetadata,
       };
+
       stakerToReward.set(staker, rewardEntry);
     }
 
@@ -375,15 +386,17 @@ export class StakerIncentivesCalculator
       return true;
     }
 
-    const currentChainEndBlock = this._endBlocks[chainId];
+    // query `TANIssuanceHistory` contract with period's start block so runs on settled periods
+    // return cumulative rewards for this period's pre-settlement value and not the next period's
+    const currentChainEndBlock = this._endBlocks[chainId]! - 1n;
     const existingLowestStake = accountToLowestStake.get(address);
     // check whether the account's lowest stake for the period was detected from `StakeChanged` events
     if (existingLowestStake) {
-      // if a `StakeChanged` event was emitted and `newStake` was not 0, only fetch cumulative rewards
+      // if nonzero lowest stake was identified by `StakeChanged` events, only fetch cumulative rewards
       const prevCumulativeRewards = await this.fetchCumulativeRewardsAtBlock(
         client,
         address,
-        currentChainEndBlock!,
+        currentChainEndBlock,
         tanIssuanceHistory
       );
       addressToOnchainRewardDatas.set(address, [
@@ -405,7 +418,7 @@ export class StakerIncentivesCalculator
       const stake = await this.fetchStake(
         client,
         address,
-        currentChainEndBlock!,
+        currentChainEndBlock,
         stakingModuleContract
       );
 
@@ -417,7 +430,7 @@ export class StakerIncentivesCalculator
         const prevCumulativeRewards = await this.fetchCumulativeRewardsAtBlock(
           client,
           address,
-          currentChainEndBlock!,
+          currentChainEndBlock,
           tanIssuanceHistory
         );
         addressToOnchainRewardDatas.set(address, [
@@ -439,9 +452,6 @@ export class StakerIncentivesCalculator
 
   /**
    * @dev Checks whether onchain data, ie stake and cumulative rewards, has already been fetched for given `address`
-   * If not, cross reference `address` against known stake changes previously detected from `StakeChanged` events
-   * If a change in stake for `address` was emitted, stake is known so only fetch cumulative rewards and return true
-   * If no stake change was emitted, fetch the stake. If 0, return false. If > 0, fetch cumulative rewards and return true
    */
   private onchainDataAlreadyFetched(
     address: Address,
@@ -485,32 +495,43 @@ export class StakerIncentivesCalculator
             txHash: transfer.txHash,
             userAddress: args[0]!,
             userFee: transfer.amount,
+            isRefereeSwap: false,
           },
           {
             txHash: transfer.txHash,
             userAddress: defiSwap.referrer,
             userFee: transfer.amount,
+            isRefereeSwap: true,
           },
         ];
       })
       .flat();
   }
 
-  private updateStakerFeeTotal(
-    stakerFeeTotalMap: Map<Address, bigint>,
+  private updateStakerFeeTotals(
+    stakerFeeTotalsMap: Map<Address, UserMetadata>,
     stakerMap: Map<Address, OnchainRewardData[]>,
     address: Address,
-    amount: bigint
+    amount: bigint,
+    isRefereeSwap: boolean
   ) {
-    // skip zero address and nonstakers
+    // skip zero address & nonstakers; handled earlier in execution but reiterates `UserFeeSwap` values can be 0
     if (address === zeroAddress || !stakerMap.has(address)) return;
 
-    if (stakerFeeTotalMap.has(address)) {
-      const existingAmount = stakerFeeTotalMap.get(address)!;
-      stakerFeeTotalMap.set(address, existingAmount + amount);
+    // get existing map entry if it exists, else initialize a new default one
+    const feeTotals = stakerFeeTotalsMap.get(address) || {
+      fees: 0n,
+      refereeFees: 0n,
+    };
+    // update relevant member based on `isRefereeSwap`
+    if (isRefereeSwap) {
+      feeTotals.refereeFees += amount;
     } else {
-      stakerFeeTotalMap.set(address, amount);
+      feeTotals.fees += amount;
     }
+
+    // overwrite map entry with the incremented value
+    stakerFeeTotalsMap.set(address, feeTotals);
   }
 
   async fetchStake(

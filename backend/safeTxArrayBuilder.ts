@@ -1,26 +1,24 @@
 import { Address } from "viem";
 import * as fs from "fs/promises";
 import * as path from "path";
-import { jsonStringify, NetworkConfig } from "./helpers";
+import { NetworkConfig } from "./helpers";
 import { ChainId, config } from "./config";
+import { UserMetadata } from "calculators/ICalculator";
 
 // interface for the incentives output JSON file, eg `staker_incentives.json`
-interface IncentivesJson {
+export interface IncentivesJson {
   blockRanges: NetworkConfig[];
   stakerIncentives: StakerIncentive[];
 }
 
 // interface for the `address => incentive` map entries (`stakerIncentives`) within an output file
-interface StakerIncentive {
+export interface StakerIncentive {
   address: Address;
-  incentive: Incentive;
+  reward: bigint;
+  metadata?: UserMetadata; // informational; not used for distribution
 }
 
-// interface for the nested `incentive` value, keyed by address within `stakerIncentives` map
-interface Incentive {
-  reward: string;
-  uncappedAmount?: string; // informational; not used in distribution
-}
+const TEL_DECIMALS = 10n ** config.telToken[ChainId.Polygon].decimals;
 
 // usage example: `yarn ts-node backend/safeTxArrayBuilder.ts --period 0`
 async function main() {
@@ -53,16 +51,15 @@ async function main() {
     const issuanceRewards: Array<[string, string]> = [];
     for (const stakerIncentive of jsonData.stakerIncentives) {
       const rewardee = stakerIncentive.address;
-      const reward = BigInt(stakerIncentive.incentive.reward);
+      const reward = BigInt(stakerIncentive.reward);
       totalAmount += reward;
 
       issuanceRewards.push([rewardee, reward.toString()]);
     }
 
-    const telDecimals = 10n ** config.telToken[ChainId.Polygon].decimals;
     console.log(
       `Total amount to transfer to increaser (TANIssuanceHistory):
-      ${totalAmount / telDecimals} ERC20 TEL (decimals applied)
+      ${totalAmount / TEL_DECIMALS} ERC20 TEL (decimals applied)
       ${totalAmount} native/wrapped TEL (decimals not applied)`
     );
 
@@ -76,7 +73,7 @@ async function main() {
     });
 
     // write Safe TX info as chunks to gitignored `temp` directory, creating if it doesn't exist
-    const chunkSize = 250;
+    const chunkSize = 350;
     const chunks = chunkIssuanceRewardArray(issuanceRewards, chunkSize);
     for (let i = 0; i < chunks.length; i++) {
       const outputDir = path.join(__dirname, "temp");

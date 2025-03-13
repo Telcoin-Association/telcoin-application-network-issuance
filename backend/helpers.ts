@@ -223,17 +223,14 @@ export async function validateStartAndEndBlocks(
   for (const networkConfig of networkConfigs) {
     let chainId;
     let period0StartBlock;
-    let period1StartBlock;
 
     if (networkConfig.network === "polygon") {
       chainId = ChainId.Polygon;
       period0StartBlock = 68093124n;
-      period1StartBlock = 68374033n;
     } else if (networkConfig.network === "mainnet") {
       chainId = ChainId.Mainnet;
       // TANIP-1 is not currently live on mainnet
       period0StartBlock = 0n;
-      period1StartBlock = 0n;
     } else {
       console.error(`Unsupported network: ${networkConfig.network}`);
       process.exit(1);
@@ -242,14 +239,13 @@ export async function validateStartAndEndBlocks(
     const [lastSettlementBlock, latestBlock] =
       await getLastSettlementBlockAndLatestBlock(chainId);
 
-    // startBlock must match history contract's lastSettlementBlock period 0, or period 1 startBlock
+    // startBlock must match history contract's lastSettlementBlock + 1 or period 0 startBlock
     if (
-      networkConfig.startBlock !== lastSettlementBlock &&
-      networkConfig.startBlock !== period0StartBlock &&
-      networkConfig.startBlock !== period1StartBlock
+      networkConfig.startBlock !== lastSettlementBlock + 1n &&
+      networkConfig.startBlock !== period0StartBlock
     ) {
       console.error(
-        `${networkConfig.network} startBlock ${networkConfig.network} doesn't match last settlement or period 0 block`
+        `${networkConfig.network} startBlock ${networkConfig.network} must be last settlement block + 1 or period 0 block`
       );
       process.exit(1);
     }
@@ -321,11 +317,13 @@ export async function writeIncentivesToFile(
 ) {
   // serialize UserRewardEntrys
   const incentivesArray = Array.from(stakerIncentives.entries()).map(
-    ([address, incentive]) => ({
+    ([address, userRewardEntry]) => ({
       address,
-      incentive: {
-        reward: incentive.reward.toString(),
-        uncappedAmount: incentive.uncappedAmount.toString(),
+      reward: userRewardEntry.reward.toString(),
+      metadata: {
+        uncappedAmount: userRewardEntry.metadata.uncappedAmount!.toString(),
+        fees: userRewardEntry.metadata.fees.toString(),
+        refereeFees: userRewardEntry.metadata.refereeFees.toString(),
       },
     })
   );
@@ -334,8 +332,8 @@ export async function writeIncentivesToFile(
   const blockRangesForJson = blockRanges.map(
     ({ network, startBlock, endBlock }) => ({
       network,
-      startBlock: startBlock!.toString(),
-      endBlock: endBlock!.toString(),
+      startBlock: startBlock.toString(),
+      endBlock: endBlock.toString(),
     })
   );
 
@@ -348,89 +346,84 @@ export async function writeIncentivesToFile(
   try {
     await writeFile(filePath, json, "utf8");
     console.log(`Incentives written to ${filePath}`);
-    writeIncentivesToExcel(data);
   } catch (err) {
     console.error(`Error writing to file: ${err}`);
   }
 }
 
-function writeIncentivesToExcel(data: any) {
+export function writeIncentivesToExcel(
+  stakerIncentives: Map<Address, UserRewardEntry>,
+  blockRanges: NetworkConfig[],
+  filePath: string
+) {
   // Process data to include the new column with formatted values
-  const stakerIncentives = data.stakerIncentives.map(
-    (entry: {
-      address: string;
-      incentive: { reward: string; uncappedAmount: string };
-    }) => ({
-      address: entry.address,
-      "incentive - script output": Number(entry.incentive.reward),
-      "incentive (TEL)": (
-        Number(entry.incentive.reward) / 100
+  const data = Array.from(stakerIncentives.entries()).map(
+    ([address, userRewardEntry]) => ({
+      "Staker Address": address,
+      "Reward (ERC20 TEL)": (
+        Number(userRewardEntry.reward) / 100
       ).toLocaleString(),
-      "uncapped amount - script output": Number(entry.incentive.uncappedAmount),
-      "uncapped amount (TEL)": (
-        Number(entry.incentive.uncappedAmount) / 100
+      "Uncapped Reward (ERC20 TEL)": (
+        Number(userRewardEntry.metadata.uncappedAmount) / 100
+      ).toLocaleString(),
+      "Staker Fees": (
+        Number(userRewardEntry.metadata.fees) / 100
+      ).toLocaleString(),
+      "Referee Fees": (
+        Number(userRewardEntry.metadata.refereeFees) / 100
       ).toLocaleString(),
     })
   );
 
-  const stakerIncentivesNumbers = data.stakerIncentives.map(
-    (entry: {
-      address: string;
-      incentive: { reward: string; uncappedAmount: string };
-    }) => ({
-      address: entry.address,
-      "incentive (TEL)": Number(entry.incentive.reward) / 100,
-      "uncapped amount (TEL)": Number(entry.incentive.uncappedAmount) / 100,
-    })
-  );
-
-  // Calculate totals
-  const totalIncentive = stakerIncentives.reduce(
-    (sum: number, entry: { [x: string]: number }) =>
-      sum + entry["incentive - script output"],
-    0
-  );
-  const totalIncentiveTel = stakerIncentivesNumbers.reduce(
-    (sum: number, entry: { [x: string]: number }) =>
-      sum + entry["incentive (TEL)"],
-    0
-  );
-  const totalUncappedIncentive = stakerIncentives.reduce(
-    (sum: number, entry: { [x: string]: number }) =>
-      sum + entry["uncapped amount - script output"],
-    0
-  );
-  const totalUncappedIncentiveTel = stakerIncentivesNumbers.reduce(
-    (sum: number, entry: { [x: string]: number }) =>
-      sum + entry["uncapped amount (TEL)"],
-    0
+  const totals = data.reduce(
+    (accumulator: any, entry: any) => {
+      accumulator.totalRewardERC20 += Number(
+        entry["Reward (ERC20 TEL)"].replace(/,/g, "")
+      );
+      accumulator.totalUncappedIssuance += entry["Uncapped Reward (ERC20 TEL)"];
+      accumulator.totalFees += entry["Staker Fees"];
+      accumulator.totalRefereeFees += entry["Referee Fees"];
+      return accumulator;
+    },
+    {
+      totalRewardERC20: 0,
+      totalUncappedIssuance: 0,
+      totalFees: 0,
+      totalRefereeFees: 0,
+    }
   );
 
   // Add total row
-  stakerIncentives.push({
-    address: "Total",
-    "incentive - script output": totalIncentive,
-    "incentive (TEL)": totalIncentiveTel.toLocaleString(),
-    "uncapped amount - script output": totalUncappedIncentive,
-    "uncapped amount (TEL)": totalUncappedIncentiveTel.toLocaleString(),
+  data.push({
+    "Staker Address": "Total" as `0x${string}`,
+    "Reward (ERC20 TEL)": totals.totalRewardERC20,
+    "Uncapped Reward (ERC20 TEL)": totals.totalUncappedIssuance,
+    "Staker Fees": totals.totalFees,
+    "Referee Fees": totals.totalRefereeFees,
   });
 
   // Convert processed data to worksheet
-  const stakerIncentivesSheet = xlsx.utils.json_to_sheet(stakerIncentives);
-
-  // Define output file
-  const outputFile = "staker_incentives.xlsx";
-  let workbook;
+  const stakerIncentivesSheet = xlsx.utils.json_to_sheet(data);
+  // Adjust column widths for better readability
+  const cols = [
+    { wch: 20 }, // Staker Address
+    { wch: 15 }, // Reward (ERC20 TEL)
+    { wch: 20 }, // Uncapped Reward (ERC20 TEL)
+    { wch: 10 }, // Staker Fees
+    { wch: 15 }, // Referee Fees
+  ];
+  stakerIncentivesSheet["!cols"] = cols;
 
   // Check if file exists and load it, otherwise create a new workbook
-  if (fs.existsSync(outputFile)) {
-    workbook = xlsx.readFile(outputFile);
+  let workbook;
+  if (fs.existsSync(filePath)) {
+    workbook = xlsx.readFile(filePath);
   } else {
     workbook = xlsx.utils.book_new();
   }
 
-  // Generate sheet name based on block range
-  const sheetName = `Blocks ${data.blockRanges[0].startBlock} - ${data.blockRanges[0].endBlock}`;
+  // Generate sheet name based on block range. Not currently configured for multichain block ranges
+  const sheetName = `Blocks ${blockRanges[0].startBlock} - ${blockRanges[0].endBlock}`;
 
   // Remove existing sheet if it exists
   if (workbook.Sheets[sheetName]) {
@@ -444,9 +437,9 @@ function writeIncentivesToExcel(data: any) {
   xlsx.utils.book_append_sheet(workbook, stakerIncentivesSheet, sheetName);
 
   // Save workbook
-  xlsx.writeFile(workbook, outputFile);
+  xlsx.writeFile(workbook, filePath);
 
-  console.log(`Excel file updated/saved as ${outputFile}`);
+  console.log(`Excel file updated/saved as ${filePath}`);
 }
 
 export function calculateIncentivesFromVolumeOrSimilar(
