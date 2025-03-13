@@ -218,6 +218,9 @@ export class StakerIncentivesCalculator
       } else {
         stakerReward = stakerRewardCap!;
       }
+      // skip stakers capped to 0
+      if (stakerReward === 0n) continue;
+
       const rewardEntry = {
         userAddress: staker,
         reward: stakerReward,

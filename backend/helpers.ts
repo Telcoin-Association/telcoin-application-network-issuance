@@ -223,17 +223,14 @@ export async function validateStartAndEndBlocks(
   for (const networkConfig of networkConfigs) {
     let chainId;
     let period0StartBlock;
-    let period1StartBlock;
 
     if (networkConfig.network === "polygon") {
       chainId = ChainId.Polygon;
       period0StartBlock = 68093124n;
-      period1StartBlock = 68374033n;
     } else if (networkConfig.network === "mainnet") {
       chainId = ChainId.Mainnet;
       // TANIP-1 is not currently live on mainnet
       period0StartBlock = 0n;
-      period1StartBlock = 0n;
     } else {
       console.error(`Unsupported network: ${networkConfig.network}`);
       process.exit(1);
@@ -242,14 +239,13 @@ export async function validateStartAndEndBlocks(
     const [lastSettlementBlock, latestBlock] =
       await getLastSettlementBlockAndLatestBlock(chainId);
 
-    // startBlock must match history contract's lastSettlementBlock period 0, or period 1 startBlock
+    // startBlock must match history contract's lastSettlementBlock + 1 or period 0 startBlock
     if (
-      networkConfig.startBlock !== lastSettlementBlock &&
-      networkConfig.startBlock !== period0StartBlock &&
-      networkConfig.startBlock !== period1StartBlock
+      networkConfig.startBlock !== lastSettlementBlock + 1n &&
+      networkConfig.startBlock !== period0StartBlock
     ) {
       console.error(
-        `${networkConfig.network} startBlock ${networkConfig.network} doesn't match last settlement or period 0 block`
+        `${networkConfig.network} startBlock ${networkConfig.network} must be last settlement block + 1 or period 0 block`
       );
       process.exit(1);
     }
