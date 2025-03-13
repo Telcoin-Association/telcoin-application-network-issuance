@@ -52,8 +52,11 @@ async function main() {
     for (const stakerIncentive of jsonData.stakerIncentives) {
       const rewardee = stakerIncentive.address;
       const reward = BigInt(stakerIncentive.reward);
-      totalAmount += reward;
 
+      // skip rewardees capped to 0
+      if (reward === 0n) continue;
+
+      totalAmount += reward;
       issuanceRewards.push([rewardee, reward.toString()]);
     }
 

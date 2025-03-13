@@ -380,9 +380,13 @@ export function writeIncentivesToExcel(
       accumulator.totalRewardERC20 += Number(
         entry["Reward (ERC20 TEL)"].replace(/,/g, "")
       );
-      accumulator.totalUncappedIssuance += entry["Uncapped Reward (ERC20 TEL)"];
-      accumulator.totalFees += entry["Staker Fees"];
-      accumulator.totalRefereeFees += entry["Referee Fees"];
+      accumulator.totalUncappedIssuance += Number(
+        entry["Uncapped Reward (ERC20 TEL)"].replace(/,/g, "")
+      );
+      accumulator.totalFees += Number(entry["Staker Fees"].replace(/,/g, ""));
+      accumulator.totalRefereeFees += Number(
+        entry["Referee Fees"].replace(/,/g, "")
+      );
       return accumulator;
     },
     {
@@ -396,10 +400,11 @@ export function writeIncentivesToExcel(
   // Add total row
   data.push({
     "Staker Address": "Total" as `0x${string}`,
-    "Reward (ERC20 TEL)": totals.totalRewardERC20,
-    "Uncapped Reward (ERC20 TEL)": totals.totalUncappedIssuance,
-    "Staker Fees": totals.totalFees,
-    "Referee Fees": totals.totalRefereeFees,
+    "Reward (ERC20 TEL)": totals.totalRewardERC20.toLocaleString(),
+    "Uncapped Reward (ERC20 TEL)":
+      totals.totalUncappedIssuance.toLocaleString(),
+    "Staker Fees": totals.totalFees.toLocaleString(),
+    "Referee Fees": totals.totalRefereeFees.toLocaleString(),
   });
 
   // Convert processed data to worksheet
