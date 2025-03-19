@@ -65,6 +65,9 @@ async function main() {
       ${totalAmount / TEL_DECIMALS} ERC20 TEL (decimals applied)
       ${totalAmount} native/wrapped TEL (decimals not applied)`
     );
+    console.log(
+      "TEL token address on Polygon: 0xdF7837DE1F2Fa4631D716CF2502f8b230F1dcc32"
+    );
 
     // relevant endBlock must be used in settlement transaction on the settlement chain
     console.log(
@@ -74,6 +77,9 @@ async function main() {
       console.log(`${config.network} endBlock:
         ${config.endBlock}`);
     });
+    console.log(
+      "TANIssuanceHistory contract address on Polygon: 0xe533911f00f1c3b58bb8d821131c9b6e2452fc27"
+    );
 
     // write Safe TX info as chunks to gitignored `temp` directory, creating if it doesn't exist
     const chunkSize = 350;
