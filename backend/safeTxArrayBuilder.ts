@@ -82,7 +82,7 @@ async function main() {
     );
 
     // write Safe TX info as chunks to gitignored `temp` directory, creating if it doesn't exist
-    const chunkSize = 350;
+    const chunkSize = 300;
     const chunks = chunkIssuanceRewardArray(issuanceRewards, chunkSize);
     for (let i = 0; i < chunks.length; i++) {
       const outputDir = path.join(__dirname, "temp");
