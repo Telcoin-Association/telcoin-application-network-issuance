@@ -10,7 +10,7 @@ import { ChainId, config } from "../config";
 import { executors } from "../data/executors";
 import { amirXs } from "../data/amirXs";
 import { stakingModules } from "../data/stakingModules";
-import { StakerIncentivesCalculator } from "../calculators/StakerIncentivesCalculator";
+import {StakeChangedEvent, StakerIncentivesCalculator} from "../calculators/StakerIncentivesCalculator";
 import {
   mockToken,
   mockTelTransfers,
@@ -380,4 +380,143 @@ describe("StakerIncentivesCalculator", () => {
       }
     }
   });
+
+
+  it("should return the correct average staked amount from a given set of events", async () => {
+    const startBlock = 10n;
+    const endBlock = 30n;
+    const accounts = [
+        getAddress("0x1111111111111111111111111111111111111111"),
+        getAddress("0x2222222222222222222222222222222222222222"),
+        getAddress("0x3333333333333333333333333333333333333333"),
+        getAddress("0x4444444444444444444444444444444444444444"),
+    ]
+    const accountsMap = new Map<Address, {
+      initialStakeAmount: bigint,
+      events: StakeChangedEvent[],
+      expectedAverageStakedAmount: bigint
+    }>([
+        //Even increasing stake
+      [
+        accounts[0],
+        {
+          initialStakeAmount: 500n,
+          events: [
+            {
+              account: accounts[0],
+              blockNumber: startBlock + 5n,
+              oldStake: 500n,
+              newStake: 1000n
+            },
+            {
+              account: accounts[0],
+              blockNumber:startBlock + 10n,
+              oldStake: 1000n,
+              newStake: 1500n
+            },
+            {
+              account: accounts[0],
+              blockNumber: startBlock + 15n,
+              oldStake: 1500n,
+              newStake: 2000n
+            }
+          ],
+          expectedAverageStakedAmount: 1250n
+        }
+      ],
+        //Uneven increasing stake
+      [
+        accounts[1],
+        {
+          initialStakeAmount: 800n,
+          events: [
+            {
+              account: accounts[1],
+              blockNumber: startBlock + 3n,
+              oldStake: 800n,
+              newStake: 1200n
+            },
+            {
+              account: accounts[1],
+              blockNumber: startBlock + 8n,
+              oldStake: 1200n,
+              newStake: 1600n
+            },
+            {
+              account: accounts[1],
+              blockNumber: startBlock + 12n,
+              oldStake: 1600n,
+              newStake: 2000n
+            }
+          ],
+          expectedAverageStakedAmount: 1540n
+        }
+      ],
+        //Even decreasing stake
+      [
+        accounts[2],
+        {
+          initialStakeAmount: 2000n,
+          events: [
+            {
+              account: accounts[2],
+              blockNumber: startBlock + 5n,
+              oldStake: 2000n,
+              newStake: 1500n
+            },
+            {
+              account: accounts[2],
+              blockNumber:startBlock + 10n,
+              oldStake: 1500n,
+              newStake: 1000n
+            },
+            {
+              account: accounts[2],
+              blockNumber: startBlock + 15n,
+              oldStake: 1000n,
+              newStake: 500n
+            }
+          ],
+          expectedAverageStakedAmount: 1250n
+        }
+      ],
+        //Uneven decreasing stake
+      [
+        accounts[3],
+        {
+          initialStakeAmount: 2000n,
+          events: [
+            {
+              account: accounts[3],
+              blockNumber: startBlock + 3n,
+              oldStake: 2000n,
+              newStake: 1600n
+            },
+            {
+              account: accounts[3],
+              blockNumber: startBlock + 8n,
+              oldStake: 1600n,
+              newStake: 1200n
+            },
+            {
+              account: accounts[3],
+              blockNumber: startBlock + 12n,
+              oldStake: 1200n,
+              newStake: 800n
+            }
+          ],
+          expectedAverageStakedAmount: 1260n
+        }
+      ]
+    ]);
+
+    const allEvents = [...accountsMap.values()].flatMap((entry) => entry.events);
+
+    const result = await calculator.CalculateAvgStakedAmountsPerAccount(allEvents, startBlock, endBlock);
+
+    for (const [account, {expectedAverageStakedAmount}] of accountsMap.entries()) {
+      expect(result.get(account)).toEqual(expectedAverageStakedAmount);
+    }
+  });
+  
 });
