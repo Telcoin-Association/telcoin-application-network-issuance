@@ -1,27 +1,22 @@
 import {
   AbiEvent,
   Address,
-  createPublicClient,
   decodeFunctionData,
   getAbiItem,
   getAddress,
+  GetLogsReturnType,
   PublicClient,
   zeroAddress,
 } from "viem";
-import { ICalculator, UserRewardEntry, UserMetadata } from "./ICalculator";
-import { BaseBlocksDatabase } from "../datasources/persistent/BlocksDatabase";
-import { BaseExecutorRegistry } from "../datasources/ExecutorRegistry";
-import { ChainId, config, Token } from "../config";
-import {
-  TokenTransfer,
-  TokenTransferWithCalldata,
-  TokenTransferHistory,
-} from "../datasources/TokenTransferHistory";
-import { AmirX } from "../data/amirXs";
-import { StakingModule } from "../data/stakingModules";
-import { AmirXAbi, StakingModuleAbi, TanIssuanceHistoryAbi } from "../abi/abi";
-import { TanIssuanceHistory } from "../data/tanIssuanceHistories";
-import { getTransaction } from "viem/_types/actions/public/getTransaction";
+import {ICalculator, UserMetadata, UserRewardEntry} from "./ICalculator";
+import {BaseExecutorRegistry} from "../datasources/ExecutorRegistry";
+import {ChainId} from "../config";
+import {TokenTransfer, TokenTransferHistory, TokenTransferWithCalldata,} from "../datasources/TokenTransferHistory";
+import {AmirX} from "../data/amirXs";
+import {StakingModule} from "../data/stakingModules";
+import {AmirXAbi, StakingModuleAbi, TanIssuanceHistoryAbi} from "../abi/abi";
+import {TanIssuanceHistory} from "../data/tanIssuanceHistories";
+
 /**
  * This class calculates TAN stakers' referrals incentives.
  *
@@ -48,6 +43,13 @@ type OnchainRewardData = {
   chain: ChainId;
   userStake: bigint;
   prevCumulativeRewards: bigint;
+};
+
+export type StakeChangedEvent = {
+  account: Address;
+  blockNumber: bigint;
+  oldStake: bigint;
+  newStake: bigint;
 };
 
 export class StakerIncentivesCalculator
@@ -269,35 +271,20 @@ export class StakerIncentivesCalculator
         userFeeSwaps.map((swap) => {
           accountsOfInterest.add(swap.userAddress);
         });
-        const stakeChangedEvents = await client.getLogs({
-          address: currentChainStakingModule.address,
-          event: stakeChangedAbiItem as AbiEvent,
-          args: { account: Array.from(accountsOfInterest) },
-          fromBlock: this._startBlocks[currentChain],
-          toBlock: this._endBlocks[currentChain],
-        });
-
-        // populate a map of Address => newStakeAmount which will be used to skip RPC calls to `StakingModule::stakedByAt()`
-        const accountToLowestStake = new Map<Address, bigint>();
-        stakeChangedEvents.forEach((stakeChange) => {
-          const { account, oldStake, newStake } = stakeChange.args as {
-            account: Address;
-            oldStake: bigint;
-            newStake: bigint;
-          };
-          const currentLowerStake = oldStake < newStake ? oldStake : newStake;
-
-          const existingLowestStake = accountToLowestStake.get(account);
-          if (
-            existingLowestStake == undefined ||
-            currentLowerStake < existingLowestStake
-          ) {
-            console.log(
-              `StakeChanged event found for ${account} for stake amount ${oldStake} to ${newStake}`
-            );
-            accountToLowestStake.set(account, currentLowerStake);
-          }
-        });
+        
+        const stakeChangedEvents = await this.fetchStakeChangedEvents(
+            client,
+            currentChainStakingModule.address,
+            stakeChangedAbiItem as AbiEvent,
+            {account: Array.from(accountsOfInterest)},
+            this._startBlocks[currentChain]!,
+            this._endBlocks[currentChain]!)
+        
+        const accountToAverageStake = await this.CalculateAvgStakedAmountsPerAccount(
+            stakeChangedEvents,
+            this._startBlocks[currentChain]!,
+            this._endBlocks[currentChain]!);
+        
 
         return await this.processUserFeeSwaps(
           userFeeSwaps,
@@ -305,12 +292,79 @@ export class StakerIncentivesCalculator
           currentChainStakingModule.address,
           currentChainTanIssuanceHistory!.address,
           addressToOnchainRewardDatas,
-          accountToLowestStake
+          accountToAverageStake
         );
       })
     );
 
     return [eligibleUserFeeSwaps.flat(), addressToOnchainRewardDatas];
+  }
+  
+  async CalculateAvgStakedAmountsPerAccount(
+      stakeChangedEvents: StakeChangedEvent[],
+      fromBlock: bigint,
+      toBlock: bigint,
+  ): Promise<Map<Address, bigint>> {
+
+    // populate a map of Address => newStakeAmount which will be used to skip RPC calls to `StakingModule::stakedByAt()`
+    const accountToLowestStake = new Map<Address, bigint>();
+    
+    // Group stakeChangedEvents by their `args.account`
+    const groupedStakeChangedEvents = stakeChangedEvents.reduce((grouped, event) => {
+
+      if (!grouped.has(event.account)) {
+        grouped.set(event.account, []);
+      }
+      grouped.get(event.account)!.push(event);
+      return grouped;
+    }, new Map<Address, typeof stakeChangedEvents>());
+
+    // Loop over the grouping and log account and its corresponding events
+    groupedStakeChangedEvents.forEach((events, account) => {
+      events.sort((a, b) => (a.blockNumber > b.blockNumber ? 1 : -1));
+
+      let lowestBlockNumber = fromBlock;
+
+
+      const stakedAmount: { blocks: bigint; stake: bigint }[] = [];
+      for (let i = 0; i < events.length; i++) {
+        
+        stakedAmount.push({
+          blocks: events[i].blockNumber - lowestBlockNumber!,
+          stake: events[i].oldStake
+        })
+
+
+        if(i == (events.length - 1)){
+          stakedAmount.push({
+            blocks: toBlock! - events[i].blockNumber,
+            stake: events[i].newStake
+          })
+        }
+
+        lowestBlockNumber = events[i].blockNumber;
+
+      }
+
+      // calculate the total number of blocks available in our period here. 
+      const totalBlocks =
+          (toBlock ?? 0n) - (fromBlock ?? 0n);
+
+      // Calculate the total staked amount weighted by the duration for each stake period
+      let totalWeightedStake = 0n;
+      let totalDuration = 0n;
+
+      stakedAmount.forEach(({blocks, stake}) => {
+        totalWeightedStake += stake * blocks;
+      });
+
+      // Calculate the average stake over the total duration and total blocks
+      const averageStakeOverTime = totalWeightedStake / totalBlocks;
+
+      accountToLowestStake.set(account, averageStakeOverTime);
+    });
+    
+    return accountToLowestStake;
   }
 
   /**
@@ -324,7 +378,7 @@ export class StakerIncentivesCalculator
     stakingModuleContract: Address,
     tanIssuanceHistory: Address,
     addressToOnchainRewardDatas: Map<Address, OnchainRewardData[]>,
-    accountToLowestStake: Map<Address, bigint>
+    accountToAverageStake: Map<Address, bigint>
   ): Promise<UserFeeSwap[]> {
     const eligibleFeeSwaps: UserFeeSwap[] = [];
     // fetch onchain data for each fee swap to filter out unstaked users and set reward data
@@ -345,7 +399,7 @@ export class StakerIncentivesCalculator
           stakingModuleContract,
           tanIssuanceHistory,
           addressToOnchainRewardDatas,
-          accountToLowestStake
+          accountToAverageStake
         );
         // if `userFeeSwap` user is eligible for rewards, ie staked, push to return array
         if (userEligible) eligibleFeeSwaps.push(userFeeSwap);
@@ -368,7 +422,7 @@ export class StakerIncentivesCalculator
     stakingModuleContract: Address,
     tanIssuanceHistory: Address,
     addressToOnchainRewardDatas: Map<Address, OnchainRewardData[]>,
-    accountToLowestStake: Map<Address, bigint>
+    accountToAverageStake: Map<Address, bigint>
   ): Promise<boolean> {
     // check if the top level map already contains the user address, ie from another swap iteration or different chain
     const chainId = client.chain!.id as ChainId;
@@ -387,9 +441,9 @@ export class StakerIncentivesCalculator
     // query `TANIssuanceHistory` contract with period's start block so runs on settled periods
     // return cumulative rewards for this period's pre-settlement value and not the next period's
     const currentChainEndBlock = this._endBlocks[chainId]! - 1n;
-    const existingLowestStake = accountToLowestStake.get(address);
+    const existingAverageStake = accountToAverageStake.get(address);
     // check whether the account's lowest stake for the period was detected from `StakeChanged` events
-    if (existingLowestStake) {
+    if (existingAverageStake) {
       // if nonzero lowest stake was identified by `StakeChanged` events, only fetch cumulative rewards
       const prevCumulativeRewards = await this.fetchCumulativeRewardsAtBlock(
         client,
@@ -400,7 +454,7 @@ export class StakerIncentivesCalculator
       addressToOnchainRewardDatas.set(address, [
         {
           chain: chainId,
-          userStake: existingLowestStake!,
+          userStake: existingAverageStake!,
           prevCumulativeRewards: prevCumulativeRewards,
         },
       ]);
@@ -532,6 +586,39 @@ export class StakerIncentivesCalculator
     stakerFeeTotalsMap.set(address, feeTotals);
   }
 
+  async fetchStakeChangedEvents(
+      client: PublicClient,
+      stakingModuleAddress: Address,
+      stakeChangedEvent: AbiEvent,
+      args: {account: Address[]},
+      startBlock: bigint,
+      endBlock: bigint
+  ): Promise<StakeChangedEvent[]> {
+    const loggedEvents: GetLogsReturnType<AbiEvent, [AbiEvent], undefined, bigint | undefined, bigint | undefined> = await client.getLogs({
+      address: stakingModuleAddress,
+      event: stakeChangedEvent,
+      args: args,
+      fromBlock: startBlock,
+      toBlock: endBlock,
+    });
+
+    return loggedEvents.map(event => {
+
+      const {account, oldStake, newStake} = event.args as {
+        account: Address,
+        oldStake: bigint;
+        newStake: bigint;
+      };
+
+      return {
+        blockNumber: event.blockNumber,
+        account: account,
+        oldStake: oldStake,
+        newStake: newStake,
+      } as StakeChangedEvent;
+    });
+  }
+  
   async fetchStake(
     client: PublicClient,
     userAddress: Address,
