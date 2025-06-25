@@ -16,9 +16,9 @@
 
 `Stakers'` own user fees are eligible for rewards if they are also `Referees`, and if they are `Referrers` they are additionally eligible for their `Referees` fees. As a result, the set of `eligible users` for TAN rewards issuance comprises both `Stakers` and `Referrers`.
 
-### **Rewards Caps:** Rewards for any given period are capped by the lowest stake held by the `Staker/Referrer` during the period, less cumulative rewards already earned.
+### **Rewards Caps:** Rewards for any given period are capped by the time weighted average stake held by the `Staker/Referrer` during the period, less cumulative rewards already earned.
 
-To incentivize staking TEL, `Stakers'` are only eligible to receive issuance rewards up to their lowest amount staked for the period. This includes their cumulative rewards for all previous periods. Thus `rewardsCap = stakeAmtTrough - cumulativePrevRewards`.
+To incentivize staking TEL, `Stakers'` are only eligible to receive issuance rewards up to their time weighted average stake for the period. This includes their cumulative rewards for all previous periods. Thus `rewardsCap = timeWeightedStake - cumulativePrevRewards`.
 
 Historical rewards checkpoints are persisted by the `TANIssuanceHistory` contract in a mapping called `prevCumulativeRewards` for immutable derivation of future rewards caps.
 
@@ -72,7 +72,7 @@ For each validated user fee transfer, the `fetchUserFeeTransfers()` function als
 ### 4. **StakerIncentivesCalculator::fetchOnchainData()**
 
 - Filter the fetched user fee transfers to include only those involving an eligible user fee for `Stakers` and `Referrers`.
-- This necessitates fetching the trough stake amount for each transfer's `User (Wallet)` and `Referrer` parameters over the period (located in previously appended tx calldata). It is achieved first by examining `IPlugin::StakeChanged` events and falling back to a direct contract read of `StakingModule::stakedByAt(user, endBlock)` if no events were found.
+- This necessitates identifying the time weighted average stake amount for each transfer's `User (Wallet)` and `Referrer` parameters over the period (located in previously appended tx calldata). It is achieved first by examining `IPlugin::StakeChanged` events and falling back to a direct contract read of `StakingModule::stakedByAt(user, endBlock)` if no events were found.
 - For users and referrers who are staked, it is also necessary to fetch the users' and referrers' cumulative rewards, performed within `processUserFeeSwaps()` and `processAddress()`
 - Returns an array comprising all eligible trades by TEL stakers & referrers as well as a map containing all eligible users for the period and their multichain reward datas (stake and cumulative rewards)
 
