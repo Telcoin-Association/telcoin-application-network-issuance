@@ -7,9 +7,12 @@ import {
   type PublicClient,
 } from "viem";
 import * as dotenv from "dotenv";
+import { existsSync } from "fs";
+import { readFile, writeFile } from "fs/promises";
 dotenv.config();
 
 /// usage: `yarn ts-node backend/calculators/TELxRewardsCalculator.ts`
+const CHECKPOINT_FILE = "./checkpoint.json";
 
 // BASE — WETH/TEL
 const rpcUrl =
@@ -26,13 +29,12 @@ const STATE_VIEW_ADDRESS: Address =
 const POOL_ID =
   "0xb6d004fca4f9a34197862176485c45ceab7117c86f07422d1fe3d9cfd6e9d1da";
 const INITIALIZE_BLOCK = 25_832_462n;
-const PROGRAM_START = 33_824_526n; // aug 6
-const FIRST_PERIOD_END = 34_126_926n; // aug 13
-const SECOND_PERIOD_END = 34_429_326n; // aug 20
-const THIRD_PERIOD_END = 34_731_726n; // aug 27
-const FOURTH_PERIOD_END = 35034126n; // sep 3
+const PROGRAM_START = 33_954_126; // aug 9
+const FIRST_PERIOD_END = 34_429_326n; // aug 20
+const SECOND_PERIOD_END = 34_731_726n; // aug 27
+const THIRD_PERIOD_END = 35_034_126n; // sep 3
 
-const FROM_BLOCK = 25_000_000n; //33_954_127;
+const FROM_BLOCK = 25_000_000n;
 const TO_BLOCK = 34_429_326n;
 
 // //  POLYGON — WETH/TEL
@@ -71,22 +73,26 @@ const STATE_VIEW_ABI = parseAbi([
   "function getFeeGrowthInside(bytes32 poolId, int24 tickLower, int24 tickUpper) external view returns (uint256 feeGrowthInside0X128, uint256 feeGrowthInside1X128)",
 ]);
 
-// // --- Interfaces to structure our data ---
-// interface PositionState {
-//   owner: string;
-//   poolId: string;
-//   tickLower: number;
-//   tickUpper: number;
-//   liquidity: bigint;
-//   // The fee growth inside the range, as of the last modification event
-//   feeGrowthInsideLast0: bigint;
-//   feeGrowthInsideLast1: bigint;
-// }
+interface PositionState {
+  owner: string;
+  poolId: string;
+  tickLower: number;
+  tickUpper: number;
+  liquidity: bigint;
+  // The fee growth inside the range, as of the last modification event
+  feeGrowthInsideLast0: bigint;
+  feeGrowthInsideLast1: bigint;
+}
 
 // interface LPFees {
 //   totalFees0: bigint;
 //   totalFees1: bigint;
 // }
+
+interface CheckpointData {
+  lastProcessedBlock: string;
+  positions: [string, PositionState][];
+}
 
 async function main() {
   const client = createPublicClient({ transport: http(rpcUrl) });
@@ -105,7 +111,67 @@ async function main() {
   );
 }
 
-main();
+//todo: dedicate this function to updating checkpoints only
+async function updateCheckpoints(
+  rpcUrl: string,
+  poolId: string,
+  currentBlock: bigint
+) {
+  let startBlock = INITIALIZE_BLOCK;
+  let initialPositions = new Map<string, PositionState>();
+
+  // 1. Load state from checkpoint if it exists
+  if (existsSync(CHECKPOINT_FILE)) {
+    console.log("Checkpoint file found, loading previous state...");
+    const fileContent = await readFile(CHECKPOINT_FILE, "utf-8");
+    const checkpoint: CheckpointData = JSON.parse(fileContent, (key, value) =>
+      typeof value === "string" && /^\d+n$/.test(value)
+        ? BigInt(value.slice(0, -1))
+        : value
+    );
+    startBlock = BigInt(checkpoint.lastProcessedBlock) + 1n;
+    initialPositions = new Map(checkpoint.positions);
+  } else {
+    console.log("No checkpoint file found, starting from pool creation block.");
+  }
+
+  if (startBlock > currentBlock) {
+    console.log("Already up to date. No new blocks to process.");
+    return;
+  }
+
+  return; //TODO
+  console.log(`Analyzing fees from block ${startBlock} to ${currentBlock}...`);
+
+  //   // 2. Run the core analysis logic
+  //   const { lpFees, finalPositions } = await fetchLPFees(
+  //     poolId,
+  //     startBlock,
+  //     currentBlock,
+  //     rpcUrl,
+  //     initialPositions
+  //   );
+
+  //   // 3. Save the new state to the checkpoint file
+  //   const newCheckpoint: CheckpointData = {
+  //     lastProcessedBlock: currentBlock.toString(),
+  //     positions: Array.from(finalPositions.entries()),
+  //   };
+  //   await writeFile(
+  //     CHECKPOINT_FILE,
+  //     JSON.stringify(
+  //       newCheckpoint,
+  //       (key, value) =>
+  //         typeof value === "bigint" ? value.toString() + "n" : value,
+  //       2
+  //     ),
+  //     "utf-8"
+  //   );
+
+  //   console.log("Analysis complete. New checkpoint saved.");
+  //   console.log("LP Fees Earned in Period:", lpFees);
+  //   return { lpFees, finalPositions };
+}
 
 /**
  * Identifies cumulative fee totals for each liquidity provider
@@ -286,3 +352,5 @@ async function getPoolCreationBlock(
     },
   };
 }
+
+main();
