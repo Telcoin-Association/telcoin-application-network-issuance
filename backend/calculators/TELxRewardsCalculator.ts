@@ -1,8 +1,11 @@
 import {
   createPublicClient,
+  getAddress,
+  hexToBigInt,
   http,
   parseAbi,
   parseAbiItem,
+  zeroAddress,
   type Address,
   type PublicClient,
 } from "viem";
@@ -68,6 +71,10 @@ const POOL_MANAGER_ABI = parseAbi([
 const STATE_VIEW_ABI = parseAbi([
   "function getSlot0(bytes32 id) external view returns (uint160 sqrtPriceX96, int24 tick, uint24 protocolFee, uint24 lpFee)",
   "function getFeeGrowthInside(bytes32 poolId, int24 tickLower, int24 tickUpper) external view returns (uint256 feeGrowthInside0X128, uint256 feeGrowthInside1X128)",
+]);
+const POSITION_MANAGER_ABI = parseAbi([
+  "function positionInfo(uint256 tokenId) external view returns (uint256)",
+  "function ownerOf(uint256 id) public view returns (address owner)",
 ]);
 
 interface PositionState {
@@ -151,9 +158,6 @@ async function updateFeesAndPositions(
     initialPositions
   );
 
-  console.log("Final Positions State:", finalPositions);
-  console.log("lpFees:", lpFees);
-
   //todo remove to save to checkpoints file once working properly
   //todo forward positions checkpoints file to telx council to check position info is accurate
   //todo derive rewards from lpFees
@@ -183,7 +187,7 @@ async function updateFeesAndPositions(
 
 /**
  * Identifies cumulative fee totals for each liquidity provider
- * @return lpFees Map of `LP-tickLower-tickUpper => PositionState` tracking state of each unique position
+ * @return lpFees Map of `tokenId => PositionState` tracking state of each unique position
  * @return finalPositions Map of `LP => LPFees` tracking total fees per LP
  */
 async function fetchLPFees(
@@ -219,14 +223,12 @@ async function fetchLPFees(
     return Number(a.blockNumber) - Number(b.blockNumber);
   });
 
-  // Calculate fees for positions that existed before this period but had no modifications
+  // 2. Calculate fees for positions that existed before this period but had no modifications
   for (const [key, position] of positions.entries()) {
     if (position.liquidity > 0) {
       // Check if this position was modified during the log period
       const wasModified = logs.some(
-        (log) =>
-          `${log.args.sender}-${log.args.tickLower}-${log.args.tickUpper}` ===
-          key
+        (log) => `${hexToBigInt(log.args.salt!).toString()}` === key
       );
       if (!wasModified) {
         // If not modified, calculate its fees over the whole period and update its feeGrowth baseline
@@ -268,14 +270,22 @@ async function fetchLPFees(
     }
   }
 
-  // 2. Process events chronologically
+  // 3. Process ModifyLiquidity events chronologically
   for (const log of logs) {
     if (!log.args || !log.blockNumber) continue;
-    const { sender, tickLower, tickUpper, liquidityDelta } = log.args;
-    const positionKey = `${sender}-${tickLower}-${tickUpper}`;
-    const currentPositionState = positions.get(positionKey);
+    const { tickLower, tickUpper, liquidityDelta, salt } = log.args;
+    const tokenId = hexToBigInt(salt!);
+    if (!tokenId) throw new Error("Missing tokenId in event args");
+    const lp = await client.readContract({
+      address: POSITION_MANAGER_ADDRESS,
+      abi: POSITION_MANAGER_ABI,
+      functionName: "ownerOf",
+      args: [tokenId],
+      blockNumber: log.blockNumber,
+    });
 
     // If position existed, its liquidity was active since last update; calculate period's fees
+    const currentPositionState = positions.get(tokenId.toString());
     if (currentPositionState && currentPositionState.liquidity > 0) {
       // fetch state just BEFORE this event
       const feeGrowthInsideNow = await getFeeGrowthInside(
@@ -296,17 +306,17 @@ async function fetchLPFees(
           currentPositionState.liquidity) /
         2n ** 128n;
       // Add these "collected" fees to the LP's total
-      const currentLpTotal = lpFees.get(sender!) ?? {
+      const currentLpTotal = lpFees.get(lp) ?? {
         totalFees0: 0n,
         totalFees1: 0n,
       };
-      lpFees.set(sender!, {
+      lpFees.set(lp, {
         totalFees0: currentLpTotal.totalFees0 + feesEarned0,
         totalFees1: currentLpTotal.totalFees1 + feesEarned1,
       });
     }
 
-    // 3. Update the position's state for the *next* iteration
+    // update the position's state for the *next* iteration
     const newLiquidity =
       (currentPositionState?.liquidity ?? 0n) + liquidityDelta!;
 
@@ -319,8 +329,8 @@ async function fetchLPFees(
       tickUpper!,
       log.blockNumber
     );
-    positions.set(positionKey, {
-      lp: sender as string,
+    positions.set(tokenId.toString(), {
+      lp: lp,
       poolId: poolId,
       tickLower: tickLower!,
       tickUpper: tickUpper!,
@@ -330,32 +340,84 @@ async function fetchLPFees(
     });
   }
 
-  // todo: incorporate uncollected fees
-  // // 4. Calculate final "uncollected" fees for all remaining positions
-  // for (const [key, position] of positions.entries()) {
-  //     if (position.liquidity > 0) {
-  //         const positionFinalFeeGrowth = await getFeeGrowthInside(
-  //             client,
-  //             poolId,
-  //             position.tickLower,
-  //             position.tickUpper,
-  //             endBlock
-  //         );
+  // 3. Calculate final "uncollected" fees for all remaining positions
+  for (const [key, position] of positions.entries()) {
+    if (position.liquidity > 0) {
+      const positionFinalFeeGrowth = await getFeeGrowthInside(
+        client,
+        poolId,
+        position.tickLower,
+        position.tickUpper,
+        endBlock
+      );
 
-  //         const uncollectedFees0 = ((positionFinalFeeGrowth.feeGrowthInside0 - position.feeGrowthInsideLast0) * position.liquidity) / (2n ** 128n);
-  //         const uncollectedFees1 = ((positionFinalFeeGrowth.feeGrowthInside1 - position.feeGrowthInsideLast1) * position.liquidity) / (2n ** 128n);
+      const uncollectedFees0 =
+        ((positionFinalFeeGrowth.feeGrowthInside0 -
+          position.feeGrowthInsideLast0) *
+          position.liquidity) /
+        2n ** 128n;
+      const uncollectedFees1 =
+        ((positionFinalFeeGrowth.feeGrowthInside1 -
+          position.feeGrowthInsideLast1) *
+          position.liquidity) /
+        2n ** 128n;
 
-  //         const currentLpTotal = lpFees.get(position.lp) ?? { totalFees0: 0n, totalFees1: 0n };
-  //         lpFees.set(position.lp, {
-  //             totalFees0: currentLpTotal.totalFees0 + uncollectedFees0,
-  //             totalFees1: currentLpTotal.totalFees1 + uncollectedFees1,
-  //         });
-  //     }
-  // }
+      const currentLpTotal = lpFees.get(position.lp) ?? {
+        totalFees0: 0n,
+        totalFees1: 0n,
+      };
+      lpFees.set(position.lp, {
+        totalFees0: currentLpTotal.totalFees0 + uncollectedFees0,
+        totalFees1: currentLpTotal.totalFees1 + uncollectedFees1,
+      });
+    }
+  }
 
   // This script now only calculates fees earned *during the specified block range*.
   // The total cumulative fee is implicitly stored by not resetting lpFees between runs
   return { lpFees, finalPositions: positions };
+}
+
+/**
+ * PositionInfoLibrary logic replicated offchain to decode packed `uint256 positionInfo`
+ * @param info The packed bigint/uint256 value.
+ * @returns An object with the decoded `(bytes25 poolId), int24 tickLower, int24 tickUpper`
+ */
+function unpackPositionInfo(info: bigint): {
+  poolId: string;
+  tickLower: number;
+  tickUpper: number;
+} {
+  const TICK_LOWER_OFFSET = 8n;
+  const TICK_UPPER_OFFSET = 32n;
+  const POOL_ID_OFFSET = 56n;
+
+  const MASK_24_BITS = 0xffffffn;
+  const SIGN_BIT_24 = 0x800000n;
+  const MAX_UINT_24 = 0x1000000n;
+
+  // Extract tickLower (int24)
+  let tickLowerRaw = (info >> TICK_LOWER_OFFSET) & MASK_24_BITS;
+  if ((tickLowerRaw & SIGN_BIT_24) !== 0n) {
+    tickLowerRaw -= MAX_UINT_24;
+  }
+
+  // Extract tickUpper (int24)
+  let tickUpperRaw = (info >> TICK_UPPER_OFFSET) & MASK_24_BITS;
+  if ((tickUpperRaw & SIGN_BIT_24) !== 0n) {
+    tickUpperRaw -= MAX_UINT_24;
+  }
+
+  // Extract poolId (bytes25)
+  // The poolId is in the upper 200 bits. We just need to shift right.
+  const poolIdBigInt = info >> POOL_ID_OFFSET;
+  const poolIdHex = poolIdBigInt.toString(16).padStart(50, "0");
+
+  return {
+    poolId: `0x${poolIdHex}`,
+    tickLower: Number(tickLowerRaw),
+    tickUpper: Number(tickUpperRaw),
+  };
 }
 
 /**
@@ -425,3 +487,154 @@ async function getPoolCreationBlock(
 }
 
 main();
+
+//todo: delete below once above is verified working
+async function fetchLPFeesTransfer(
+  poolId: string,
+  startBlock: bigint,
+  endBlock: bigint,
+  client: PublicClient,
+  initialPositions: Map<string, PositionState>
+): Promise<{
+  lpFees: Map<Address, LPFees>;
+  finalPositions: Map<string, PositionState>;
+}> {
+  const lpFees = new Map<Address, LPFees>();
+  // use copy of initial positions fetched from checkpoint file
+  const positions = new Map<string, PositionState>(initialPositions);
+
+  // 1. Fetch all relevant events (transfers, modifyLiquidities) from the PositionManager
+  const transferLogs = await client.getLogs({
+    address: POSITION_MANAGER_ADDRESS,
+    event: parseAbiItem(
+      "event Transfer(address indexed from, address indexed to, uint256 indexed id)"
+    ),
+    fromBlock: startBlock,
+    toBlock: endBlock,
+  });
+  const modifyLogs = await client.getLogs({
+    address: POOL_MANAGER_ADDRESS,
+    event: parseAbiItem(
+      "event ModifyLiquidity(bytes32 indexed id, address indexed sender, int24 tickLower, int24 tickUpper, int256 liquidityDelta, bytes32 salt)"
+    ),
+    args: { id: poolId as `0x${string}` },
+    fromBlock: startBlock,
+    toBlock: endBlock,
+  });
+
+  const allLogs = [...transferLogs, ...modifyLogs].sort((a, b) => {
+    if (a.blockNumber === b.blockNumber) {
+      return Number(a.logIndex) - Number(b.logIndex);
+    }
+    return Number(a.blockNumber) - Number(b.blockNumber);
+  });
+
+  // 2. Process events chronologically
+  for (const log of allLogs) {
+    if (!log.args || !log.blockNumber) continue;
+    const tokenId = (log.args as any).tokenId
+      ? BigInt((log.args as any).tokenId)
+      : hexToBigInt((log.args as any).salt);
+    if (!tokenId) throw new Error("Missing tokenId in event args");
+    let currentPositionState = positions.get(tokenId.toString());
+
+    // Fetch position details if we haven't seen this tokenId before
+    if (!currentPositionState) {
+      const positionInfo = await client.readContract({
+        address: POSITION_MANAGER_ADDRESS,
+        abi: POSITION_MANAGER_ABI,
+        functionName: "positionInfo",
+        args: [tokenId],
+        blockNumber: log.blockNumber,
+      });
+
+      const posDetails = unpackPositionInfo(positionInfo as bigint);
+
+      // IMPORTANT: poolIds are truncated to 52 chars (0x + 50 hex chars) in packed `positionInfo`
+      const poolIdTruncated = poolId.toLowerCase().substring(0, 52); // 0x + 50 chars
+      // Only proceed if the position belongs to the pool we're analyzing
+      if (posDetails.poolId.toLowerCase() !== poolIdTruncated) continue;
+
+      positions.set(tokenId.toString(), {
+        lp: zeroAddress, // placeholder; will be set when processing Transfer event below
+        poolId: posDetails.poolId,
+        tickLower: posDetails.tickLower,
+        tickUpper: posDetails.tickUpper,
+        liquidity: 0n, // placeholder: will be set when processing Modifyliquidity event below
+        feeGrowthInsideLast0: 0n,
+        feeGrowthInsideLast1: 0n,
+      });
+      currentPositionState = positions.get(tokenId.toString())!;
+    }
+
+    // handle event based on its type
+    if (log.eventName === "Transfer") {
+      // Transfer event: overwrite zero address placeholder with actual LP address
+      currentPositionState.lp = (log.args as any).to;
+    } else {
+      // ModifyLiquidity event: apply fee calculation logic triggered by liquidity change
+      if (currentPositionState.liquidity > 0) {
+        const feeGrowthInsideNow = await getFeeGrowthInside(
+          client,
+          currentPositionState.poolId,
+          currentPositionState.tickLower,
+          currentPositionState.tickUpper,
+          log.blockNumber - 1n // fetch state just BEFORE this event
+        );
+        const feesEarned0 =
+          ((feeGrowthInsideNow.feeGrowthInside0 -
+            currentPositionState.feeGrowthInsideLast0) *
+            currentPositionState.liquidity) /
+          2n ** 128n;
+        const feesEarned1 =
+          ((feeGrowthInsideNow.feeGrowthInside1 -
+            currentPositionState.feeGrowthInsideLast1) *
+            currentPositionState.liquidity) /
+          2n ** 128n;
+
+        // update current lp owner
+        const lp = await client.readContract({
+          address: POSITION_MANAGER_ADDRESS,
+          abi: POSITION_MANAGER_ABI,
+          functionName: "ownerOf",
+          args: [tokenId],
+          blockNumber: log.blockNumber,
+        });
+        currentPositionState.lp = lp;
+
+        // Add collected fees to the LP's total
+        const currentLpTotal = lpFees.get(lp) ?? {
+          totalFees0: 0n,
+          totalFees1: 0n,
+        };
+        lpFees.set(lp, {
+          totalFees0: currentLpTotal.totalFees0 + feesEarned0,
+          totalFees1: currentLpTotal.totalFees1 + feesEarned1,
+        });
+      }
+
+      const liquidityDelta = BigInt(log.args.liquidityDelta!);
+      currentPositionState.liquidity += liquidityDelta;
+
+      const feeGrowthInsideAtEvent = await getFeeGrowthInside(
+        client,
+        currentPositionState.poolId,
+        currentPositionState.tickLower,
+        currentPositionState.tickUpper,
+        log.blockNumber
+      );
+      currentPositionState.feeGrowthInsideLast0 =
+        feeGrowthInsideAtEvent.feeGrowthInside0;
+      currentPositionState.feeGrowthInsideLast1 =
+        feeGrowthInsideAtEvent.feeGrowthInside1;
+    }
+  }
+
+  //todo:
+  // After processing events, calculate fees for positions that were not modified in this period
+  // This logic is now more complex as we need to ensure we don't double-count
+  // For simplicity, this part is omitted but would be needed for full accuracy if many positions are idle.
+  // The current script accurately calculates fees for any position that had any interaction (transfer/liquidity change).
+
+  return { lpFees, finalPositions: positions };
+}
