@@ -78,11 +78,13 @@ const POSITION_MANAGER_ABI = parseAbi([
 ]);
 
 interface PositionState {
-  lp: string;
-  poolId: string;
+  lp: Address;
+  poolId: `0x${string}`;
   tickLower: number;
   tickUpper: number;
   liquidity: bigint;
+  feeGrowthInsidePeriod0: bigint;
+  feeGrowthInsidePeriod1: bigint;
   // the fee growth inside the range, as of the last modification event
   feeGrowthInsideLast0: bigint;
   feeGrowthInsideLast1: bigint;
@@ -104,8 +106,9 @@ async function main() {
   const client = createPublicClient({ transport: http(rpcUrl) });
 
   // SET RANGE HERE
-  let startBlock = INITIALIZE_BLOCK;
-  let endBlock = PROGRAM_START;
+  let startBlock = INITIALIZE_BLOCK; //PROGRAM_START;
+  let endBlock = PROGRAM_START; //FIRST_PERIOD_END;
+  //todo: check if blocks range is inclusive or exclusive
 
   await updateFeesAndPositions(POOL_ID, startBlock, endBlock, client).then(
     (res) => console.log(res)
@@ -113,53 +116,45 @@ async function main() {
 }
 
 async function updateFeesAndPositions(
-  poolId: string,
+  poolId: `0x${string}`,
   startBlock: bigint,
-  currentBlock: bigint,
+  endBlock: bigint,
   client: PublicClient
 ): Promise<{}> {
-  let initialPositions = new Map<string, PositionState>();
-
-  // 1. Load state from checkpoint json if it exists
-  if (existsSync(CHECKPOINT_FILE)) {
-    console.log("Checkpoint file found, loading previous state...");
-    const fileContent = await readFile(CHECKPOINT_FILE, "utf-8");
-    const checkpoint: CheckpointData = JSON.parse(fileContent, (key, value) =>
-      typeof value === "string" && /^\d+n$/.test(value)
-        ? BigInt(value.slice(0, -1))
-        : value
-    );
-    startBlock = BigInt(checkpoint.lastProcessedBlock) + 1n;
-    initialPositions = new Map(checkpoint.positions);
-  } else {
-    console.log("No checkpoint file found, starting from pool creation block.");
-  }
-
-  if (startBlock > currentBlock) {
-    console.error("Already up to date. No new blocks to process.");
-    throw new Error("No new blocks to process");
-  }
-
-  console.log(`Analyzing fees from block ${startBlock} to ${currentBlock}...`);
+  // 1. Load state from checkpoint json if it exists and reset its period-specific fee fields
+  let initialPositions: Map<string, PositionState> = await initialize(
+    startBlock,
+    endBlock
+  );
 
   // 2. Run the core analysis logic
   const { lpFees, finalPositions } = await fetchLPFees(
     poolId,
     startBlock,
-    currentBlock,
+    endBlock,
     client,
     initialPositions
   );
 
-  //todo remove to save to checkpoints file once working properly
-  //todo forward positions checkpoints file to telx council to check position info is accurate
-  //todo derive rewards from lpFees
-  //todo write rewards and lpFees to a separate file for publishing
-  return { lpFees, finalPositions };
+  // 3. assert final outputs are correct
+  for (const [key, position] of finalPositions) {
+    verifyPositionCheckpoint(
+      key,
+      position,
+      client,
+      poolId as `0x${string}`,
+      endBlock
+    );
+  }
 
-  // 3. Save the new state to the checkpoint file
+  //todo derive rewards from lpFees
+  //todo forward positions checkpoints file to telx council to check position info is accurate
+  //todo write rewards and lpFees to a separate file for publishing
+  //todo file should be formatted similarly to tanip1 incl chain, pool, period start/end, total rewards, total fees, lp rewards/fees
+
+  // 4. Save the new state to the checkpoint file
   const newCheckpoint: CheckpointData = {
-    lastProcessedBlock: currentBlock.toString(),
+    lastProcessedBlock: endBlock.toString(),
     positions: Array.from(finalPositions.entries()),
   };
   await writeFile(
@@ -179,12 +174,64 @@ async function updateFeesAndPositions(
 }
 
 /**
+ * Initialize the script run by loading previous state from checkpoint file if it exists
+ * and resetting all per-period fee values such as `position.feeGrowthInsidePeriod0/1`
+ */
+async function initialize(
+  startBlock: bigint,
+  endBlock: bigint
+): Promise<Map<string, PositionState>> {
+  let initialPositions = new Map<string, PositionState>();
+
+  if (existsSync(CHECKPOINT_FILE)) {
+    console.log("Checkpoint file found, loading previous state...");
+    const fileContent = await readFile(CHECKPOINT_FILE, "utf-8");
+    const checkpoint: CheckpointData = JSON.parse(fileContent, (key, value) =>
+      typeof value === "string" && /^\d+n$/.test(value)
+        ? BigInt(value.slice(0, -1))
+        : value
+    );
+
+    const expectedStartBlock = BigInt(checkpoint.lastProcessedBlock) + 1n;
+    if (startBlock !== expectedStartBlock) {
+      throw new Error(
+        `Provided startBlock (${startBlock}) does not correspond to lastProcessedBlock + 1 (${expectedStartBlock})`
+      );
+    }
+
+    initialPositions = new Map(checkpoint.positions);
+  } else {
+    if (startBlock !== INITIALIZE_BLOCK) {
+      throw new Error(
+        `No checkpoint file found. Please set startBlock to the pool creation block (${INITIALIZE_BLOCK}) for first runs.`
+      );
+    }
+  }
+
+  if (startBlock > endBlock) {
+    console.error("Already up to date. No new blocks to process.");
+    throw new Error("No new blocks to process");
+  }
+
+  // wipe all positions.feeGrowthInsidePeriod0/1 to 0n at start of period to track per-period fees
+  for (const [key, position] of initialPositions) {
+    updatePosition(initialPositions, key, {
+      feeGrowthInsidePeriod0: 0n,
+      feeGrowthInsidePeriod1: 0n,
+    });
+  }
+  console.log(`Analyzing fees from block ${startBlock} to ${endBlock}...`);
+
+  return initialPositions;
+}
+
+/**
  * Identifies cumulative fee totals for each liquidity provider
  * @return lpFees Map of `tokenId => PositionState` tracking state of each unique position
  * @return finalPositions Map of `LP => LPFees` tracking total fees per LP
  */
 async function fetchLPFees(
-  poolId: string,
+  poolId: `0x${string}`,
   startBlock: bigint,
   endBlock: bigint,
   client: PublicClient,
@@ -268,6 +315,8 @@ async function fetchLPFees(
         });
         updatePosition(positions, key, {
           lp: lp,
+          feeGrowthInsidePeriod0: feesEarned0,
+          feeGrowthInsidePeriod1: feesEarned1,
           feeGrowthInsideLast0: feeGrowthAtEnd.feeGrowthInside0,
           feeGrowthInsideLast1: feeGrowthAtEnd.feeGrowthInside1,
           lastUpdatedBlock: endBlock,
@@ -276,7 +325,7 @@ async function fetchLPFees(
     }
   }
 
-  // 3. Process ModifyLiquidity events chronologically
+  // 3. Identify collected fee totals by processing ModifyLiquidity events chronologically
   for (const log of logs) {
     if (!log.args || !log.blockNumber) continue;
     const { tickLower, tickUpper, liquidityDelta, salt } = log.args;
@@ -293,6 +342,14 @@ async function fetchLPFees(
 
     // If position existed, its liquidity was active since last update; calculate subperiod's fees
     const currentPositionState = positions.get(tokenId.toString());
+    //todo: wipe all positions.feeGrowthInsidePeriod0/1 to 0n at start of period so we can track per-period fees
+    // all positions.feeGrowthInsidePeriod0/1 are wiped to 0n at start of period so this assignment is period-specific
+    let feesEarnedThisPeriod0 = currentPositionState?.feeGrowthInsidePeriod0
+      ? currentPositionState?.feeGrowthInsidePeriod0
+      : 0n;
+    let feesEarnedThisPeriod1 = currentPositionState?.feeGrowthInsidePeriod1
+      ? currentPositionState?.feeGrowthInsidePeriod1
+      : 0n;
     if (currentPositionState && currentPositionState.liquidity > 0) {
       // fetch state just BEFORE this event
       const feeGrowthInsideNow = await getFeeGrowthInside(
@@ -312,7 +369,12 @@ async function fetchLPFees(
           currentPositionState.feeGrowthInsideLast1) *
           currentPositionState.liquidity) /
         2n ** 128n;
-      // Add these "collected" fees to the LP's total
+
+      // add subperiod's collected fees to period total for this position
+      feesEarnedThisPeriod0 += feesEarned0;
+      feesEarnedThisPeriod1 += feesEarned1;
+
+      // add these collected fees to the LP's total
       const currentLpTotal = lpFees.get(lp) ?? {
         totalFees0: 0n,
         totalFees1: 0n,
@@ -340,13 +402,15 @@ async function fetchLPFees(
       tickLower: tickLower!,
       tickUpper: tickUpper!,
       liquidity: newLiquidity,
+      feeGrowthInsidePeriod0: feesEarnedThisPeriod0,
+      feeGrowthInsidePeriod1: feesEarnedThisPeriod1,
       feeGrowthInsideLast0: feeGrowthInsideAtEvent.feeGrowthInside0,
       feeGrowthInsideLast1: feeGrowthInsideAtEvent.feeGrowthInside1,
       lastUpdatedBlock: log.blockNumber,
     });
   }
 
-  // 4. Calculate final "uncollected" fees for all positions
+  // 4. Calculate final uncollected fees for all positions with liquidity modifications this period
   for (const [key, position] of positions.entries()) {
     if (position.liquidity > 0 && position.lastUpdatedBlock !== endBlock) {
       const positionFinalFeeGrowth = await getFeeGrowthInside(
@@ -368,6 +432,12 @@ async function fetchLPFees(
           position.liquidity) /
         2n ** 128n;
 
+      // add uncollected fees to previously identified collected fees
+      const totalFeesThisPeriod0 =
+        position.feeGrowthInsidePeriod0 + uncollectedFees0;
+      const totalFeesThisPeriod1 =
+        position.feeGrowthInsidePeriod1 + uncollectedFees1;
+
       // owner may have changed; fetch current lp owner as of last block
       const lp = await client.readContract({
         address: POSITION_MANAGER_ADDRESS,
@@ -376,7 +446,7 @@ async function fetchLPFees(
         args: [BigInt(key)],
         blockNumber: endBlock,
       });
-      // update lpFees with uncollected fees
+      // update lpFees with uncollected fees (credited to current position owner)
       const currentLpTotal = lpFees.get(lp) ?? {
         totalFees0: 0n,
         totalFees1: 0n,
@@ -390,10 +460,30 @@ async function fetchLPFees(
       // liquidity is excluded since it is guaranteed the same after processing all events
       updatePosition(positions, key, {
         lp: lp,
+        feeGrowthInsidePeriod0: totalFeesThisPeriod0,
+        feeGrowthInsidePeriod1: totalFeesThisPeriod1,
         feeGrowthInsideLast0: positionFinalFeeGrowth.feeGrowthInside0,
         feeGrowthInsideLast1: positionFinalFeeGrowth.feeGrowthInside1,
         lastUpdatedBlock: endBlock,
       });
+    } else {
+      // liquidity is 0; check if position still exists onchain;
+      try {
+        await client.readContract({
+          address: POSITION_MANAGER_ADDRESS,
+          abi: POSITION_MANAGER_ABI,
+          functionName: "ownerOf",
+          args: [BigInt(key)],
+          blockNumber: endBlock,
+        });
+        // it exists; update only lastUpdatedBlock
+        updatePosition(positions, key, {
+          lastUpdatedBlock: endBlock,
+        });
+      } catch (e) {
+        // position does not exist; remove it
+        positions.delete(key);
+      }
     }
   }
 
@@ -408,13 +498,15 @@ function updatePosition(
   key: string,
   updates: {
     lp?: Address;
-    poolId?: string;
+    poolId?: `0x${string}`;
     tickLower?: number;
     tickUpper?: number;
     liquidity?: bigint;
-    feeGrowthInsideLast0: bigint;
-    feeGrowthInsideLast1: bigint;
-    lastUpdatedBlock: bigint;
+    feeGrowthInsidePeriod0?: bigint;
+    feeGrowthInsidePeriod1?: bigint;
+    feeGrowthInsideLast0?: bigint;
+    feeGrowthInsideLast1?: bigint;
+    lastUpdatedBlock?: bigint;
   }
 ) {
   const existing = positions.get(key);
@@ -432,7 +524,12 @@ function updatePosition(
       !updates.poolId ||
       updates.tickLower === undefined ||
       updates.tickUpper === undefined ||
-      updates.liquidity === undefined
+      updates.liquidity === undefined ||
+      updates.feeGrowthInsidePeriod0 === undefined ||
+      updates.feeGrowthInsidePeriod1 === undefined ||
+      updates.feeGrowthInsideLast0 === undefined ||
+      updates.feeGrowthInsideLast1 === undefined ||
+      updates.lastUpdatedBlock === undefined
     ) {
       throw new Error(
         `Cannot create new position ${key}: due to missing required fields.`
@@ -446,6 +543,8 @@ function updatePosition(
       tickLower: updates.tickLower,
       tickUpper: updates.tickUpper,
       liquidity: updates.liquidity,
+      feeGrowthInsidePeriod0: updates.feeGrowthInsidePeriod0,
+      feeGrowthInsidePeriod1: updates.feeGrowthInsidePeriod1,
       feeGrowthInsideLast0: updates.feeGrowthInsideLast0,
       feeGrowthInsideLast1: updates.feeGrowthInsideLast1,
       lastUpdatedBlock: updates.lastUpdatedBlock,
@@ -477,6 +576,61 @@ async function getFeeGrowthInside(
     feeGrowthInside0: feeGrowthInside0,
     feeGrowthInside1: feeGrowthInside1,
   };
+}
+
+/**
+ * Asserts that a position's stored state matches on-chain data at the end of the analyzed period.
+ * Throws an error if any discrepancies are found.
+ */
+async function verifyPositionCheckpoint(
+  key: string,
+  position: PositionState,
+  client: PublicClient,
+  poolId: `0x${string}`,
+  endBlock: bigint
+) {
+  if (position.poolId.toLowerCase() !== poolId.toLowerCase()) {
+    throw new Error(
+      `Discrepancy found for tokenId ${key}: stored poolId ${position.poolId} does not match target poolId ${poolId}`
+    );
+  }
+  // ensure `lastUpdatedBlock === endBlock` for all positions
+  if (position.lastUpdatedBlock !== endBlock) {
+    throw new Error(
+      `Position ${key} lastUpdatedBlock ${position.lastUpdatedBlock} does not match endBlock ${endBlock}`
+    );
+  }
+  // ensure position lp corresponds to ownerOf(tokenId)
+  const owner = await client.readContract({
+    address: POSITION_MANAGER_ADDRESS,
+    abi: POSITION_MANAGER_ABI,
+    functionName: "ownerOf",
+    args: [BigInt(key)],
+    blockNumber: endBlock,
+  });
+  if (owner !== position.lp) {
+    throw new Error(
+      `Discrepancy found for tokenId ${key}: stored LP ${position.lp} vs on-chain owner ${owner}`
+    );
+  }
+  // if position still active, ensure feeGrowthInside position's tick range was updated with latest on-chain state
+  if (position.liquidity != 0n) {
+    const feeGrowthOnChain = await getFeeGrowthInside(
+      client,
+      poolId,
+      position.tickLower,
+      position.tickUpper,
+      endBlock
+    );
+    if (
+      feeGrowthOnChain.feeGrowthInside0 !== position.feeGrowthInsideLast0 ||
+      feeGrowthOnChain.feeGrowthInside1 !== position.feeGrowthInsideLast1
+    ) {
+      throw new Error(
+        `Discrepancy found for tokenId ${key}: stored feeGrowthInsideLast0/1 (${position.feeGrowthInsideLast0}, ${position.feeGrowthInsideLast1}) vs on-chain (${feeGrowthOnChain.feeGrowthInside0}, ${feeGrowthOnChain.feeGrowthInside1})`
+      );
+    }
+  }
 }
 
 /**
@@ -534,189 +688,189 @@ async function getPoolCreationBlock(
 main();
 
 //todo: delete below once above is verified working
-async function fetchLPFeesTransfer(
-  poolId: string,
-  startBlock: bigint,
-  endBlock: bigint,
-  client: PublicClient,
-  initialPositions: Map<string, PositionState>
-): Promise<{
-  lpFees: Map<Address, LPFees>;
-  finalPositions: Map<string, PositionState>;
-}> {
-  const lpFees = new Map<Address, LPFees>();
-  // use copy of initial positions fetched from checkpoint file
-  const positions = new Map<string, PositionState>(initialPositions);
+// async function fetchLPFeesTransfer(
+//   poolId: string,
+//   startBlock: bigint,
+//   endBlock: bigint,
+//   client: PublicClient,
+//   initialPositions: Map<string, PositionState>
+// ): Promise<{
+//   lpFees: Map<Address, LPFees>;
+//   finalPositions: Map<string, PositionState>;
+// }> {
+//   const lpFees = new Map<Address, LPFees>();
+//   // use copy of initial positions fetched from checkpoint file
+//   const positions = new Map<string, PositionState>(initialPositions);
 
-  // 1. Fetch all relevant events (transfers, modifyLiquidities) from the PositionManager
-  const transferLogs = await client.getLogs({
-    address: POSITION_MANAGER_ADDRESS,
-    event: parseAbiItem(
-      "event Transfer(address indexed from, address indexed to, uint256 indexed id)"
-    ),
-    fromBlock: startBlock,
-    toBlock: endBlock,
-  });
-  const modifyLogs = await client.getLogs({
-    address: POOL_MANAGER_ADDRESS,
-    event: parseAbiItem(
-      "event ModifyLiquidity(bytes32 indexed id, address indexed sender, int24 tickLower, int24 tickUpper, int256 liquidityDelta, bytes32 salt)"
-    ),
-    args: { id: poolId as `0x${string}` },
-    fromBlock: startBlock,
-    toBlock: endBlock,
-  });
+//   // 1. Fetch all relevant events (transfers, modifyLiquidities) from the PositionManager
+//   const transferLogs = await client.getLogs({
+//     address: POSITION_MANAGER_ADDRESS,
+//     event: parseAbiItem(
+//       "event Transfer(address indexed from, address indexed to, uint256 indexed id)"
+//     ),
+//     fromBlock: startBlock,
+//     toBlock: endBlock,
+//   });
+//   const modifyLogs = await client.getLogs({
+//     address: POOL_MANAGER_ADDRESS,
+//     event: parseAbiItem(
+//       "event ModifyLiquidity(bytes32 indexed id, address indexed sender, int24 tickLower, int24 tickUpper, int256 liquidityDelta, bytes32 salt)"
+//     ),
+//     args: { id: poolId as `0x${string}` },
+//     fromBlock: startBlock,
+//     toBlock: endBlock,
+//   });
 
-  const allLogs = [...transferLogs, ...modifyLogs].sort((a, b) => {
-    if (a.blockNumber === b.blockNumber) {
-      return Number(a.logIndex) - Number(b.logIndex);
-    }
-    return Number(a.blockNumber) - Number(b.blockNumber);
-  });
+//   const allLogs = [...transferLogs, ...modifyLogs].sort((a, b) => {
+//     if (a.blockNumber === b.blockNumber) {
+//       return Number(a.logIndex) - Number(b.logIndex);
+//     }
+//     return Number(a.blockNumber) - Number(b.blockNumber);
+//   });
 
-  // 2. Process events chronologically
-  for (const log of allLogs) {
-    if (!log.args || !log.blockNumber) continue;
-    const tokenId = (log.args as any).tokenId
-      ? BigInt((log.args as any).tokenId)
-      : hexToBigInt((log.args as any).salt);
-    if (!tokenId) throw new Error("Missing tokenId in event args");
-    let currentPositionState = positions.get(tokenId.toString());
+//   // 2. Process events chronologically
+//   for (const log of allLogs) {
+//     if (!log.args || !log.blockNumber) continue;
+//     const tokenId = (log.args as any).tokenId
+//       ? BigInt((log.args as any).tokenId)
+//       : hexToBigInt((log.args as any).salt);
+//     if (!tokenId) throw new Error("Missing tokenId in event args");
+//     let currentPositionState = positions.get(tokenId.toString());
 
-    // Fetch position details if we haven't seen this tokenId before
-    if (!currentPositionState) {
-      const positionInfo = await client.readContract({
-        address: POSITION_MANAGER_ADDRESS,
-        abi: POSITION_MANAGER_ABI,
-        functionName: "positionInfo",
-        args: [tokenId],
-        blockNumber: log.blockNumber,
-      });
+//     // Fetch position details if we haven't seen this tokenId before
+//     if (!currentPositionState) {
+//       const positionInfo = await client.readContract({
+//         address: POSITION_MANAGER_ADDRESS,
+//         abi: POSITION_MANAGER_ABI,
+//         functionName: "positionInfo",
+//         args: [tokenId],
+//         blockNumber: log.blockNumber,
+//       });
 
-      const posDetails = unpackPositionInfo(positionInfo as bigint);
+//       const posDetails = unpackPositionInfo(positionInfo as bigint);
 
-      // IMPORTANT: poolIds are truncated to 52 chars (0x + 50 hex chars) in packed `positionInfo`
-      const poolIdTruncated = poolId.toLowerCase().substring(0, 52); // 0x + 50 chars
-      // Only proceed if the position belongs to the pool we're analyzing
-      if (posDetails.poolId.toLowerCase() !== poolIdTruncated) continue;
+//       // IMPORTANT: poolIds are truncated to 52 chars (0x + 50 hex chars) in packed `positionInfo`
+//       const poolIdTruncated = poolId.toLowerCase().substring(0, 52); // 0x + 50 chars
+//       // Only proceed if the position belongs to the pool we're analyzing
+//       if (posDetails.poolId.toLowerCase() !== poolIdTruncated) continue;
 
-      positions.set(tokenId.toString(), {
-        lp: zeroAddress, // placeholder; will be set when processing Transfer event below
-        poolId: posDetails.poolId,
-        tickLower: posDetails.tickLower,
-        tickUpper: posDetails.tickUpper,
-        liquidity: 0n, // placeholder: will be set when processing Modifyliquidity event below
-        feeGrowthInsideLast0: 0n,
-        feeGrowthInsideLast1: 0n,
-        lastUpdatedBlock: log.blockNumber,
-      });
-      currentPositionState = positions.get(tokenId.toString())!;
-    }
+//       positions.set(tokenId.toString(), {
+//         lp: zeroAddress, // placeholder; will be set when processing Transfer event below
+//         poolId: posDetails.poolId,
+//         tickLower: posDetails.tickLower,
+//         tickUpper: posDetails.tickUpper,
+//         liquidity: 0n, // placeholder: will be set when processing Modifyliquidity event below
+//         feeGrowthInsideLast0: 0n,
+//         feeGrowthInsideLast1: 0n,
+//         lastUpdatedBlock: log.blockNumber,
+//       });
+//       currentPositionState = positions.get(tokenId.toString())!;
+//     }
 
-    // handle event based on its type
-    if (log.eventName === "Transfer") {
-      // Transfer event: overwrite zero address placeholder with actual LP address
-      currentPositionState.lp = (log.args as any).to;
-    } else {
-      // ModifyLiquidity event: apply fee calculation logic triggered by liquidity change
-      if (currentPositionState.liquidity > 0) {
-        const feeGrowthInsideNow = await getFeeGrowthInside(
-          client,
-          currentPositionState.poolId,
-          currentPositionState.tickLower,
-          currentPositionState.tickUpper,
-          log.blockNumber - 1n // fetch state just BEFORE this event
-        );
-        const feesEarned0 =
-          ((feeGrowthInsideNow.feeGrowthInside0 -
-            currentPositionState.feeGrowthInsideLast0) *
-            currentPositionState.liquidity) /
-          2n ** 128n;
-        const feesEarned1 =
-          ((feeGrowthInsideNow.feeGrowthInside1 -
-            currentPositionState.feeGrowthInsideLast1) *
-            currentPositionState.liquidity) /
-          2n ** 128n;
+//     // handle event based on its type
+//     if (log.eventName === "Transfer") {
+//       // Transfer event: overwrite zero address placeholder with actual LP address
+//       currentPositionState.lp = (log.args as any).to;
+//     } else {
+//       // ModifyLiquidity event: apply fee calculation logic triggered by liquidity change
+//       if (currentPositionState.liquidity > 0) {
+//         const feeGrowthInsideNow = await getFeeGrowthInside(
+//           client,
+//           currentPositionState.poolId,
+//           currentPositionState.tickLower,
+//           currentPositionState.tickUpper,
+//           log.blockNumber - 1n // fetch state just BEFORE this event
+//         );
+//         const feesEarned0 =
+//           ((feeGrowthInsideNow.feeGrowthInside0 -
+//             currentPositionState.feeGrowthInsideLast0) *
+//             currentPositionState.liquidity) /
+//           2n ** 128n;
+//         const feesEarned1 =
+//           ((feeGrowthInsideNow.feeGrowthInside1 -
+//             currentPositionState.feeGrowthInsideLast1) *
+//             currentPositionState.liquidity) /
+//           2n ** 128n;
 
-        // update current lp owner
-        const lp = await client.readContract({
-          address: POSITION_MANAGER_ADDRESS,
-          abi: POSITION_MANAGER_ABI,
-          functionName: "ownerOf",
-          args: [tokenId],
-          blockNumber: log.blockNumber,
-        });
-        currentPositionState.lp = lp;
+//         // update current lp owner
+//         const lp = await client.readContract({
+//           address: POSITION_MANAGER_ADDRESS,
+//           abi: POSITION_MANAGER_ABI,
+//           functionName: "ownerOf",
+//           args: [tokenId],
+//           blockNumber: log.blockNumber,
+//         });
+//         currentPositionState.lp = lp;
 
-        // Add collected fees to the LP's total
-        const currentLpTotal = lpFees.get(lp) ?? {
-          totalFees0: 0n,
-          totalFees1: 0n,
-        };
-        lpFees.set(lp, {
-          totalFees0: currentLpTotal.totalFees0 + feesEarned0,
-          totalFees1: currentLpTotal.totalFees1 + feesEarned1,
-        });
-      }
+//         // Add collected fees to the LP's total
+//         const currentLpTotal = lpFees.get(lp) ?? {
+//           totalFees0: 0n,
+//           totalFees1: 0n,
+//         };
+//         lpFees.set(lp, {
+//           totalFees0: currentLpTotal.totalFees0 + feesEarned0,
+//           totalFees1: currentLpTotal.totalFees1 + feesEarned1,
+//         });
+//       }
 
-      const liquidityDelta = BigInt(log.args.liquidityDelta!);
-      currentPositionState.liquidity += liquidityDelta;
+//       const liquidityDelta = BigInt(log.args.liquidityDelta!);
+//       currentPositionState.liquidity += liquidityDelta;
 
-      const feeGrowthInsideAtEvent = await getFeeGrowthInside(
-        client,
-        currentPositionState.poolId,
-        currentPositionState.tickLower,
-        currentPositionState.tickUpper,
-        log.blockNumber
-      );
-      currentPositionState.feeGrowthInsideLast0 =
-        feeGrowthInsideAtEvent.feeGrowthInside0;
-      currentPositionState.feeGrowthInsideLast1 =
-        feeGrowthInsideAtEvent.feeGrowthInside1;
-    }
-  }
+//       const feeGrowthInsideAtEvent = await getFeeGrowthInside(
+//         client,
+//         currentPositionState.poolId,
+//         currentPositionState.tickLower,
+//         currentPositionState.tickUpper,
+//         log.blockNumber
+//       );
+//       currentPositionState.feeGrowthInsideLast0 =
+//         feeGrowthInsideAtEvent.feeGrowthInside0;
+//       currentPositionState.feeGrowthInsideLast1 =
+//         feeGrowthInsideAtEvent.feeGrowthInside1;
+//     }
+//   }
 
-  return { lpFees, finalPositions: positions };
-}
+//   return { lpFees, finalPositions: positions };
+// }
 
-/**
- * PositionInfoLibrary logic replicated offchain to decode packed `uint256 positionInfo`
- * @param info The packed bigint/uint256 value.
- * @returns An object with the decoded `(bytes25 poolId), int24 tickLower, int24 tickUpper`
- */
-function unpackPositionInfo(info: bigint): {
-  poolId: string;
-  tickLower: number;
-  tickUpper: number;
-} {
-  const TICK_LOWER_OFFSET = 8n;
-  const TICK_UPPER_OFFSET = 32n;
-  const POOL_ID_OFFSET = 56n;
+// /**
+//  * PositionInfoLibrary logic replicated offchain to decode packed `uint256 positionInfo`
+//  * @param info The packed bigint/uint256 value.
+//  * @returns An object with the decoded `(bytes25 poolId), int24 tickLower, int24 tickUpper`
+//  */
+// function unpackPositionInfo(info: bigint): {
+//   poolId: string;
+//   tickLower: number;
+//   tickUpper: number;
+// } {
+//   const TICK_LOWER_OFFSET = 8n;
+//   const TICK_UPPER_OFFSET = 32n;
+//   const POOL_ID_OFFSET = 56n;
 
-  const MASK_24_BITS = 0xffffffn;
-  const SIGN_BIT_24 = 0x800000n;
-  const MAX_UINT_24 = 0x1000000n;
+//   const MASK_24_BITS = 0xffffffn;
+//   const SIGN_BIT_24 = 0x800000n;
+//   const MAX_UINT_24 = 0x1000000n;
 
-  // Extract tickLower (int24)
-  let tickLowerRaw = (info >> TICK_LOWER_OFFSET) & MASK_24_BITS;
-  if ((tickLowerRaw & SIGN_BIT_24) !== 0n) {
-    tickLowerRaw -= MAX_UINT_24;
-  }
+//   // Extract tickLower (int24)
+//   let tickLowerRaw = (info >> TICK_LOWER_OFFSET) & MASK_24_BITS;
+//   if ((tickLowerRaw & SIGN_BIT_24) !== 0n) {
+//     tickLowerRaw -= MAX_UINT_24;
+//   }
 
-  // Extract tickUpper (int24)
-  let tickUpperRaw = (info >> TICK_UPPER_OFFSET) & MASK_24_BITS;
-  if ((tickUpperRaw & SIGN_BIT_24) !== 0n) {
-    tickUpperRaw -= MAX_UINT_24;
-  }
+//   // Extract tickUpper (int24)
+//   let tickUpperRaw = (info >> TICK_UPPER_OFFSET) & MASK_24_BITS;
+//   if ((tickUpperRaw & SIGN_BIT_24) !== 0n) {
+//     tickUpperRaw -= MAX_UINT_24;
+//   }
 
-  // Extract poolId (bytes25)
-  // The poolId is in the upper 200 bits. We just need to shift right.
-  const poolIdBigInt = info >> POOL_ID_OFFSET;
-  const poolIdHex = poolIdBigInt.toString(16).padStart(50, "0");
+//   // Extract poolId (bytes25)
+//   // The poolId is in the upper 200 bits. We just need to shift right.
+//   const poolIdBigInt = info >> POOL_ID_OFFSET;
+//   const poolIdHex = poolIdBigInt.toString(16).padStart(50, "0");
 
-  return {
-    poolId: `0x${poolIdHex}`,
-    tickLower: Number(tickLowerRaw),
-    tickUpper: Number(tickUpperRaw),
-  };
-}
+//   return {
+//     poolId: `0x${poolIdHex}`,
+//     tickLower: Number(tickLowerRaw),
+//     tickUpper: Number(tickUpperRaw),
+//   };
+// }
