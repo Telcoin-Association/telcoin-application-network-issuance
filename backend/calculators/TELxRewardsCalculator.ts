@@ -467,23 +467,8 @@ async function fetchLPFees(
         lastUpdatedBlock: endBlock,
       });
     } else {
-      // liquidity is 0; check if position still exists onchain;
-      try {
-        await client.readContract({
-          address: POSITION_MANAGER_ADDRESS,
-          abi: POSITION_MANAGER_ABI,
-          functionName: "ownerOf",
-          args: [BigInt(key)],
-          blockNumber: endBlock,
-        });
-        // it exists; update only lastUpdatedBlock
-        updatePosition(positions, key, {
-          lastUpdatedBlock: endBlock,
-        });
-      } catch (e) {
-        // position does not exist; remove it
-        positions.delete(key);
-      }
+      // liquidity is 0; delete it
+      positions.delete(key);
     }
   }
 
@@ -600,6 +585,11 @@ async function verifyPositionCheckpoint(
       `Position ${key} lastUpdatedBlock ${position.lastUpdatedBlock} does not match endBlock ${endBlock}`
     );
   }
+  if (position.liquidity === 0n) {
+    throw new Error(
+      `Position ${key} has zero liquidity; should have been deleted`
+    );
+  }
   // ensure position lp corresponds to ownerOf(tokenId)
   const owner = await client.readContract({
     address: POSITION_MANAGER_ADDRESS,
@@ -613,23 +603,21 @@ async function verifyPositionCheckpoint(
       `Discrepancy found for tokenId ${key}: stored LP ${position.lp} vs on-chain owner ${owner}`
     );
   }
-  // if position still active, ensure feeGrowthInside position's tick range was updated with latest on-chain state
-  if (position.liquidity != 0n) {
-    const feeGrowthOnChain = await getFeeGrowthInside(
-      client,
-      poolId,
-      position.tickLower,
-      position.tickUpper,
-      endBlock
+  // ensure feeGrowthInside position's tick range was updated with latest on-chain state
+  const feeGrowthOnChain = await getFeeGrowthInside(
+    client,
+    poolId,
+    position.tickLower,
+    position.tickUpper,
+    endBlock
+  );
+  if (
+    feeGrowthOnChain.feeGrowthInside0 !== position.feeGrowthInsideLast0 ||
+    feeGrowthOnChain.feeGrowthInside1 !== position.feeGrowthInsideLast1
+  ) {
+    throw new Error(
+      `Discrepancy found for tokenId ${key}: stored feeGrowthInsideLast0/1 (${position.feeGrowthInsideLast0}, ${position.feeGrowthInsideLast1}) vs on-chain (${feeGrowthOnChain.feeGrowthInside0}, ${feeGrowthOnChain.feeGrowthInside1})`
     );
-    if (
-      feeGrowthOnChain.feeGrowthInside0 !== position.feeGrowthInsideLast0 ||
-      feeGrowthOnChain.feeGrowthInside1 !== position.feeGrowthInsideLast1
-    ) {
-      throw new Error(
-        `Discrepancy found for tokenId ${key}: stored feeGrowthInsideLast0/1 (${position.feeGrowthInsideLast0}, ${position.feeGrowthInsideLast1}) vs on-chain (${feeGrowthOnChain.feeGrowthInside0}, ${feeGrowthOnChain.feeGrowthInside1})`
-      );
-    }
   }
 }
 
@@ -686,191 +674,3 @@ async function getPoolCreationBlock(
 }
 
 main();
-
-//todo: delete below once above is verified working
-// async function fetchLPFeesTransfer(
-//   poolId: string,
-//   startBlock: bigint,
-//   endBlock: bigint,
-//   client: PublicClient,
-//   initialPositions: Map<string, PositionState>
-// ): Promise<{
-//   lpFees: Map<Address, LPFees>;
-//   finalPositions: Map<string, PositionState>;
-// }> {
-//   const lpFees = new Map<Address, LPFees>();
-//   // use copy of initial positions fetched from checkpoint file
-//   const positions = new Map<string, PositionState>(initialPositions);
-
-//   // 1. Fetch all relevant events (transfers, modifyLiquidities) from the PositionManager
-//   const transferLogs = await client.getLogs({
-//     address: POSITION_MANAGER_ADDRESS,
-//     event: parseAbiItem(
-//       "event Transfer(address indexed from, address indexed to, uint256 indexed id)"
-//     ),
-//     fromBlock: startBlock,
-//     toBlock: endBlock,
-//   });
-//   const modifyLogs = await client.getLogs({
-//     address: POOL_MANAGER_ADDRESS,
-//     event: parseAbiItem(
-//       "event ModifyLiquidity(bytes32 indexed id, address indexed sender, int24 tickLower, int24 tickUpper, int256 liquidityDelta, bytes32 salt)"
-//     ),
-//     args: { id: poolId as `0x${string}` },
-//     fromBlock: startBlock,
-//     toBlock: endBlock,
-//   });
-
-//   const allLogs = [...transferLogs, ...modifyLogs].sort((a, b) => {
-//     if (a.blockNumber === b.blockNumber) {
-//       return Number(a.logIndex) - Number(b.logIndex);
-//     }
-//     return Number(a.blockNumber) - Number(b.blockNumber);
-//   });
-
-//   // 2. Process events chronologically
-//   for (const log of allLogs) {
-//     if (!log.args || !log.blockNumber) continue;
-//     const tokenId = (log.args as any).tokenId
-//       ? BigInt((log.args as any).tokenId)
-//       : hexToBigInt((log.args as any).salt);
-//     if (!tokenId) throw new Error("Missing tokenId in event args");
-//     let currentPositionState = positions.get(tokenId.toString());
-
-//     // Fetch position details if we haven't seen this tokenId before
-//     if (!currentPositionState) {
-//       const positionInfo = await client.readContract({
-//         address: POSITION_MANAGER_ADDRESS,
-//         abi: POSITION_MANAGER_ABI,
-//         functionName: "positionInfo",
-//         args: [tokenId],
-//         blockNumber: log.blockNumber,
-//       });
-
-//       const posDetails = unpackPositionInfo(positionInfo as bigint);
-
-//       // IMPORTANT: poolIds are truncated to 52 chars (0x + 50 hex chars) in packed `positionInfo`
-//       const poolIdTruncated = poolId.toLowerCase().substring(0, 52); // 0x + 50 chars
-//       // Only proceed if the position belongs to the pool we're analyzing
-//       if (posDetails.poolId.toLowerCase() !== poolIdTruncated) continue;
-
-//       positions.set(tokenId.toString(), {
-//         lp: zeroAddress, // placeholder; will be set when processing Transfer event below
-//         poolId: posDetails.poolId,
-//         tickLower: posDetails.tickLower,
-//         tickUpper: posDetails.tickUpper,
-//         liquidity: 0n, // placeholder: will be set when processing Modifyliquidity event below
-//         feeGrowthInsideLast0: 0n,
-//         feeGrowthInsideLast1: 0n,
-//         lastUpdatedBlock: log.blockNumber,
-//       });
-//       currentPositionState = positions.get(tokenId.toString())!;
-//     }
-
-//     // handle event based on its type
-//     if (log.eventName === "Transfer") {
-//       // Transfer event: overwrite zero address placeholder with actual LP address
-//       currentPositionState.lp = (log.args as any).to;
-//     } else {
-//       // ModifyLiquidity event: apply fee calculation logic triggered by liquidity change
-//       if (currentPositionState.liquidity > 0) {
-//         const feeGrowthInsideNow = await getFeeGrowthInside(
-//           client,
-//           currentPositionState.poolId,
-//           currentPositionState.tickLower,
-//           currentPositionState.tickUpper,
-//           log.blockNumber - 1n // fetch state just BEFORE this event
-//         );
-//         const feesEarned0 =
-//           ((feeGrowthInsideNow.feeGrowthInside0 -
-//             currentPositionState.feeGrowthInsideLast0) *
-//             currentPositionState.liquidity) /
-//           2n ** 128n;
-//         const feesEarned1 =
-//           ((feeGrowthInsideNow.feeGrowthInside1 -
-//             currentPositionState.feeGrowthInsideLast1) *
-//             currentPositionState.liquidity) /
-//           2n ** 128n;
-
-//         // update current lp owner
-//         const lp = await client.readContract({
-//           address: POSITION_MANAGER_ADDRESS,
-//           abi: POSITION_MANAGER_ABI,
-//           functionName: "ownerOf",
-//           args: [tokenId],
-//           blockNumber: log.blockNumber,
-//         });
-//         currentPositionState.lp = lp;
-
-//         // Add collected fees to the LP's total
-//         const currentLpTotal = lpFees.get(lp) ?? {
-//           totalFees0: 0n,
-//           totalFees1: 0n,
-//         };
-//         lpFees.set(lp, {
-//           totalFees0: currentLpTotal.totalFees0 + feesEarned0,
-//           totalFees1: currentLpTotal.totalFees1 + feesEarned1,
-//         });
-//       }
-
-//       const liquidityDelta = BigInt(log.args.liquidityDelta!);
-//       currentPositionState.liquidity += liquidityDelta;
-
-//       const feeGrowthInsideAtEvent = await getFeeGrowthInside(
-//         client,
-//         currentPositionState.poolId,
-//         currentPositionState.tickLower,
-//         currentPositionState.tickUpper,
-//         log.blockNumber
-//       );
-//       currentPositionState.feeGrowthInsideLast0 =
-//         feeGrowthInsideAtEvent.feeGrowthInside0;
-//       currentPositionState.feeGrowthInsideLast1 =
-//         feeGrowthInsideAtEvent.feeGrowthInside1;
-//     }
-//   }
-
-//   return { lpFees, finalPositions: positions };
-// }
-
-// /**
-//  * PositionInfoLibrary logic replicated offchain to decode packed `uint256 positionInfo`
-//  * @param info The packed bigint/uint256 value.
-//  * @returns An object with the decoded `(bytes25 poolId), int24 tickLower, int24 tickUpper`
-//  */
-// function unpackPositionInfo(info: bigint): {
-//   poolId: string;
-//   tickLower: number;
-//   tickUpper: number;
-// } {
-//   const TICK_LOWER_OFFSET = 8n;
-//   const TICK_UPPER_OFFSET = 32n;
-//   const POOL_ID_OFFSET = 56n;
-
-//   const MASK_24_BITS = 0xffffffn;
-//   const SIGN_BIT_24 = 0x800000n;
-//   const MAX_UINT_24 = 0x1000000n;
-
-//   // Extract tickLower (int24)
-//   let tickLowerRaw = (info >> TICK_LOWER_OFFSET) & MASK_24_BITS;
-//   if ((tickLowerRaw & SIGN_BIT_24) !== 0n) {
-//     tickLowerRaw -= MAX_UINT_24;
-//   }
-
-//   // Extract tickUpper (int24)
-//   let tickUpperRaw = (info >> TICK_UPPER_OFFSET) & MASK_24_BITS;
-//   if ((tickUpperRaw & SIGN_BIT_24) !== 0n) {
-//     tickUpperRaw -= MAX_UINT_24;
-//   }
-
-//   // Extract poolId (bytes25)
-//   // The poolId is in the upper 200 bits. We just need to shift right.
-//   const poolIdBigInt = info >> POOL_ID_OFFSET;
-//   const poolIdHex = poolIdBigInt.toString(16).padStart(50, "0");
-
-//   return {
-//     poolId: `0x${poolIdHex}`,
-//     tickLower: Number(tickLowerRaw),
-//     tickUpper: Number(tickUpperRaw),
-//   };
-// }
