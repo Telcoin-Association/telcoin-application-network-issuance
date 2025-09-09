@@ -108,7 +108,6 @@ async function main() {
   // SET RANGE HERE
   let startBlock = INITIALIZE_BLOCK; //PROGRAM_START;
   let endBlock = PROGRAM_START; //FIRST_PERIOD_END;
-  //todo: check if blocks range is inclusive or exclusive
 
   await updateFeesAndPositions(POOL_ID, startBlock, endBlock, client).then(
     (res) => console.log(res)
@@ -277,7 +276,7 @@ async function fetchLPFees(
           poolId,
           position.tickLower,
           position.tickUpper,
-          startBlock - 1n
+          startBlock
         );
         const feeGrowthAtEnd = await getFeeGrowthInside(
           client,
@@ -286,16 +285,15 @@ async function fetchLPFees(
           position.tickUpper,
           endBlock
         );
-        const feesEarned0 =
-          ((feeGrowthAtEnd.feeGrowthInside0 -
-            feeGrowthAtStart.feeGrowthInside0) *
-            position.liquidity) /
-          2n ** 128n;
-        const feesEarned1 =
-          ((feeGrowthAtEnd.feeGrowthInside1 -
-            feeGrowthAtStart.feeGrowthInside1) *
-            position.liquidity) /
-          2n ** 128n;
+
+        const { token0Fees: feesEarned0, token1Fees: feesEarned1 } =
+          calculateUncollectedFees(
+            position.liquidity,
+            feeGrowthAtEnd.feeGrowthInside0,
+            feeGrowthAtEnd.feeGrowthInside1,
+            feeGrowthAtStart.feeGrowthInside0,
+            feeGrowthAtStart.feeGrowthInside1
+          );
 
         // fetch current lp owner as of last block since lp may have changed
         const lp = await client.readContract({
@@ -342,7 +340,6 @@ async function fetchLPFees(
 
     // If position existed, its liquidity was active since last update; calculate subperiod's fees
     const currentPositionState = positions.get(tokenId.toString());
-    //todo: wipe all positions.feeGrowthInsidePeriod0/1 to 0n at start of period so we can track per-period fees
     // all positions.feeGrowthInsidePeriod0/1 are wiped to 0n at start of period so this assignment is period-specific
     let feesEarnedThisPeriod0 = currentPositionState?.feeGrowthInsidePeriod0
       ? currentPositionState?.feeGrowthInsidePeriod0
@@ -351,24 +348,22 @@ async function fetchLPFees(
       ? currentPositionState?.feeGrowthInsidePeriod1
       : 0n;
     if (currentPositionState && currentPositionState.liquidity > 0) {
-      // fetch state just BEFORE this event
+      // calculate fees collected as part of this event (ie uncollected fee amount just before event)
       const feeGrowthInsideNow = await getFeeGrowthInside(
         client,
         poolId,
         currentPositionState.tickLower,
         currentPositionState.tickUpper,
-        log.blockNumber - 1n
+        log.blockNumber
       );
-      const feesEarned0 =
-        ((feeGrowthInsideNow.feeGrowthInside0 -
-          currentPositionState.feeGrowthInsideLast0) *
-          currentPositionState.liquidity) /
-        2n ** 128n;
-      const feesEarned1 =
-        ((feeGrowthInsideNow.feeGrowthInside1 -
-          currentPositionState.feeGrowthInsideLast1) *
-          currentPositionState.liquidity) /
-        2n ** 128n;
+      const { token0Fees: feesEarned0, token1Fees: feesEarned1 } =
+        calculateUncollectedFees(
+          currentPositionState.liquidity,
+          feeGrowthInsideNow.feeGrowthInside0,
+          feeGrowthInsideNow.feeGrowthInside1,
+          currentPositionState.feeGrowthInsideLast0,
+          currentPositionState.feeGrowthInsideLast1
+        );
 
       // add subperiod's collected fees to period total for this position
       feesEarnedThisPeriod0 += feesEarned0;
@@ -421,16 +416,15 @@ async function fetchLPFees(
         endBlock
       );
 
-      const uncollectedFees0 =
-        ((positionFinalFeeGrowth.feeGrowthInside0 -
-          position.feeGrowthInsideLast0) *
-          position.liquidity) /
-        2n ** 128n;
-      const uncollectedFees1 =
-        ((positionFinalFeeGrowth.feeGrowthInside1 -
-          position.feeGrowthInsideLast1) *
-          position.liquidity) /
-        2n ** 128n;
+      // calculate uncollected fees since last modification up to endBlock
+      const { token0Fees: uncollectedFees0, token1Fees: uncollectedFees1 } =
+        calculateUncollectedFees(
+          position.liquidity,
+          positionFinalFeeGrowth.feeGrowthInside0,
+          positionFinalFeeGrowth.feeGrowthInside1,
+          position.feeGrowthInsideLast0,
+          position.feeGrowthInsideLast1
+        );
 
       // add uncollected fees to previously identified collected fees
       const totalFeesThisPeriod0 =
@@ -473,6 +467,30 @@ async function fetchLPFees(
   }
 
   return { lpFees, finalPositions: positions };
+}
+
+function calculateUncollectedFees(
+  liquidity: bigint,
+  feeGrowthInside0Current: bigint,
+  feeGrowthInside1Current: bigint,
+  feeGrowthInside0Last: bigint,
+  feeGrowthInside1Last: bigint
+): { token0Fees: bigint; token1Fees: bigint } {
+  const Q128 = 2n ** 128n;
+  // underflow protection: return 0 if current is less than last
+  const feeGrowthDelta0 =
+    feeGrowthInside0Current >= feeGrowthInside0Last
+      ? feeGrowthInside0Current - feeGrowthInside0Last
+      : 0n;
+  const feeGrowthDelta1 =
+    feeGrowthInside1Current >= feeGrowthInside1Last
+      ? feeGrowthInside1Current - feeGrowthInside1Last
+      : 0n;
+
+  return {
+    token0Fees: (feeGrowthDelta0 * liquidity) / Q128,
+    token1Fees: (feeGrowthDelta1 * liquidity) / Q128,
+  };
 }
 
 /**
