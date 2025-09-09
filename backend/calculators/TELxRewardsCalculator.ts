@@ -16,6 +16,7 @@ dotenv.config();
 
 /// usage: `yarn ts-node backend/calculators/TELxRewardsCalculator.ts`
 const CHECKPOINT_FILE = "./checkpoint.json";
+const PERIOD_REWARD_AMOUNT = 101_851_827n; // 1.018 million TEL per period
 
 // BASE — WETH/TEL
 const rpcUrl =
@@ -637,6 +638,141 @@ async function verifyPositionCheckpoint(
       `Discrepancy found for tokenId ${key}: stored feeGrowthInsideLast0/1 (${position.feeGrowthInsideLast0}, ${position.feeGrowthInsideLast1}) vs on-chain (${feeGrowthOnChain.feeGrowthInside0}, ${feeGrowthOnChain.feeGrowthInside1})`
     );
   }
+}
+
+// Condenses token0 and token1 amounts into a single TEL-denominatd value based on current tick price
+async function denominateTokenAmountsInTEL(
+  lpFees: Map<string, LPFees>,
+  stateView: Address,
+  poolId: `0x${string}`,
+  client: PublicClient,
+  blockNumber: bigint,
+  token0: Address,
+  token1: Address
+): Promise<Map<string, bigint>> {
+  const [currentTick] = await client.readContract({
+    address: stateView,
+    abi: STATE_VIEW_ABI,
+    functionName: "getSlot0",
+    args: [poolId],
+    blockNumber: blockNumber,
+  });
+
+  // Identify whether TEL is token0 or token1
+  const telIsToken0 = token0.toLowerCase() === TEL_TOKEN.toLowerCase(); //todo Address type handles this
+  const telIsToken1 = token1.toLowerCase() === TEL_TOKEN.toLowerCase(); // todo: identify TEL_TOKEN address constant, find way to fetch token0 and token1 given poolId
+  if (!telIsToken0 && !telIsToken1) {
+    throw new Error("TEL token not found in pool");
+  }
+
+  // Fetch the non-TEL token decimals
+  const nonTelToken = telIsToken0 ? token1 : token0;
+  const tokenDecimals = await client.readContract({
+    address: nonTelToken,
+    abi: [
+      {
+        inputs: [],
+        name: "decimals",
+        outputs: [{ name: "", type: "uint8" }],
+        stateMutability: "view",
+        type: "function",
+      },
+    ],
+    functionName: "decimals",
+    blockNumber: blockNumber,
+  });
+
+  const telDecimals = 2;
+
+  // Calculate price based on tick; uniswap uses token1/token0 convention ie:
+  // `price = (token0 == TEL) ? token1/TEL : TEL/token0`
+  const sqrtPriceX96 = tickToSqrtPriceX96(Number(currentTick));
+  const Q96 = 2n ** 96n;
+
+  const condensedFees = new Map<string, bigint>();
+  const decimalAdjustment =
+    10n ** BigInt(Math.abs(Number(tokenDecimals) - telDecimals));
+
+  for (const [lpAddress, fees] of lpFees) {
+    let totalFeesInTEL: bigint;
+
+    if (telIsToken0) {
+      // totalFees0 is already in TEL; convert totalFees1 to TEL
+      let nonTelAmountInTEL: bigint;
+      // Price from tick represents token1/token0, ie nonTEL/TEL: `telAmt = token1Amt / price`
+      if (tokenDecimals >= telDecimals) {
+        // Non-TEL token has more or equal decimals
+        nonTelAmountInTEL =
+          (fees.totalFees1 * Q96 * decimalAdjustment) /
+          ((sqrtPriceX96 * sqrtPriceX96) / Q96);
+      } else {
+        // TEL has more decimals
+        nonTelAmountInTEL =
+          (fees.totalFees1 * Q96) /
+          ((sqrtPriceX96 * sqrtPriceX96) / Q96 / decimalAdjustment);
+      }
+
+      totalFeesInTEL = fees.totalFees0 + nonTelAmountInTEL;
+    } else {
+      // TEL is token1; totalFees1 is already in TEL, so convert totalFees0 to TEL
+      let nonTelAmountInTEL: bigint;
+      // Price from tick represents token1/token0, ie TEL/nonTEL: `telAmt = token0Amt * price`
+      if (telDecimals >= Number(tokenDecimals)) {
+        // TEL has more or equal decimals
+        nonTelAmountInTEL =
+          (fees.totalFees0 * sqrtPriceX96 * sqrtPriceX96 * decimalAdjustment) /
+          (Q96 * Q96);
+      } else {
+        // Non-TEL token has more decimals
+        nonTelAmountInTEL =
+          (fees.totalFees0 * sqrtPriceX96 * sqrtPriceX96) /
+          (Q96 * Q96 * decimalAdjustment);
+      }
+
+      totalFeesInTEL = fees.totalFees1 + nonTelAmountInTEL;
+    }
+
+    condensedFees.set(lpAddress, totalFeesInTEL);
+  }
+
+  return condensedFees;
+}
+
+// Helper to calculate sqrtPriceX96 from tick using v4's fixed point math
+function tickToSqrtPriceX96(tick: number): bigint {
+  // sqrtPriceX96 = sqrt(1.0001^tick) * 2^96
+  const Q96 = 2n ** 96n;
+  const sqrtPrice = Math.sqrt(1.0001 ** tick);
+  return BigInt(Math.floor(sqrtPrice * Number(Q96)));
+}
+
+// Function to calculate reward distribution
+function calculateRewardDistribution(
+  condensedFees: Map<string, bigint>,
+  rewardAmount: bigint
+): Map<string, bigint> {
+  let totalFees = 0n;
+  //todo: use reduce
+  for (const fees of condensedFees.values()) {
+    totalFees += fees;
+  }
+
+  // there should never be zero fees, but handle anyway
+  if (totalFees === 0n) {
+    return new Map();
+  }
+
+  const rewards = new Map<string, bigint>();
+
+  // Calculate each LP's share of rewards
+  for (const [lpAddress, lpFees] of condensedFees) {
+    // todo: handle rounding errors for case where totalFees is much larger than `lpFees * rewardAmount` (lpFees can be very small)
+    // Calculate proportional reward: (lpFees / totalFees) * rewardAmount
+    const lpReward = (lpFees * rewardAmount) / totalFees;
+    rewards.set(lpAddress, lpReward);
+  }
+
+  return rewards;
 }
 
 /**
