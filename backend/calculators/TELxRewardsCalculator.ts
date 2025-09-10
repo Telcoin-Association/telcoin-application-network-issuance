@@ -12,9 +12,11 @@ import {
 import * as dotenv from "dotenv";
 import { existsSync } from "fs";
 import { readFile, writeFile } from "fs/promises";
+import { NetworkConfig } from "helpers";
 dotenv.config();
 
 /// usage: `yarn ts-node backend/calculators/TELxRewardsCalculator.ts`
+const PRECISION = 10n ** 18n;
 const CHECKPOINT_FILE = "./positions-checkpoint.json";
 const FIRST_PERIOD_REWARD_AMOUNT = 101_851_827n; // 1.018 million TEL per period
 const PERIOD_REWARD_AMOUNT = 64_814_800n;
@@ -38,7 +40,7 @@ const POSITION_MANAGER_ADDRESS = getAddress(
 const STATE_VIEW_ADDRESS = getAddress(
   "0xa3c0c9b65bad0b08107aa264b0f3db444b867a71"
 );
-const POOL_ID =
+const POOL_ID: `0x${string}` =
   "0xb6d004fca4f9a34197862176485c45ceab7117c86f07422d1fe3d9cfd6e9d1da";
 const TEL_TOKEN = getAddress("0x09bE1692ca16e06f536F0038fF11D1dA8524aDB1");
 const TEL_DECIMALS = 2;
@@ -88,7 +90,6 @@ const POSITION_MANAGER_ABI = parseAbi([
 
 interface PositionState {
   lp: Address;
-  poolId: `0x${string}`;
   tickLower: number;
   tickUpper: number;
   liquidity: bigint;
@@ -102,42 +103,68 @@ interface PositionState {
 }
 
 interface LPData {
-  totalFees0: bigint;
-  totalFees1: bigint;
+  periodFeesCurrency0: bigint;
+  periodFeesCurrency1: bigint;
   totalFeesTELDenominated?: bigint;
   reward?: bigint;
 }
 
 interface CheckpointData {
-  lastProcessedBlock: string;
+  blockRange: NetworkConfig;
+  poolId: `0x${string}`;
   positions: [string, PositionState][];
+  lpData: [string, LPData][];
 }
 
 async function main() {
   const client = createPublicClient({ transport: http(rpcUrl) });
 
   // SET PARAMS HERE
+  let network = "base";
   let startBlock = INITIALIZE_BLOCK; //PROGRAM_START;
   let endBlock = PROGRAM_START; //FIRST_PERIOD_END;
+  let poolId = POOL_ID;
   let rewardAmount = FIRST_PERIOD_REWARD_AMOUNT; //PERIOD_REWARD_AMOUNT;
 
-  const { lpData, finalPositions } = await updateFeesAndPositions(
+  const { lpData: lpFees, finalPositions } = await updateFeesAndPositions(
     POOL_ID,
     startBlock,
     endBlock,
     client
   );
 
-  const lpFeesInTel = await denominateTokenAmountsInTEL(
-    lpData,
+  const lpData = await denominateTokenAmountsInTEL(
+    lpFees,
     STATE_VIEW_ADDRESS,
     POOL_ID as `0x${string}`,
     client,
     endBlock
   );
 
-  const lpRewards = calculateRewardDistribution(lpFeesInTel, rewardAmount);
-  console.log(lpData, lpFeesInTel, lpRewards);
+  const lpRewards = calculateRewardDistribution(lpData, rewardAmount);
+
+  // write to the checkpoint file
+  const newCheckpoint: CheckpointData = {
+    blockRange: {
+      network: network,
+      startBlock: startBlock,
+      endBlock: endBlock,
+    },
+    poolId: poolId,
+    positions: Array.from(finalPositions.entries()),
+    lpData: Array.from(lpRewards.entries()),
+  };
+  await writeFile(
+    CHECKPOINT_FILE,
+    JSON.stringify(
+      newCheckpoint,
+      (key, value) => (typeof value === "bigint" ? value.toString() : value),
+      2
+    ),
+    "utf-8"
+  );
+
+  console.log("Analysis complete. New checkpoint saved.");
 }
 
 async function updateFeesAndPositions(
@@ -175,23 +202,6 @@ async function updateFeesAndPositions(
     );
   }
 
-  // 4. Save the new state to the checkpoint file
-  const newCheckpoint: CheckpointData = {
-    lastProcessedBlock: endBlock.toString(),
-    positions: Array.from(finalPositions.entries()),
-  };
-  await writeFile(
-    CHECKPOINT_FILE,
-    JSON.stringify(
-      newCheckpoint,
-      (key, value) =>
-        typeof value === "bigint" ? value.toString() + "n" : value,
-      2
-    ),
-    "utf-8"
-  );
-
-  console.log("Analysis complete. New checkpoint saved.");
   return { lpData, finalPositions };
 }
 
@@ -214,7 +224,7 @@ async function initialize(
         : value
     );
 
-    const expectedStartBlock = BigInt(checkpoint.lastProcessedBlock) + 1n;
+    const expectedStartBlock = BigInt(checkpoint.blockRange.endBlock) + 1n;
     if (startBlock !== expectedStartBlock) {
       throw new Error(
         `Provided startBlock (${startBlock}) does not correspond to lastProcessedBlock + 1 (${expectedStartBlock})`
@@ -327,12 +337,12 @@ async function fetchLPData(
           blockNumber: endBlock,
         });
         const currentLpTotal = lpData.get(lp) ?? {
-          totalFees0: 0n,
-          totalFees1: 0n,
+          periodFeesCurrency0: 0n,
+          periodFeesCurrency1: 0n,
         };
         lpData.set(lp, {
-          totalFees0: currentLpTotal.totalFees0 + feesEarned0,
-          totalFees1: currentLpTotal.totalFees1 + feesEarned1,
+          periodFeesCurrency0: currentLpTotal.periodFeesCurrency0 + feesEarned0,
+          periodFeesCurrency1: currentLpTotal.periodFeesCurrency1 + feesEarned1,
         });
         updatePosition(positions, key, {
           lp: lp,
@@ -394,12 +404,12 @@ async function fetchLPData(
 
       // add these collected fees to the LP's total
       const currentLpTotal = lpData.get(lp) ?? {
-        totalFees0: 0n,
-        totalFees1: 0n,
+        periodFeesCurrency0: 0n,
+        periodFeesCurrency1: 0n,
       };
       lpData.set(lp, {
-        totalFees0: currentLpTotal.totalFees0 + feesEarned0,
-        totalFees1: currentLpTotal.totalFees1 + feesEarned1,
+        periodFeesCurrency0: currentLpTotal.periodFeesCurrency0 + feesEarned0,
+        periodFeesCurrency1: currentLpTotal.periodFeesCurrency1 + feesEarned1,
       });
     }
 
@@ -465,12 +475,14 @@ async function fetchLPData(
       });
       // update lpData with uncollected fees (credited to current position owner)
       const currentLpTotal = lpData.get(lp) ?? {
-        totalFees0: 0n,
-        totalFees1: 0n,
+        periodFeesCurrency0: 0n,
+        periodFeesCurrency1: 0n,
       };
       lpData.set(lp, {
-        totalFees0: currentLpTotal.totalFees0 + uncollectedFees0,
-        totalFees1: currentLpTotal.totalFees1 + uncollectedFees1,
+        periodFeesCurrency0:
+          currentLpTotal.periodFeesCurrency0 + uncollectedFees0,
+        periodFeesCurrency1:
+          currentLpTotal.periodFeesCurrency1 + uncollectedFees1,
       });
 
       // update position's feeGrowth baseline to the final state for this period
@@ -565,7 +577,6 @@ function updatePosition(
     // create new position entry
     positions.set(key, {
       lp: updates.lp,
-      poolId: updates.poolId,
       tickLower: updates.tickLower,
       tickUpper: updates.tickUpper,
       liquidity: updates.liquidity,
@@ -575,6 +586,25 @@ function updatePosition(
       feeGrowthInsideLast1: updates.feeGrowthInsideLast1,
       lastUpdatedBlock: updates.lastUpdatedBlock,
     });
+  }
+}
+
+/**
+ * Updates existing entry at `lpData[key]` with fields provided in `updates`
+ */
+function modifyLPData(
+  lpData: Map<string, LPData>,
+  key: string,
+  updates: Partial<LPData>
+) {
+  const existing = lpData.get(key);
+  if (existing) {
+    lpData.set(key, {
+      ...existing,
+      ...updates,
+    });
+  } else {
+    throw new Error(`${key} Not found; modifications only`);
   }
 }
 
@@ -615,11 +645,6 @@ async function verifyPositionCheckpoint(
   poolId: `0x${string}`,
   endBlock: bigint
 ) {
-  if (position.poolId.toLowerCase() !== poolId.toLowerCase()) {
-    throw new Error(
-      `Discrepancy found for tokenId ${key}: stored poolId ${position.poolId} does not match target poolId ${poolId}`
-    );
-  }
   // ensure `lastUpdatedBlock === endBlock` for all positions
   if (position.lastUpdatedBlock !== endBlock) {
     throw new Error(
@@ -669,7 +694,7 @@ async function denominateTokenAmountsInTEL(
   poolId: `0x${string}`,
   client: PublicClient,
   blockNumber: bigint
-): Promise<Map<string, bigint>> {
+): Promise<Map<string, LPData>> {
   // rhe position manager uses only the first 25 bytes of the poolId
   const [currency0, currency1] = await client.readContract({
     address: POSITION_MANAGER_ADDRESS,
@@ -717,64 +742,58 @@ async function denominateTokenAmountsInTEL(
   });
 
   const Q96 = 2n ** 96n;
-  const PRECISION = 10n ** 18n;
   // denominate both token amounts into TEL and sum;
-  const condensedFees = new Map<string, bigint>();
   for (const [lpAddress, fees] of lpData) {
     let totalFeesInTEL: bigint;
 
     if (telIsCurrency0) {
-      // totalFees0 is already in TEL; convert totalFees1 to TEL
-      const scaledFees1 = fees.totalFees1 * PRECISION;
+      // periodFeesCurrency0 is already in TEL; convert periodFeesCurrency1 to TEL
+      const scaledFees1 = fees.periodFeesCurrency1 * PRECISION;
       // Price from tick represents token1/token0, ie nonTEL/TEL: `amount0 = amount1 * Q96^2 / sqrtPriceX96^2`
       const nonTelAmountInTEL =
         (scaledFees1 * Q96 * Q96) / (sqrtPriceX96 * sqrtPriceX96);
 
-      totalFeesInTEL = fees.totalFees0 + nonTelAmountInTEL / PRECISION;
+      totalFeesInTEL = fees.periodFeesCurrency0 + nonTelAmountInTEL / PRECISION;
     } else {
-      // TEL is currency1; totalFees1 is already in TEL, so convert totalFees0 to TEL
-      const scaledFees0 = fees.totalFees0 * PRECISION;
+      // TEL is currency1; periodFeesCurrency1 is already in TEL, so convert periodFeesCurrency0 to TEL
+      const scaledFees0 = fees.periodFeesCurrency0 * PRECISION;
       // price is TEL/nonTEL; `amount1 = (amount0 * sqrtPriceX96^2) / Q96^2`
       const nonTelAmount =
         (scaledFees0 * sqrtPriceX96 * sqrtPriceX96) / (Q96 * Q96);
       const nonTelAmountInTEL = nonTelAmount / PRECISION;
 
-      totalFeesInTEL = fees.totalFees1 + nonTelAmountInTEL;
+      totalFeesInTEL = fees.periodFeesCurrency1 + nonTelAmountInTEL;
     }
 
-    condensedFees.set(lpAddress, totalFeesInTEL);
+    modifyLPData(lpData, lpAddress, {
+      totalFeesTELDenominated: totalFeesInTEL,
+    });
   }
 
-  return condensedFees;
+  return lpData;
 }
 
 // allocates each LP the amount proportional to their share of the total reward amount
 function calculateRewardDistribution(
-  condensedFees: Map<string, bigint>,
+  lpData: Map<string, LPData>,
   rewardAmount: bigint
-): Map<string, bigint> {
-  const totalFees = Array.from(condensedFees.values()).reduce(
-    (a, b) => a + b,
-    0n
-  );
+): Map<string, LPData> {
+  const totalFees = Array.from(lpData.values())
+    .map((data) => data.totalFeesTELDenominated!)
+    .reduce((a, b) => a + b, 0n);
+  if (totalFees === 0n) return new Map();
 
-  // there should never be zero fees, but handle anyway
-  if (totalFees === 0n) {
-    return new Map();
-  }
-
-  // Calculate each LP's share of rewards
-  const rewards = new Map<string, bigint>();
-  const PRECISION = 10n ** 18n;
-  for (const [lpAddress, lpFees] of condensedFees) {
-    // identify proportional reward: (lpFees / totalFees) * rewardAmount
-    const scaledShare = (lpFees * PRECISION) / totalFees;
+  // calculate each LP's share of rewards
+  for (const [lpAddress, lpFees] of lpData) {
+    // identify proportional reward: (lpFeesTELDenominated / totalFees) * rewardAmount
+    const scaledShare =
+      (lpFees.totalFeesTELDenominated! * PRECISION) / totalFees;
     const lpReward = (scaledShare * rewardAmount) / PRECISION;
 
-    rewards.set(lpAddress, lpReward);
+    modifyLPData(lpData, lpAddress, { reward: lpReward });
   }
 
-  return rewards;
+  return lpData;
 }
 
 /**
