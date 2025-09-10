@@ -16,29 +16,36 @@ dotenv.config();
 
 /// usage: `yarn ts-node backend/calculators/TELxRewardsCalculator.ts`
 const CHECKPOINT_FILE = "./checkpoint.json";
-const PERIOD_REWARD_AMOUNT = 101_851_827n; // 1.018 million TEL per period
-
-// BASE — WETH/TEL
-const rpcUrl =
-  process.env.BASE_RPC_URL ||
-  (() => {
-    throw new Error("BASE_RPC_URL environment variable is not set");
-  })();
-const POOL_MANAGER_ADDRESS: Address =
-  "0x498581fF718922c3f8e6A244956aF099B2652b2b";
-const POSITION_MANAGER_ADDRESS: Address =
-  "0x7C5f5A4bBd8fD63184577525326123B519429bDc";
-const STATE_VIEW_ADDRESS: Address =
-  "0xa3c0c9b65bad0b08107aa264b0f3db444b867a71";
-const POOL_ID =
-  "0xb6d004fca4f9a34197862176485c45ceab7117c86f07422d1fe3d9cfd6e9d1da";
-const INITIALIZE_BLOCK = 25_832_462n;
+const FIRST_PERIOD_REWARD_AMOUNT = 101_851_827n; // 1.018 million TEL per period
+const PERIOD_REWARD_AMOUNT = 64_814_800n;
 const PROGRAM_START = 33_954_126n; // aug 9
 const FIRST_PERIOD_END = 34_429_326n; // aug 20
 const SECOND_PERIOD_END = 34_731_726n; // aug 27
 const THIRD_PERIOD_END = 35_034_126n; // sep 3
 
-// //  POLYGON — WETH/TEL
+// BASE — ETH/TEL
+const rpcUrl =
+  process.env.BASE_RPC_URL ||
+  (() => {
+    throw new Error("BASE_RPC_URL environment variable is not set");
+  })();
+const POOL_MANAGER_ADDRESS = getAddress(
+  "0x498581fF718922c3f8e6A244956aF099B2652b2b"
+);
+const POSITION_MANAGER_ADDRESS = getAddress(
+  "0x7C5f5A4bBd8fD63184577525326123B519429bDc"
+);
+const STATE_VIEW_ADDRESS = getAddress(
+  "0xa3c0c9b65bad0b08107aa264b0f3db444b867a71"
+);
+const POOL_ID =
+  "0xb6d004fca4f9a34197862176485c45ceab7117c86f07422d1fe3d9cfd6e9d1da";
+const TEL_TOKEN = getAddress("0x09bE1692ca16e06f536F0038fF11D1dA8524aDB1");
+const TEL_DECIMALS = 2;
+
+const INITIALIZE_BLOCK = 25_832_462n;
+
+// //  POLYGON — ETH/TEL
 // const rpcUrl =
 //   process.env.POLYGON_RPC_URL ||
 //   (() => {
@@ -76,6 +83,7 @@ const STATE_VIEW_ABI = parseAbi([
 const POSITION_MANAGER_ABI = parseAbi([
   "function positionInfo(uint256 tokenId) external view returns (uint256)",
   "function ownerOf(uint256 id) public view returns (address owner)",
+  "function poolKeys(bytes25 poolId) external view returns (address token0, address token1, uint24 fee, int24 tickSpacing, address hooks)",
 ]);
 
 interface PositionState {
@@ -110,9 +118,17 @@ async function main() {
   let startBlock = INITIALIZE_BLOCK; //PROGRAM_START;
   let endBlock = PROGRAM_START; //FIRST_PERIOD_END;
 
-  await updateFeesAndPositions(POOL_ID, startBlock, endBlock, client).then(
-    (res) => console.log(res)
+  await denominateTokenAmountsInTEL(
+    new Map<string, LPFees>(),
+    POSITION_MANAGER_ADDRESS,
+    STATE_VIEW_ADDRESS,
+    POOL_ID as `0x${string}`,
+    client,
+    endBlock
   );
+  //   await updateFeesAndPositions(POOL_ID, startBlock, endBlock, client).then(
+  // (res) => console.log(res)
+  //   );
 }
 
 async function updateFeesAndPositions(
@@ -643,14 +659,51 @@ async function verifyPositionCheckpoint(
 // Condenses token0 and token1 amounts into a single TEL-denominatd value based on current tick price
 async function denominateTokenAmountsInTEL(
   lpFees: Map<string, LPFees>,
+  positionManager: Address,
   stateView: Address,
   poolId: `0x${string}`,
   client: PublicClient,
-  blockNumber: bigint,
-  token0: Address,
-  token1: Address
+  blockNumber: bigint
 ): Promise<Map<string, bigint>> {
-  const [currentTick] = await client.readContract({
+  // rhe position manager uses only the first 25 bytes of the poolId
+  const [currency0, currency1] = await client.readContract({
+    address: POSITION_MANAGER_ADDRESS,
+    abi: POSITION_MANAGER_ABI,
+    functionName: "poolKeys",
+    args: [poolId.slice(0, 52) as `0x${string}`],
+  });
+
+  // Identify whether TEL is token0 or token1
+  const telIsCurrency0 = getAddress(currency0) === TEL_TOKEN;
+  const telIsCurrency1 = currency1 === TEL_TOKEN;
+  if (!telIsCurrency0 && !telIsCurrency1) {
+    throw new Error("TEL token not found in pool");
+  }
+
+  // fetch the non-TEL token decimals
+  const nonTel = telIsCurrency0 ? currency1 : currency0;
+  let nonTelDecimals = 0;
+  if (nonTel === zeroAddress) {
+    nonTelDecimals = 18;
+  } else {
+    nonTelDecimals = await client.readContract({
+      address: nonTel,
+      abi: [
+        {
+          inputs: [],
+          name: "decimals",
+          outputs: [{ name: "", type: "uint8" }],
+          stateMutability: "view",
+          type: "function",
+        },
+      ],
+      functionName: "decimals",
+      blockNumber: blockNumber,
+    });
+  }
+
+  // fetch current price based on tick; uniswap uses token1/token0 convention
+  const [sqrtPriceX96] = await client.readContract({
     address: stateView,
     abi: STATE_VIEW_ABI,
     functionName: "getSlot0",
@@ -658,117 +711,63 @@ async function denominateTokenAmountsInTEL(
     blockNumber: blockNumber,
   });
 
-  // Identify whether TEL is token0 or token1
-  const telIsToken0 = token0.toLowerCase() === TEL_TOKEN.toLowerCase(); //todo Address type handles this
-  const telIsToken1 = token1.toLowerCase() === TEL_TOKEN.toLowerCase(); // todo: identify TEL_TOKEN address constant, find way to fetch token0 and token1 given poolId
-  if (!telIsToken0 && !telIsToken1) {
-    throw new Error("TEL token not found in pool");
-  }
-
-  // Fetch the non-TEL token decimals
-  const nonTelToken = telIsToken0 ? token1 : token0;
-  const tokenDecimals = await client.readContract({
-    address: nonTelToken,
-    abi: [
-      {
-        inputs: [],
-        name: "decimals",
-        outputs: [{ name: "", type: "uint8" }],
-        stateMutability: "view",
-        type: "function",
-      },
-    ],
-    functionName: "decimals",
-    blockNumber: blockNumber,
-  });
-
-  const telDecimals = 2;
-
-  // Calculate price based on tick; uniswap uses token1/token0 convention ie:
-  // `price = (token0 == TEL) ? token1/TEL : TEL/token0`
-  const sqrtPriceX96 = tickToSqrtPriceX96(Number(currentTick));
   const Q96 = 2n ** 96n;
-
   const condensedFees = new Map<string, bigint>();
-  const decimalAdjustment =
-    10n ** BigInt(Math.abs(Number(tokenDecimals) - telDecimals));
-
   for (const [lpAddress, fees] of lpFees) {
     let totalFeesInTEL: bigint;
-
-    if (telIsToken0) {
+    if (telIsCurrency0) {
       // totalFees0 is already in TEL; convert totalFees1 to TEL
-      let nonTelAmountInTEL: bigint;
-      // Price from tick represents token1/token0, ie nonTEL/TEL: `telAmt = token1Amt / price`
-      if (tokenDecimals >= telDecimals) {
-        // Non-TEL token has more or equal decimals
-        nonTelAmountInTEL =
-          (fees.totalFees1 * Q96 * decimalAdjustment) /
-          ((sqrtPriceX96 * sqrtPriceX96) / Q96);
-      } else {
-        // TEL has more decimals
-        nonTelAmountInTEL =
-          (fees.totalFees1 * Q96) /
-          ((sqrtPriceX96 * sqrtPriceX96) / Q96 / decimalAdjustment);
-      }
-
+      // Price from tick represents token1/token0, ie nonTEL/TEL: `amount0 = amount1 * Q96^2 / sqrtPriceX96^2`
+      const nonTelAmountInTEL =
+        (fees.totalFees1 * Q96 * Q96) / (sqrtPriceX96 * sqrtPriceX96);
       totalFeesInTEL = fees.totalFees0 + nonTelAmountInTEL;
     } else {
-      // TEL is token1; totalFees1 is already in TEL, so convert totalFees0 to TEL
-      let nonTelAmountInTEL: bigint;
-      // Price from tick represents token1/token0, ie TEL/nonTEL: `telAmt = token0Amt * price`
-      if (telDecimals >= Number(tokenDecimals)) {
-        // TEL has more or equal decimals
-        nonTelAmountInTEL =
-          (fees.totalFees0 * sqrtPriceX96 * sqrtPriceX96 * decimalAdjustment) /
-          (Q96 * Q96);
-      } else {
-        // Non-TEL token has more decimals
-        nonTelAmountInTEL =
-          (fees.totalFees0 * sqrtPriceX96 * sqrtPriceX96) /
-          (Q96 * Q96 * decimalAdjustment);
-      }
-
+      // TEL is currency1; totalFees1 is already in TEL, so convert totalFees0 to TEL
+      // price is TEL/nonTEL; `amount1 = (amount0 * sqrtPriceX96^2) / Q96^2`
+      const nonTelAmountInTEL =
+        (fees.totalFees0 * sqrtPriceX96 * sqrtPriceX96) / (Q96 * Q96);
       totalFeesInTEL = fees.totalFees1 + nonTelAmountInTEL;
     }
 
-    condensedFees.set(lpAddress, totalFeesInTEL);
+    // Adjust for decimals
+    let finalFeesInTEL: bigint;
+    if (Number(nonTelDecimals) > TEL_DECIMALS) {
+      const decimalDifference = BigInt(Number(nonTelDecimals) - TEL_DECIMALS);
+      finalFeesInTEL = totalFeesInTEL / 10n ** decimalDifference;
+    } else {
+      const decimalDifference = BigInt(TEL_DECIMALS - Number(nonTelDecimals));
+      finalFeesInTEL = totalFeesInTEL * 10n ** decimalDifference;
+    }
+
+    condensedFees.set(lpAddress, finalFeesInTEL);
   }
 
   return condensedFees;
 }
 
-// Helper to calculate sqrtPriceX96 from tick using v4's fixed point math
-function tickToSqrtPriceX96(tick: number): bigint {
-  // sqrtPriceX96 = sqrt(1.0001^tick) * 2^96
-  const Q96 = 2n ** 96n;
-  const sqrtPrice = Math.sqrt(1.0001 ** tick);
-  return BigInt(Math.floor(sqrtPrice * Number(Q96)));
-}
-
-// Function to calculate reward distribution
+// allocates each LP the amount proportional to their share of the total reward amount
 function calculateRewardDistribution(
   condensedFees: Map<string, bigint>,
   rewardAmount: bigint
 ): Map<string, bigint> {
-  let totalFees = 0n;
-  //todo: use reduce
-  for (const fees of condensedFees.values()) {
-    totalFees += fees;
-  }
+  const totalFees = Array.from(condensedFees.values()).reduce(
+    (a, b) => a + b,
+    0n
+  );
 
   // there should never be zero fees, but handle anyway
   if (totalFees === 0n) {
     return new Map();
   }
 
-  const rewards = new Map<string, bigint>();
-
   // Calculate each LP's share of rewards
+  const rewards = new Map<string, bigint>();
+  const PRECISION = 10n ** 18n;
   for (const [lpAddress, lpFees] of condensedFees) {
-    // todo: handle rounding errors for case where totalFees is much larger than `lpFees * rewardAmount` (lpFees can be very small)
-    // Calculate proportional reward: (lpFees / totalFees) * rewardAmount
-    const lpReward = (lpFees * rewardAmount) / totalFees;
+    // identify proportional reward: (lpFees / totalFees) * rewardAmount
+    const scaledShare = (lpFees * PRECISION) / totalFees;
+    const lpReward = (scaledShare * rewardAmount) / PRECISION;
+
     rewards.set(lpAddress, lpReward);
   }
 
