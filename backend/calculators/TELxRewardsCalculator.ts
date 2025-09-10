@@ -15,7 +15,7 @@ import { readFile, writeFile } from "fs/promises";
 dotenv.config();
 
 /// usage: `yarn ts-node backend/calculators/TELxRewardsCalculator.ts`
-const CHECKPOINT_FILE = "./checkpoint.json";
+const CHECKPOINT_FILE = "./positions-checkpoint.json";
 const FIRST_PERIOD_REWARD_AMOUNT = 101_851_827n; // 1.018 million TEL per period
 const PERIOD_REWARD_AMOUNT = 64_814_800n;
 const PROGRAM_START = 33_954_126n; // aug 9
@@ -114,21 +114,28 @@ interface CheckpointData {
 async function main() {
   const client = createPublicClient({ transport: http(rpcUrl) });
 
-  // SET RANGE HERE
+  // SET PARAMS HERE
   let startBlock = INITIALIZE_BLOCK; //PROGRAM_START;
   let endBlock = PROGRAM_START; //FIRST_PERIOD_END;
+  let rewardAmount = FIRST_PERIOD_REWARD_AMOUNT; //PERIOD_REWARD_AMOUNT;
 
-  await denominateTokenAmountsInTEL(
-    new Map<string, LPFees>(),
-    POSITION_MANAGER_ADDRESS,
+  const { lpFees, finalPositions } = await updateFeesAndPositions(
+    POOL_ID,
+    startBlock,
+    endBlock,
+    client
+  );
+
+  const lpFeesInTel = await denominateTokenAmountsInTEL(
+    lpFees,
     STATE_VIEW_ADDRESS,
     POOL_ID as `0x${string}`,
     client,
     endBlock
   );
-  //   await updateFeesAndPositions(POOL_ID, startBlock, endBlock, client).then(
-  // (res) => console.log(res)
-  //   );
+
+  const lpRewards = calculateRewardDistribution(lpFeesInTel, rewardAmount);
+  console.log(lpFees, lpFeesInTel, lpRewards);
 }
 
 async function updateFeesAndPositions(
@@ -136,7 +143,10 @@ async function updateFeesAndPositions(
   startBlock: bigint,
   endBlock: bigint,
   client: PublicClient
-): Promise<{}> {
+): Promise<{
+  lpFees: Map<string, LPFees>;
+  finalPositions: Map<string, PositionState>;
+}> {
   // 1. Load state from checkpoint json if it exists and reset its period-specific fee fields
   let initialPositions: Map<string, PositionState> = await initialize(
     startBlock,
@@ -163,11 +173,6 @@ async function updateFeesAndPositions(
     );
   }
 
-  //todo derive rewards from lpFees
-  //todo forward positions checkpoints file to telx council to check position info is accurate
-  //todo write rewards and lpFees to a separate file for publishing
-  //todo file should be formatted similarly to tanip1 incl chain, pool, period start/end, total rewards, total fees, lp rewards/fees
-
   // 4. Save the new state to the checkpoint file
   const newCheckpoint: CheckpointData = {
     lastProcessedBlock: endBlock.toString(),
@@ -185,7 +190,6 @@ async function updateFeesAndPositions(
   );
 
   console.log("Analysis complete. New checkpoint saved.");
-  console.log("LP Fees Earned in Period:", lpFees);
   return { lpFees, finalPositions };
 }
 
@@ -659,7 +663,6 @@ async function verifyPositionCheckpoint(
 // Condenses token0 and token1 amounts into a single TEL-denominatd value based on current tick price
 async function denominateTokenAmountsInTEL(
   lpFees: Map<string, LPFees>,
-  positionManager: Address,
   stateView: Address,
   poolId: `0x${string}`,
   client: PublicClient,
@@ -702,7 +705,7 @@ async function denominateTokenAmountsInTEL(
     });
   }
 
-  // fetch current price based on tick; uniswap uses token1/token0 convention
+  // fetch price; uniswap uses token1/token0 convention + incorporates decimal difference
   const [sqrtPriceX96] = await client.readContract({
     address: stateView,
     abi: STATE_VIEW_ABI,
@@ -712,34 +715,32 @@ async function denominateTokenAmountsInTEL(
   });
 
   const Q96 = 2n ** 96n;
+  const PRECISION = 10n ** 18n;
+  // denominate both token amounts into TEL and sum;
   const condensedFees = new Map<string, bigint>();
   for (const [lpAddress, fees] of lpFees) {
     let totalFeesInTEL: bigint;
+
     if (telIsCurrency0) {
       // totalFees0 is already in TEL; convert totalFees1 to TEL
+      const scaledFees1 = fees.totalFees1 * PRECISION;
       // Price from tick represents token1/token0, ie nonTEL/TEL: `amount0 = amount1 * Q96^2 / sqrtPriceX96^2`
       const nonTelAmountInTEL =
-        (fees.totalFees1 * Q96 * Q96) / (sqrtPriceX96 * sqrtPriceX96);
-      totalFeesInTEL = fees.totalFees0 + nonTelAmountInTEL;
+        (scaledFees1 * Q96 * Q96) / (sqrtPriceX96 * sqrtPriceX96);
+
+      totalFeesInTEL = fees.totalFees0 + nonTelAmountInTEL / PRECISION;
     } else {
       // TEL is currency1; totalFees1 is already in TEL, so convert totalFees0 to TEL
+      const scaledFees0 = fees.totalFees0 * PRECISION;
       // price is TEL/nonTEL; `amount1 = (amount0 * sqrtPriceX96^2) / Q96^2`
-      const nonTelAmountInTEL =
-        (fees.totalFees0 * sqrtPriceX96 * sqrtPriceX96) / (Q96 * Q96);
+      const nonTelAmount =
+        (scaledFees0 * sqrtPriceX96 * sqrtPriceX96) / (Q96 * Q96);
+      const nonTelAmountInTEL = nonTelAmount / PRECISION;
+
       totalFeesInTEL = fees.totalFees1 + nonTelAmountInTEL;
     }
 
-    // Adjust for decimals
-    let finalFeesInTEL: bigint;
-    if (Number(nonTelDecimals) > TEL_DECIMALS) {
-      const decimalDifference = BigInt(Number(nonTelDecimals) - TEL_DECIMALS);
-      finalFeesInTEL = totalFeesInTEL / 10n ** decimalDifference;
-    } else {
-      const decimalDifference = BigInt(TEL_DECIMALS - Number(nonTelDecimals));
-      finalFeesInTEL = totalFeesInTEL * 10n ** decimalDifference;
-    }
-
-    condensedFees.set(lpAddress, finalFeesInTEL);
+    condensedFees.set(lpAddress, totalFeesInTEL);
   }
 
   return condensedFees;
