@@ -101,9 +101,11 @@ interface PositionState {
   lastUpdatedBlock: bigint;
 }
 
-interface LPFees {
+interface LPData {
   totalFees0: bigint;
   totalFees1: bigint;
+  totalFeesTELDenominated?: bigint;
+  reward?: bigint;
 }
 
 interface CheckpointData {
@@ -119,7 +121,7 @@ async function main() {
   let endBlock = PROGRAM_START; //FIRST_PERIOD_END;
   let rewardAmount = FIRST_PERIOD_REWARD_AMOUNT; //PERIOD_REWARD_AMOUNT;
 
-  const { lpFees, finalPositions } = await updateFeesAndPositions(
+  const { lpData, finalPositions } = await updateFeesAndPositions(
     POOL_ID,
     startBlock,
     endBlock,
@@ -127,7 +129,7 @@ async function main() {
   );
 
   const lpFeesInTel = await denominateTokenAmountsInTEL(
-    lpFees,
+    lpData,
     STATE_VIEW_ADDRESS,
     POOL_ID as `0x${string}`,
     client,
@@ -135,7 +137,7 @@ async function main() {
   );
 
   const lpRewards = calculateRewardDistribution(lpFeesInTel, rewardAmount);
-  console.log(lpFees, lpFeesInTel, lpRewards);
+  console.log(lpData, lpFeesInTel, lpRewards);
 }
 
 async function updateFeesAndPositions(
@@ -144,7 +146,7 @@ async function updateFeesAndPositions(
   endBlock: bigint,
   client: PublicClient
 ): Promise<{
-  lpFees: Map<string, LPFees>;
+  lpData: Map<string, LPData>;
   finalPositions: Map<string, PositionState>;
 }> {
   // 1. Load state from checkpoint json if it exists and reset its period-specific fee fields
@@ -154,7 +156,7 @@ async function updateFeesAndPositions(
   );
 
   // 2. Run the core analysis logic
-  const { lpFees, finalPositions } = await fetchLPFees(
+  const { lpData, finalPositions } = await fetchLPData(
     poolId,
     startBlock,
     endBlock,
@@ -190,7 +192,7 @@ async function updateFeesAndPositions(
   );
 
   console.log("Analysis complete. New checkpoint saved.");
-  return { lpFees, finalPositions };
+  return { lpData, finalPositions };
 }
 
 /**
@@ -247,20 +249,20 @@ async function initialize(
 
 /**
  * Identifies cumulative fee totals for each liquidity provider
- * @return lpFees Map of `tokenId => PositionState` tracking state of each unique position
- * @return finalPositions Map of `LP => LPFees` tracking total fees per LP
+ * @return finalPositions Map of `tokenId => PositionState` tracking state of each unique position
+ * @return lpData Map of `LP => LPData` tracking total fees per LP
  */
-async function fetchLPFees(
+async function fetchLPData(
   poolId: `0x${string}`,
   startBlock: bigint,
   endBlock: bigint,
   client: PublicClient,
   initialPositions: Map<string, PositionState>
 ): Promise<{
-  lpFees: Map<string, LPFees>;
+  lpData: Map<string, LPData>;
   finalPositions: Map<string, PositionState>;
 }> {
-  const lpFees = new Map<string, LPFees>();
+  const lpData = new Map<string, LPData>();
   // use copy of initial positions fetched from checkpoint file
   const positions = new Map<string, PositionState>(initialPositions);
 
@@ -324,11 +326,11 @@ async function fetchLPFees(
           args: [BigInt(key)],
           blockNumber: endBlock,
         });
-        const currentLpTotal = lpFees.get(lp) ?? {
+        const currentLpTotal = lpData.get(lp) ?? {
           totalFees0: 0n,
           totalFees1: 0n,
         };
-        lpFees.set(lp, {
+        lpData.set(lp, {
           totalFees0: currentLpTotal.totalFees0 + feesEarned0,
           totalFees1: currentLpTotal.totalFees1 + feesEarned1,
         });
@@ -391,11 +393,11 @@ async function fetchLPFees(
       feesEarnedThisPeriod1 += feesEarned1;
 
       // add these collected fees to the LP's total
-      const currentLpTotal = lpFees.get(lp) ?? {
+      const currentLpTotal = lpData.get(lp) ?? {
         totalFees0: 0n,
         totalFees1: 0n,
       };
-      lpFees.set(lp, {
+      lpData.set(lp, {
         totalFees0: currentLpTotal.totalFees0 + feesEarned0,
         totalFees1: currentLpTotal.totalFees1 + feesEarned1,
       });
@@ -461,12 +463,12 @@ async function fetchLPFees(
         args: [BigInt(key)],
         blockNumber: endBlock,
       });
-      // update lpFees with uncollected fees (credited to current position owner)
-      const currentLpTotal = lpFees.get(lp) ?? {
+      // update lpData with uncollected fees (credited to current position owner)
+      const currentLpTotal = lpData.get(lp) ?? {
         totalFees0: 0n,
         totalFees1: 0n,
       };
-      lpFees.set(lp, {
+      lpData.set(lp, {
         totalFees0: currentLpTotal.totalFees0 + uncollectedFees0,
         totalFees1: currentLpTotal.totalFees1 + uncollectedFees1,
       });
@@ -487,7 +489,7 @@ async function fetchLPFees(
     }
   }
 
-  return { lpFees, finalPositions: positions };
+  return { lpData, finalPositions: positions };
 }
 
 function calculateUncollectedFees(
@@ -662,7 +664,7 @@ async function verifyPositionCheckpoint(
 
 // Condenses token0 and token1 amounts into a single TEL-denominatd value based on current tick price
 async function denominateTokenAmountsInTEL(
-  lpFees: Map<string, LPFees>,
+  lpData: Map<string, LPData>,
   stateView: Address,
   poolId: `0x${string}`,
   client: PublicClient,
@@ -718,7 +720,7 @@ async function denominateTokenAmountsInTEL(
   const PRECISION = 10n ** 18n;
   // denominate both token amounts into TEL and sum;
   const condensedFees = new Map<string, bigint>();
-  for (const [lpAddress, fees] of lpFees) {
+  for (const [lpAddress, fees] of lpData) {
     let totalFeesInTEL: bigint;
 
     if (telIsCurrency0) {
