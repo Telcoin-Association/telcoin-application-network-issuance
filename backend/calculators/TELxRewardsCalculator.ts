@@ -18,12 +18,14 @@ dotenv.config();
 /// usage: `yarn ts-node backend/calculators/TELxRewardsCalculator.ts`
 const PRECISION = 10n ** 18n;
 const CHECKPOINT_FILE = "./positions-checkpoint.json";
-const FIRST_PERIOD_REWARD_AMOUNT = 101_851_827n; // 1.018 million TEL per period
-const PERIOD_REWARD_AMOUNT = 64_814_800n;
-const PROGRAM_START = 33_954_126n; // aug 9
-const FIRST_PERIOD_END = 34_429_326n; // aug 20
-const SECOND_PERIOD_END = 34_731_726n; // aug 27
-const THIRD_PERIOD_END = 35_034_126n; // sep 3
+const INITIALIZE_BLOCK = 25_832_462n;
+const FIRST_PERIOD_REWARD_AMOUNT = 101_851_851n; // prorated
+const PERIOD_REWARD_AMOUNT = 64_814_814n;
+const PROGRAM_START = 33_954_128n; // aug 9
+const FIRST_PERIOD_END = 34_429_327n; // aug 20
+const SECOND_PERIOD_END = 34_731_727n; // aug 27
+const THIRD_PERIOD_END = 35_034_127n; // sep 3
+const FOURTH_PERIOD_END = 35_336_526n; // sep 10
 
 // BASE — ETH/TEL
 const rpcUrl =
@@ -44,8 +46,6 @@ const POOL_ID: `0x${string}` =
   "0xb6d004fca4f9a34197862176485c45ceab7117c86f07422d1fe3d9cfd6e9d1da";
 const TEL_TOKEN = getAddress("0x09bE1692ca16e06f536F0038fF11D1dA8524aDB1");
 const TEL_DECIMALS = 2;
-
-const INITIALIZE_BLOCK = 25_832_462n;
 
 // //  POLYGON — ETH/TEL
 // const rpcUrl =
@@ -121,13 +121,13 @@ async function main() {
 
   // SET PARAMS HERE
   let network = "base";
-  let startBlock = INITIALIZE_BLOCK; //PROGRAM_START;
-  let endBlock = PROGRAM_START; //FIRST_PERIOD_END;
+  let startBlock = THIRD_PERIOD_END;
+  let endBlock = FOURTH_PERIOD_END;
   let poolId = POOL_ID;
-  let rewardAmount = FIRST_PERIOD_REWARD_AMOUNT; //PERIOD_REWARD_AMOUNT;
+  let rewardAmount = PERIOD_REWARD_AMOUNT;
 
   const { lpData: lpFees, finalPositions } = await updateFeesAndPositions(
-    POOL_ID,
+    poolId,
     startBlock,
     endBlock,
     client
@@ -136,7 +136,7 @@ async function main() {
   const lpData = await denominateTokenAmountsInTEL(
     lpFees,
     STATE_VIEW_ADDRESS,
-    POOL_ID as `0x${string}`,
+    poolId,
     client,
     endBlock
   );
@@ -158,7 +158,8 @@ async function main() {
     CHECKPOINT_FILE,
     JSON.stringify(
       newCheckpoint,
-      (key, value) => (typeof value === "bigint" ? value.toString() : value),
+      (key, value) =>
+        typeof value === "bigint" ? value.toString() + "n" : value,
       2
     ),
     "utf-8"
