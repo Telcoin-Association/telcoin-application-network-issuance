@@ -1,0 +1,80 @@
+{
+  "blockRange": {
+    "network": "polygon",
+    "startBlock": "75697435n",
+    "endBlock": "75981194n"
+  },
+  "poolId": "0xfd56605f7f4620ab44dfc0860d70b9bd1d1f648a5a74558491b39e816a10b99a",
+  "positions": [
+    [
+      "42063",
+      {
+        "lp": "0xC35Bd8e35D5C866F90bD8Db563680712560A9765",
+        "tickLower": 29220,
+        "tickUpper": 29410,
+        "liquidity": "3013032016314n",
+        "feeGrowthInsidePeriod0": "2193379n",
+        "feeGrowthInsidePeriod1": "19502536n",
+        "feeGrowthInsideLast0": "3696477516675734331075117907960325n",
+        "feeGrowthInsideLast1": "67240980643494332718990819958841203n",
+        "lastUpdatedBlock": "75981194n"
+      }
+    ]
+  ],
+  "lpData": [
+    [
+      "0xD12eabdDA283287cBe21EB1DaAdff5110B44be03",
+      {
+        "periodFeesCurrency0": "709833n",
+        "periodFeesCurrency1": "13720745n",
+        "totalFeesTELDenominated": "1442719n",
+        "reward": "1828678n"
+      }
+    ],
+    [
+      "0x93Cf0a22a26895650A8AaE960Bf85a01ec6A551C",
+      {
+        "periodFeesCurrency0": "13002926n",
+        "periodFeesCurrency1": "251340287n",
+        "totalFeesTELDenominated": "26428146n",
+        "reward": "33498263n"
+      }
+    ],
+    [
+      "0xa60209fbC5e75fBE99dAcEe53CD763850615fE10",
+      {
+        "periodFeesCurrency0": "5664428n",
+        "periodFeesCurrency1": "109490660n",
+        "totalFeesTELDenominated": "11512818n",
+        "reward": "14592753n"
+      }
+    ],
+    [
+      "0xB70D29deCca758BB72Cd2967a989782F3acAd3e6",
+      {
+        "periodFeesCurrency0": "4188964n",
+        "periodFeesCurrency1": "80970668n",
+        "totalFeesTELDenominated": "8513973n",
+        "reward": "10791650n"
+      }
+    ],
+    [
+      "0x076c48f5e0C570F49eBe79B961c8C78d1366B96b",
+      {
+        "periodFeesCurrency0": "1136n",
+        "periodFeesCurrency1": "21717n",
+        "totalFeesTELDenominated": "2296n",
+        "reward": "2910n"
+      }
+    ],
+    [
+      "0xC35Bd8e35D5C866F90bD8Db563680712560A9765",
+      {
+        "periodFeesCurrency0": "2193379n",
+        "periodFeesCurrency1": "19502536n",
+        "totalFeesTELDenominated": "3235097n",
+        "reward": "4100557n"
+      }
+    ]
+  ]
+}

@@ -16,16 +16,11 @@ import { NetworkConfig } from "helpers";
 dotenv.config();
 
 /// usage: `yarn ts-node backend/calculators/TELxRewardsCalculator.ts`
-const PRECISION = 10n ** 18n;
-const CHECKPOINT_FILE = "./positions-checkpoint.json";
-const INITIALIZE_BLOCK = 25_832_462n;
 const FIRST_PERIOD_REWARD_AMOUNT = 101_851_851n; // prorated
 const PERIOD_REWARD_AMOUNT = 64_814_814n;
-const PROGRAM_START = 33_954_128n; // aug 9
-const FIRST_PERIOD_END = 34_429_327n; // aug 20
-const SECOND_PERIOD_END = 34_731_727n; // aug 27
-const THIRD_PERIOD_END = 35_034_127n; // sep 3
-const FOURTH_PERIOD_END = 35_336_526n; // sep 10
+
+const PRECISION = 10n ** 18n;
+const CHECKPOINT_FILE = "./positions-checkpoint.json";
 
 // BASE — ETH/TEL
 const rpcUrl =
@@ -42,38 +37,45 @@ const POSITION_MANAGER_ADDRESS = getAddress(
 const STATE_VIEW_ADDRESS = getAddress(
   "0xa3c0c9b65bad0b08107aa264b0f3db444b867a71"
 );
-const POOL_ID: `0x${string}` =
-  "0xb6d004fca4f9a34197862176485c45ceab7117c86f07422d1fe3d9cfd6e9d1da";
-const TEL_TOKEN = getAddress("0x09bE1692ca16e06f536F0038fF11D1dA8524aDB1");
-const TEL_DECIMALS = 2;
+// const POOL_ID: `0x${string}` =
+//   "0xb6d004fca4f9a34197862176485c45ceab7117c86f07422d1fe3d9cfd6e9d1da";
+// const TEL_TOKEN = getAddress("0x09bE1692ca16e06f536F0038fF11D1dA8524aDB1");
+// const TEL_DECIMALS = 2;
+// const INITIALIZE_BLOCK = 25_832_462n;
+const PROGRAM_START = 33_954_128n; // aug 9
+const FIRST_PERIOD_END = 34_429_327n; // aug 20
+const SECOND_PERIOD_END = 34_731_727n; // aug 27
+const THIRD_PERIOD_END = 35_034_127n; // sep 3
+const FOURTH_PERIOD_END = 35_336_526n; // sep 10
+//todo: this is USDC so rename TEL_TOKEN to DENOMINATOR
+// const TEL_TOKEN = getAddress("0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359");
 
-// //  POLYGON — ETH/TEL
+//  POLYGON — ETH/TEL
 // const rpcUrl =
 //   process.env.POLYGON_RPC_URL ||
 //   (() => {
-//     throw new Error("POLYGON_RPC_URL environment variable is not set");
+// throw new Error("POLYGON_RPC_URL environment variable is not set");
 //   })();
 // const POOL_MANAGER_ADDRESS = "0x67366782805870060151383f4bbff9dab53e5cd6";
 // const POSITION_MANAGER_ADDRESS = "0x1Ec2eBf4F37E7363FDfe3551602425af0B3ceef9";
-// const STATE_VIEW_ADDRESS: Address = "0x5ea1bd7974c8a611cbab0bdcafcb1d9cc9b3ba5a"
-// const POOL_ID = "0x9a005a0c12cc2ef01b34e9a7f3fb91a0e6304d377b5479bd3f08f8c29cdf5deb";
-// const FROM_BLOCK = 74_970_501n;
-// const TO_BLOCK = 75_417_060n;
-// const SEED_PATH = "seeds/positions_seed_polygon_weth_tel.json";
+// const STATE_VIEW_ADDRESS: Address =
+//   "0x5ea1bd7974c8a611cbab0bdcafcb1d9cc9b3ba5a";
+// const TEL_TOKEN = getAddress("0xdF7837DE1F2Fa4631D716CF2502f8b230F1dcc32");
+// const PROGRAM_START = 74_970_501n; // aug 9
+// const FIRST_PERIOD_END = 75_417_061n; // aug 20
+// const SECOND_PERIOD_END = 75_697_435n; // aug 27
+// const THIRD_PERIOD_END = 75_981_195n; // sep 3
+// const FOURTH_PERIOD_END = 76_265_454n; // sep 10
+// const POOL_ID: `0x${string}` =
+//   "0x9a005a0c12cc2ef01b34e9a7f3fb91a0e6304d377b5479bd3f08f8c29cdf5deb";
+// const INITIALIZE_BLOCK = 67_949_841n;
 
-// // POLYGON — USDC/eMXN
-// const rpcUrl =
-//   process.env.POLYGON_RPC_URL ||
-//   (() => {
-//     throw new Error("POLYGON_RPC_URL environment variable is not set");
-//   })();
-// const POOL_MANAGER_ADDRESS = "0x67366782805870060151383f4bbff9dab53e5cd6";
-// const POSITION_MANAGER_ADDRESS = "0x1Ec2eBf4F37E7363FDfe3551602425af0B3ceef9";
-// const STATE_VIEW_ADDRESS: Address = "0x5ea1bd7974c8a611cbab0bdcafcb1d9cc9b3ba5a"
-// const POOL_ID = "0xfd56605f7f4620ab44dfc0860d70b9bd1d1f648a5a74558491b39e816a10b99a";
-// const FROM_BLOCK = 74_970_501n;
-// const TO_BLOCK = 75_417_060n;
-// const SEED_PATH = "seeds/positions_seed_polygon_usdc_emxn.json";
+// POLYGON — USDC/eMXN
+// const POOL_ID: `0x${string}` =
+//   "0xfd56605f7f4620ab44dfc0860d70b9bd1d1f648a5a74558491b39e816a10b99a";
+// const INITIALIZE_BLOCK = 74_664_812n;
+//todo: this is USDC so rename TEL_TOKEN to DENOMINATOR
+// const TEL_TOKEN = getAddress("0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359");
 
 const POOL_MANAGER_ABI = parseAbi([
   "event ModifyLiquidity(bytes32 indexed id, address indexed sender, int24 tickLower, int24 tickUpper, int256 liquidityDelta, bytes32 salt)",
@@ -119,8 +121,17 @@ interface CheckpointData {
 async function main() {
   const client = createPublicClient({ transport: http(rpcUrl) });
 
+  //   await getPoolCreationBlock(
+  //     client,
+  //     POOL_MANAGER_ADDRESS,
+  //     POOL_ID as `0x${string}`,
+  //     60_000_000n,
+  //     75_000_000n
+  //   ).then((res) => console.log(res));
+  //   return;
+
   // SET PARAMS HERE
-  let network = "base";
+  let network = "polygon";
   let startBlock = THIRD_PERIOD_END;
   let endBlock = FOURTH_PERIOD_END;
   let poolId = POOL_ID;
@@ -709,28 +720,6 @@ async function denominateTokenAmountsInTEL(
   const telIsCurrency1 = currency1 === TEL_TOKEN;
   if (!telIsCurrency0 && !telIsCurrency1) {
     throw new Error("TEL token not found in pool");
-  }
-
-  // fetch the non-TEL token decimals
-  const nonTel = telIsCurrency0 ? currency1 : currency0;
-  let nonTelDecimals = 0;
-  if (nonTel === zeroAddress) {
-    nonTelDecimals = 18;
-  } else {
-    nonTelDecimals = await client.readContract({
-      address: nonTel,
-      abi: [
-        {
-          inputs: [],
-          name: "decimals",
-          outputs: [{ name: "", type: "uint8" }],
-          stateMutability: "view",
-          type: "function",
-        },
-      ],
-      functionName: "decimals",
-      blockNumber: blockNumber,
-    });
   }
 
   // fetch price; uniswap uses token1/token0 convention + incorporates decimal difference
