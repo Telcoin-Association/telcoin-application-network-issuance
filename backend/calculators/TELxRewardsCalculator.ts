@@ -12,83 +12,10 @@ import {
 import * as dotenv from "dotenv";
 import { existsSync } from "fs";
 import { readFile, writeFile } from "fs/promises";
-import { NetworkConfig } from "helpers";
+import { NetworkConfig, parseAndSanitizeCLIArgs } from "helpers";
 dotenv.config();
 
 /// usage: `yarn ts-node backend/calculators/TELxRewardsCalculator.ts`
-const FIRST_PERIOD_REWARD_AMOUNT = 101_851_851n; // prorated
-const PERIOD_REWARD_AMOUNT = 64_814_814n;
-
-const PRECISION = 10n ** 18n;
-const CHECKPOINT_FILE = "./positions-checkpoint.json";
-
-// BASE — ETH/TEL
-const rpcUrl =
-  process.env.BASE_RPC_URL ||
-  (() => {
-    throw new Error("BASE_RPC_URL environment variable is not set");
-  })();
-const POOL_MANAGER_ADDRESS = getAddress(
-  "0x498581fF718922c3f8e6A244956aF099B2652b2b"
-);
-const POSITION_MANAGER_ADDRESS = getAddress(
-  "0x7C5f5A4bBd8fD63184577525326123B519429bDc"
-);
-const STATE_VIEW_ADDRESS = getAddress(
-  "0xa3c0c9b65bad0b08107aa264b0f3db444b867a71"
-);
-// const POOL_ID: `0x${string}` =
-//   "0xb6d004fca4f9a34197862176485c45ceab7117c86f07422d1fe3d9cfd6e9d1da";
-// const TEL_TOKEN = getAddress("0x09bE1692ca16e06f536F0038fF11D1dA8524aDB1");
-// const TEL_DECIMALS = 2;
-// const INITIALIZE_BLOCK = 25_832_462n;
-const PROGRAM_START = 33_954_128n; // aug 9
-const FIRST_PERIOD_END = 34_429_327n; // aug 20
-const SECOND_PERIOD_END = 34_731_727n; // aug 27
-const THIRD_PERIOD_END = 35_034_127n; // sep 3
-const FOURTH_PERIOD_END = 35_336_526n; // sep 10
-//todo: this is USDC so rename TEL_TOKEN to DENOMINATOR
-// const TEL_TOKEN = getAddress("0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359");
-
-//  POLYGON — ETH/TEL
-// const rpcUrl =
-//   process.env.POLYGON_RPC_URL ||
-//   (() => {
-// throw new Error("POLYGON_RPC_URL environment variable is not set");
-//   })();
-// const POOL_MANAGER_ADDRESS = "0x67366782805870060151383f4bbff9dab53e5cd6";
-// const POSITION_MANAGER_ADDRESS = "0x1Ec2eBf4F37E7363FDfe3551602425af0B3ceef9";
-// const STATE_VIEW_ADDRESS: Address =
-//   "0x5ea1bd7974c8a611cbab0bdcafcb1d9cc9b3ba5a";
-// const TEL_TOKEN = getAddress("0xdF7837DE1F2Fa4631D716CF2502f8b230F1dcc32");
-// const PROGRAM_START = 74_970_501n; // aug 9
-// const FIRST_PERIOD_END = 75_417_061n; // aug 20
-// const SECOND_PERIOD_END = 75_697_435n; // aug 27
-// const THIRD_PERIOD_END = 75_981_195n; // sep 3
-// const FOURTH_PERIOD_END = 76_265_454n; // sep 10
-// const POOL_ID: `0x${string}` =
-//   "0x9a005a0c12cc2ef01b34e9a7f3fb91a0e6304d377b5479bd3f08f8c29cdf5deb";
-// const INITIALIZE_BLOCK = 67_949_841n;
-
-// POLYGON — USDC/eMXN
-// const POOL_ID: `0x${string}` =
-//   "0xfd56605f7f4620ab44dfc0860d70b9bd1d1f648a5a74558491b39e816a10b99a";
-// const INITIALIZE_BLOCK = 74_664_812n;
-//todo: this is USDC so rename TEL_TOKEN to DENOMINATOR
-// const TEL_TOKEN = getAddress("0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359");
-
-const POOL_MANAGER_ABI = parseAbi([
-  "event ModifyLiquidity(bytes32 indexed id, address indexed sender, int24 tickLower, int24 tickUpper, int256 liquidityDelta, bytes32 salt)",
-]);
-const STATE_VIEW_ABI = parseAbi([
-  "function getSlot0(bytes32 id) external view returns (uint160 sqrtPriceX96, int24 tick, uint24 protocolFee, uint24 lpFee)",
-  "function getFeeGrowthInside(bytes32 poolId, int24 tickLower, int24 tickUpper) external view returns (uint256 feeGrowthInside0X128, uint256 feeGrowthInside1X128)",
-]);
-const POSITION_MANAGER_ABI = parseAbi([
-  "function positionInfo(uint256 tokenId) external view returns (uint256)",
-  "function ownerOf(uint256 id) public view returns (address owner)",
-  "function poolKeys(bytes25 poolId) external view returns (address token0, address token1, uint24 fee, int24 tickSpacing, address hooks)",
-]);
 
 interface PositionState {
   lp: Address;
@@ -118,48 +45,142 @@ interface CheckpointData {
   lpData: [string, LPData][];
 }
 
+type PoolConfig = {
+  network: "polygon" | "base";
+  poolId: `0x${string}`;
+  denominator: Address;
+  initializeBlock: bigint;
+  rewardAmounts: { FIRST: bigint; PERIOD: bigint };
+};
+
+const PRECISION = 10n ** 18n;
+const CHECKPOINT_FILE = "./positions-checkpoint.json";
+const INITIALIZE_REWARD_AMOUNT = 0n;
+const FIRST_PERIOD_REWARD_AMOUNT_ETH_TEL = 101_851_851n; // prorated
+const PERIOD_REWARD_AMOUNT_ETH_TEL = 64_814_814n;
+const FIRST_PERIOD_REWARD_AMOUNT_USDC_EMXN = 88_000_000n; // prorated
+const PERIOD_REWARD_AMOUNT_USDC_EMXN = 56_000_000n;
+const POOL_MANAGER_ABI = parseAbi([
+  "event ModifyLiquidity(bytes32 indexed id, address indexed sender, int24 tickLower, int24 tickUpper, int256 liquidityDelta, bytes32 salt)",
+]);
+const STATE_VIEW_ABI = parseAbi([
+  "function getSlot0(bytes32 id) external view returns (uint160 sqrtPriceX96, int24 tick, uint24 protocolFee, uint24 lpFee)",
+  "function getFeeGrowthInside(bytes32 poolId, int24 tickLower, int24 tickUpper) external view returns (uint256 feeGrowthInside0X128, uint256 feeGrowthInside1X128)",
+]);
+const POSITION_MANAGER_ABI = parseAbi([
+  "function positionInfo(uint256 tokenId) external view returns (uint256)",
+  "function ownerOf(uint256 id) public view returns (address owner)",
+  "function poolKeys(bytes25 poolId) external view returns (address token0, address token1, uint24 fee, int24 tickSpacing, address hooks)",
+]);
+
+// ---------------- Pool Definitions ----------------
+
+// BASE — ETH/TEL
+const BASE_ETH_TEL: PoolConfig = {
+  network: "base",
+  poolId: "0xb6d004fca4f9a34197862176485c45ceab7117c86f07422d1fe3d9cfd6e9d1da",
+  denominator: getAddress("0x09bE1692ca16e06f536F0038fF11D1dA8524aDB1"), // TEL
+  initializeBlock: 25_832_462n,
+  rewardAmounts: {
+    FIRST: FIRST_PERIOD_REWARD_AMOUNT_ETH_TEL,
+    PERIOD: PERIOD_REWARD_AMOUNT_ETH_TEL,
+  },
+};
+
+// POLYGON — ETH/TEL
+const POLYGON_ETH_TEL: PoolConfig = {
+  network: "polygon",
+  poolId: "0x9a005a0c12cc2ef01b34e9a7f3fb91a0e6304d377b5479bd3f08f8c29cdf5deb",
+  denominator: getAddress("0xdF7837DE1F2Fa4631D716CF2502f8b230F1dcc32"), // TEL
+  initializeBlock: 67_949_841n,
+  rewardAmounts: {
+    FIRST: FIRST_PERIOD_REWARD_AMOUNT_ETH_TEL,
+    PERIOD: PERIOD_REWARD_AMOUNT_ETH_TEL,
+  },
+};
+
+// POLYGON — USDC/eMXN
+const POLYGON_USDC_EMXN: PoolConfig = {
+  network: "polygon",
+  poolId: "0xfd56605f7f4620ab44dfc0860d70b9bd1d1f648a5a74558491b39e816a10b99a",
+  denominator: getAddress("0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359"), // USDC
+  initializeBlock: 74_664_812n,
+  rewardAmounts: {
+    FIRST: FIRST_PERIOD_REWARD_AMOUNT_USDC_EMXN,
+    PERIOD: PERIOD_REWARD_AMOUNT_USDC_EMXN,
+  },
+};
+
+const NETWORKS = {
+  polygon: {
+    poolManager: getAddress("0x67366782805870060151383f4bbff9dab53e5cd6"),
+    positionManager: getAddress("0x1Ec2eBf4F37E7363FDfe3551602425af0B3ceef9"),
+    stateView: getAddress("0x5ea1bd7974c8a611cbab0bdcafcb1d9cc9b3ba5a"),
+    rpcEnv: "POLYGON_RPC_URL",
+    periodStarts: [
+      74_970_501n, // programStart
+      75_417_061n,
+      75_697_435n,
+      75_981_195n,
+      76_265_454n,
+    ],
+  },
+  base: {
+    poolManager: getAddress("0x498581fF718922c3f8e6A244956aF099B2652b2b"),
+    positionManager: getAddress("0x7C5f5A4bBd8fD63184577525326123B519429bDc"),
+    stateView: getAddress("0xa3c0c9b65bad0b08107aa264b0f3db444b867a71"),
+    rpcEnv: "BASE_RPC_URL",
+    periodStarts: [
+      33_954_128n, // programStart
+      34_429_327n,
+      34_731_727n,
+      35_034_127n,
+      35_336_526n,
+    ],
+  },
+};
+
 async function main() {
-  const client = createPublicClient({ transport: http(rpcUrl) });
+  const args = process.argv.slice(2);
+  const [poolId, period] = parseCLIArgs(args);
+  const config = setConfig(poolId, period);
 
-  //   await getPoolCreationBlock(
-  //     client,
-  //     POOL_MANAGER_ADDRESS,
-  //     POOL_ID as `0x${string}`,
-  //     60_000_000n,
-  //     75_000_000n
-  //   ).then((res) => console.log(res));
-  //   return;
-
-  // SET PARAMS HERE
-  let network = "polygon";
-  let startBlock = THIRD_PERIOD_END;
-  let endBlock = FOURTH_PERIOD_END;
-  let poolId = POOL_ID;
-  let rewardAmount = PERIOD_REWARD_AMOUNT;
-
+  // Load state from checkpoint json if it exists and reset its period-specific fee fields
+  let initialPositions: Map<string, PositionState> = await initialize(
+    period,
+    config.startBlock,
+    config.endBlock
+  );
+  const client = createPublicClient({ transport: http(config.rpcUrl) });
   const { lpData: lpFees, finalPositions } = await updateFeesAndPositions(
     poolId,
-    startBlock,
-    endBlock,
-    client
+    config.startBlock,
+    config.endBlock,
+    client,
+    config.poolManager,
+    config.stateView,
+    config.positionManager,
+    initialPositions
   );
 
   const lpData = await denominateTokenAmountsInTEL(
     lpFees,
-    STATE_VIEW_ADDRESS,
+    config.denominator,
+    config.stateView,
+    config.positionManager,
     poolId,
     client,
-    endBlock
+    config.endBlock
   );
 
-  const lpRewards = calculateRewardDistribution(lpData, rewardAmount);
+  const lpRewards = calculateRewardDistribution(lpData, config.rewardAmount);
 
   // write to the checkpoint file
   const newCheckpoint: CheckpointData = {
     blockRange: {
-      network: network,
-      startBlock: startBlock,
-      endBlock: endBlock,
+      network: config.network,
+      startBlock: config.startBlock,
+      endBlock: config.endBlock,
     },
     poolId: poolId,
     positions: Array.from(finalPositions.entries()),
@@ -183,34 +204,37 @@ async function updateFeesAndPositions(
   poolId: `0x${string}`,
   startBlock: bigint,
   endBlock: bigint,
-  client: PublicClient
+  client: PublicClient,
+  poolManager: Address,
+  stateView: Address,
+  positionManager: Address,
+  initialPositions: Map<string, PositionState>
 ): Promise<{
   lpData: Map<string, LPData>;
   finalPositions: Map<string, PositionState>;
 }> {
-  // 1. Load state from checkpoint json if it exists and reset its period-specific fee fields
-  let initialPositions: Map<string, PositionState> = await initialize(
-    startBlock,
-    endBlock
-  );
-
-  // 2. Run the core analysis logic
+  // Run the core analysis logic
   const { lpData, finalPositions } = await fetchLPData(
     poolId,
     startBlock,
     endBlock,
     client,
+    poolManager,
+    stateView,
+    positionManager,
     initialPositions
   );
 
-  // 3. assert final outputs are correct
+  // assert final outputs are correct
   for (const [key, position] of finalPositions) {
     verifyPositionCheckpoint(
       key,
       position,
       client,
       poolId as `0x${string}`,
-      endBlock
+      endBlock,
+      positionManager,
+      stateView
     );
   }
 
@@ -222,6 +246,7 @@ async function updateFeesAndPositions(
  * and resetting all per-period fee values such as `position.feeGrowthInsidePeriod0/1`
  */
 async function initialize(
+  period: number,
   startBlock: bigint,
   endBlock: bigint
 ): Promise<Map<string, PositionState>> {
@@ -242,12 +267,13 @@ async function initialize(
         `Provided startBlock (${startBlock}) does not correspond to lastProcessedBlock + 1 (${expectedStartBlock})`
       );
     }
+    //todo: validate period info against checkpoint file, make sure lastupdatedblock is 1 before startBlock
 
     initialPositions = new Map(checkpoint.positions);
   } else {
-    if (startBlock !== INITIALIZE_BLOCK) {
+    if (period !== 0) {
       throw new Error(
-        `No checkpoint file found. Please set startBlock to the pool creation block (${INITIALIZE_BLOCK}) for first runs.`
+        `No checkpoint file found. Period must be 0 for first runs`
       );
     }
   }
@@ -279,6 +305,9 @@ async function fetchLPData(
   startBlock: bigint,
   endBlock: bigint,
   client: PublicClient,
+  poolManager: Address,
+  stateView: Address,
+  positionManager: Address,
   initialPositions: Map<string, PositionState>
 ): Promise<{
   lpData: Map<string, LPData>;
@@ -290,7 +319,7 @@ async function fetchLPData(
 
   // 1. Fetch all ModifyPosition events in the new range
   const logs = await client.getLogs({
-    address: POOL_MANAGER_ADDRESS,
+    address: poolManager,
     event: parseAbiItem(
       "event ModifyLiquidity(bytes32 indexed id, address indexed sender, int24 tickLower, int24 tickUpper, int256 liquidityDelta, bytes32 salt)"
     ),
@@ -319,6 +348,7 @@ async function fetchLPData(
         const feeGrowthAtStart = await getFeeGrowthInside(
           client,
           poolId,
+          stateView,
           position.tickLower,
           position.tickUpper,
           startBlock
@@ -326,6 +356,7 @@ async function fetchLPData(
         const feeGrowthAtEnd = await getFeeGrowthInside(
           client,
           poolId,
+          stateView,
           position.tickLower,
           position.tickUpper,
           endBlock
@@ -342,7 +373,7 @@ async function fetchLPData(
 
         // fetch current lp owner as of last block since lp may have changed
         const lp = await client.readContract({
-          address: POSITION_MANAGER_ADDRESS,
+          address: positionManager,
           abi: POSITION_MANAGER_ABI,
           functionName: "ownerOf",
           args: [BigInt(key)],
@@ -376,7 +407,7 @@ async function fetchLPData(
     if (!tokenId) throw new Error("Missing tokenId in event args");
     // fees accrued are credited to the owner at the time of the event (since transfers do not settle fees)
     const lp = await client.readContract({
-      address: POSITION_MANAGER_ADDRESS,
+      address: positionManager,
       abi: POSITION_MANAGER_ABI,
       functionName: "ownerOf",
       args: [tokenId],
@@ -397,6 +428,7 @@ async function fetchLPData(
       const feeGrowthInsideNow = await getFeeGrowthInside(
         client,
         poolId,
+        stateView,
         currentPositionState.tickLower,
         currentPositionState.tickUpper,
         log.blockNumber
@@ -432,6 +464,7 @@ async function fetchLPData(
     const feeGrowthInsideAtEvent = await getFeeGrowthInside(
       client,
       poolId,
+      stateView,
       tickLower!,
       tickUpper!,
       log.blockNumber
@@ -456,6 +489,7 @@ async function fetchLPData(
       const positionFinalFeeGrowth = await getFeeGrowthInside(
         client,
         poolId,
+        stateView,
         position.tickLower,
         position.tickUpper,
         endBlock
@@ -479,7 +513,7 @@ async function fetchLPData(
 
       // owner may have changed; fetch current lp owner as of last block
       const lp = await client.readContract({
-        address: POSITION_MANAGER_ADDRESS,
+        address: positionManager,
         abi: POSITION_MANAGER_ABI,
         functionName: "ownerOf",
         args: [BigInt(key)],
@@ -626,14 +660,13 @@ function modifyLPData(
 async function getFeeGrowthInside(
   client: PublicClient,
   poolId: string,
+  stateView: Address,
   tickLower: number,
   tickUpper: number,
   blockNumber: bigint
 ) {
-  if (blockNumber < INITIALIZE_BLOCK)
-    throw new Error("Block too early; provide exact pool creation block");
   const [feeGrowthInside0, feeGrowthInside1] = await client.readContract({
-    address: STATE_VIEW_ADDRESS,
+    address: stateView,
     abi: STATE_VIEW_ABI,
     functionName: "getFeeGrowthInside",
     args: [poolId as `0x${string}`, tickLower, tickUpper],
@@ -655,7 +688,9 @@ async function verifyPositionCheckpoint(
   position: PositionState,
   client: PublicClient,
   poolId: `0x${string}`,
-  endBlock: bigint
+  endBlock: bigint,
+  positionManager: Address,
+  stateView: Address
 ) {
   // ensure `lastUpdatedBlock === endBlock` for all positions
   if (position.lastUpdatedBlock !== endBlock) {
@@ -670,7 +705,7 @@ async function verifyPositionCheckpoint(
   }
   // ensure position lp corresponds to ownerOf(tokenId)
   const owner = await client.readContract({
-    address: POSITION_MANAGER_ADDRESS,
+    address: positionManager,
     abi: POSITION_MANAGER_ABI,
     functionName: "ownerOf",
     args: [BigInt(key)],
@@ -685,6 +720,7 @@ async function verifyPositionCheckpoint(
   const feeGrowthOnChain = await getFeeGrowthInside(
     client,
     poolId,
+    stateView,
     position.tickLower,
     position.tickUpper,
     endBlock
@@ -699,25 +735,27 @@ async function verifyPositionCheckpoint(
   }
 }
 
-// Condenses token0 and token1 amounts into a single TEL-denominatd value based on current tick price
-async function denominateTokenAmountsInTEL(
+// Sums token0 and token1 amounts into a value denominated in a single currency based on current tick price
+async function denominateTokenAmountsInTEL( //todo rename
   lpData: Map<string, LPData>,
+  denominator: Address,
   stateView: Address,
+  positionManager: Address,
   poolId: `0x${string}`,
   client: PublicClient,
   blockNumber: bigint
 ): Promise<Map<string, LPData>> {
-  // rhe position manager uses only the first 25 bytes of the poolId
+  // the position manager uses only the first 25 bytes of the poolId
   const [currency0, currency1] = await client.readContract({
-    address: POSITION_MANAGER_ADDRESS,
+    address: positionManager,
     abi: POSITION_MANAGER_ABI,
     functionName: "poolKeys",
     args: [poolId.slice(0, 52) as `0x${string}`],
   });
 
   // Identify whether TEL is token0 or token1
-  const telIsCurrency0 = getAddress(currency0) === TEL_TOKEN;
-  const telIsCurrency1 = currency1 === TEL_TOKEN;
+  const telIsCurrency0 = getAddress(currency0) === denominator;
+  const telIsCurrency1 = currency1 === denominator;
   if (!telIsCurrency0 && !telIsCurrency1) {
     throw new Error("TEL token not found in pool");
   }
@@ -839,3 +877,66 @@ async function getPoolCreationBlock(
 }
 
 main();
+
+function setConfig(poolId_: `0x${string}`, period: number) {
+  const POOLS = [BASE_ETH_TEL, POLYGON_ETH_TEL, POLYGON_USDC_EMXN];
+  const pool = POOLS.find((p) => p.poolId === poolId_);
+  if (!pool) throw new Error("Unrecognized pool ID");
+
+  const { network, denominator } = pool;
+  const { poolManager, positionManager, stateView, rpcEnv } = NETWORKS[network];
+  const rpcUrl =
+    process.env[rpcEnv] ??
+    (() => {
+      throw new Error(`${rpcEnv} environment variable is not set`);
+    })();
+
+  const { reward, start, end } = buildPeriodConfig(pool, period);
+
+  return {
+    network,
+    rpcUrl,
+    poolId: pool.poolId,
+    poolManager,
+    positionManager,
+    stateView,
+    denominator,
+    rewardAmount: reward,
+    startBlock: start,
+    endBlock: end,
+  };
+}
+
+function parseCLIArgs(args: string[]): [`0x${string}`, number] {
+  if (args.length !== 1) {
+    throw new Error("Usage: <poolId:period>");
+  }
+  const [poolId, periodStr] = args[0].split(":");
+  if (!poolId?.startsWith("0x")) {
+    throw new Error("Invalid poolId format");
+  }
+  const period = Number(periodStr);
+  if (isNaN(period) || period < 0 || period > 4) {
+    throw new Error("Invalid period, must be 0–4");
+  }
+  return [poolId as `0x${string}`, period];
+}
+
+function buildPeriodConfig(pool: PoolConfig, period: number) {
+  const networkCfg = NETWORKS[pool.network];
+  if (period === 0) {
+    return {
+      reward: INITIALIZE_REWARD_AMOUNT,
+      start: pool.initializeBlock,
+      end: networkCfg.periodStarts[0],
+    };
+  }
+
+  const index = period - 1;
+  const start = networkCfg.periodStarts[index];
+  const end = networkCfg.periodStarts[index + 1] - 1n;
+  const reward =
+    period === 1 ? pool.rewardAmounts.FIRST : pool.rewardAmounts.PERIOD;
+
+  return { reward, start, end };
+}
