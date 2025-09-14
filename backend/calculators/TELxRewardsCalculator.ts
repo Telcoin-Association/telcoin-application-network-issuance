@@ -147,6 +147,7 @@ async function main() {
 
   // Load state from checkpoint json if it exists and reset its period-specific fee fields
   let initialPositions: Map<bigint, PositionState> = await initialize(
+    config.checkpointFile,
     period,
     config.startBlock,
     config.endBlock
@@ -162,7 +163,7 @@ async function main() {
     config.positionManager,
     initialPositions
   );
-
+  /*
   const lpData = await denominateTokenAmountsInTEL(
     lpFees,
     config.denominator,
@@ -174,6 +175,7 @@ async function main() {
   );
 
   const lpRewards = calculateRewardDistribution(lpData, config.rewardAmount);
+  */
 
   // write to the checkpoint file
   const newCheckpoint: CheckpointData = {
@@ -186,8 +188,9 @@ async function main() {
     positions: Array.from(finalPositions.entries()),
     lpData: Array.from(lpRewards.entries()),
   };
+  const outputFile = `backend/checkpoints/${config.poolId}-${period}.json`;
   await writeFile(
-    CHECKPOINT_FILE,
+    outputFile,
     JSON.stringify(
       newCheckpoint,
       (key, value) =>
@@ -199,6 +202,11 @@ async function main() {
 
   console.log("Analysis complete. New checkpoint saved.");
 }
+
+//todo: fetch/update all positions
+//todo: for each position, fetch fee growth inside its range for the period (getFeeGrowthInsideB - getFeeGrowthInsideA)
+//todo: how to handle position modifications?
+// async function
 
 async function updateFeesAndPositions(
   poolId: `0x${string}`,
@@ -246,15 +254,21 @@ async function updateFeesAndPositions(
  * and resetting all per-period fee values such as `position.feeGrowthInsidePeriod0/1`
  */
 async function initialize(
+  checkpointFile: string,
   period: number,
   startBlock: bigint,
   endBlock: bigint
 ): Promise<Map<bigint, PositionState>> {
   let initialPositions = new Map<bigint, PositionState>();
 
-  if (existsSync(CHECKPOINT_FILE)) {
+  if (existsSync(checkpointFile)) {
+    if (period === 0)
+      throw new Error(
+        "Checkpoint file found but period is 0; delete checkpoint file"
+      );
+
     console.log("Checkpoint file found, loading previous state...");
-    const fileContent = await readFile(CHECKPOINT_FILE, "utf-8");
+    const fileContent = await readFile(checkpointFile, "utf-8");
     const checkpoint: CheckpointData = JSON.parse(fileContent, (key, value) =>
       typeof value === "string" && /^\d+n$/.test(value)
         ? BigInt(value.slice(0, -1))
@@ -267,7 +281,6 @@ async function initialize(
         `Provided startBlock (${startBlock}) does not correspond to lastProcessedBlock + 1 (${expectedStartBlock})`
       );
     }
-    //todo: validate period info against checkpoint file, make sure lastupdatedblock is 1 before startBlock
 
     initialPositions = new Map(checkpoint.positions);
   } else {
@@ -890,6 +903,9 @@ function setConfig(poolId_: `0x${string}`, period: number) {
     (() => {
       throw new Error(`${rpcEnv} environment variable is not set`);
     })();
+  const checkpointFile = `backend/checkpoints/${pool.poolId}-${
+    period - 1
+  }.json`;
 
   const { reward, start, end } = buildPeriodConfig(pool, period);
 
@@ -904,6 +920,7 @@ function setConfig(poolId_: `0x${string}`, period: number) {
     rewardAmount: reward,
     startBlock: start,
     endBlock: end,
+    checkpointFile,
   };
 }
 
@@ -928,7 +945,7 @@ function buildPeriodConfig(pool: PoolConfig, period: number) {
     return {
       reward: INITIALIZE_REWARD_AMOUNT,
       start: pool.initializeBlock,
-      end: networkCfg.periodStarts[0],
+      end: networkCfg.periodStarts[0] - 1n,
     };
   }
 
