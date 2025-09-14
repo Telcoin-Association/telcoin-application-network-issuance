@@ -41,8 +41,8 @@ interface LPData {
 interface CheckpointData {
   blockRange: NetworkConfig;
   poolId: `0x${string}`;
-  positions: [string, PositionState][];
-  lpData: [string, LPData][];
+  positions: [bigint, PositionState][];
+  lpData: [Address, LPData][];
 }
 
 type PoolConfig = {
@@ -146,7 +146,7 @@ async function main() {
   const config = setConfig(poolId, period);
 
   // Load state from checkpoint json if it exists and reset its period-specific fee fields
-  let initialPositions: Map<string, PositionState> = await initialize(
+  let initialPositions: Map<bigint, PositionState> = await initialize(
     period,
     config.startBlock,
     config.endBlock
@@ -208,10 +208,10 @@ async function updateFeesAndPositions(
   poolManager: Address,
   stateView: Address,
   positionManager: Address,
-  initialPositions: Map<string, PositionState>
+  initialPositions: Map<bigint, PositionState>
 ): Promise<{
-  lpData: Map<string, LPData>;
-  finalPositions: Map<string, PositionState>;
+  lpData: Map<Address, LPData>;
+  finalPositions: Map<bigint, PositionState>;
 }> {
   // Run the core analysis logic
   const { lpData, finalPositions } = await fetchLPData(
@@ -249,8 +249,8 @@ async function initialize(
   period: number,
   startBlock: bigint,
   endBlock: bigint
-): Promise<Map<string, PositionState>> {
-  let initialPositions = new Map<string, PositionState>();
+): Promise<Map<bigint, PositionState>> {
+  let initialPositions = new Map<bigint, PositionState>();
 
   if (existsSync(CHECKPOINT_FILE)) {
     console.log("Checkpoint file found, loading previous state...");
@@ -308,14 +308,14 @@ async function fetchLPData(
   poolManager: Address,
   stateView: Address,
   positionManager: Address,
-  initialPositions: Map<string, PositionState>
+  initialPositions: Map<bigint, PositionState>
 ): Promise<{
-  lpData: Map<string, LPData>;
-  finalPositions: Map<string, PositionState>;
+  lpData: Map<Address, LPData>;
+  finalPositions: Map<bigint, PositionState>;
 }> {
-  const lpData = new Map<string, LPData>();
+  const lpData = new Map<Address, LPData>();
   // use copy of initial positions fetched from checkpoint file
-  const positions = new Map<string, PositionState>(initialPositions);
+  const positions = new Map<bigint, PositionState>(initialPositions);
 
   // 1. Fetch all ModifyPosition events in the new range
   const logs = await client.getLogs({
@@ -341,7 +341,7 @@ async function fetchLPData(
     if (position.liquidity > 0) {
       // Check if this position was modified in any of the fetched ModifyLiquidity logs
       const wasModified = logs.some(
-        (log) => `${hexToBigInt(log.args.salt!).toString()}` === key
+        (log) => hexToBigInt(log.args.salt!) === BigInt(key)
       );
       if (!wasModified) {
         // If not modified, calculate its fees over the whole period and update its feeGrowth baseline
@@ -415,7 +415,7 @@ async function fetchLPData(
     });
 
     // If position existed, its liquidity was active since last update; calculate subperiod's fees
-    const currentPositionState = positions.get(tokenId.toString());
+    const currentPositionState = positions.get(tokenId);
     // all positions.feeGrowthInsidePeriod0/1 are wiped to 0n at start of period so this assignment is period-specific
     let feesEarnedThisPeriod0 = currentPositionState?.feeGrowthInsidePeriod0
       ? currentPositionState?.feeGrowthInsidePeriod0
@@ -469,7 +469,7 @@ async function fetchLPData(
       tickUpper!,
       log.blockNumber
     );
-    updatePosition(positions, tokenId.toString(), {
+    updatePosition(positions, tokenId, {
       lp: lp,
       poolId: poolId,
       tickLower: tickLower!,
@@ -578,8 +578,8 @@ function calculateUncollectedFees(
  * Adds new entry or updates existing one at `positions[key]` with fields provided in `updates`
  */
 function updatePosition(
-  positions: Map<string, PositionState>,
-  key: string,
+  positions: Map<bigint, PositionState>,
+  key: bigint,
   updates: {
     lp?: Address;
     poolId?: `0x${string}`;
@@ -639,8 +639,8 @@ function updatePosition(
  * Updates existing entry at `lpData[key]` with fields provided in `updates`
  */
 function modifyLPData(
-  lpData: Map<string, LPData>,
-  key: string,
+  lpData: Map<Address, LPData>,
+  key: Address,
   updates: Partial<LPData>
 ) {
   const existing = lpData.get(key);
@@ -684,7 +684,7 @@ async function getFeeGrowthInside(
  * Throws an error if any discrepancies are found.
  */
 async function verifyPositionCheckpoint(
-  key: string,
+  key: bigint,
   position: PositionState,
   client: PublicClient,
   poolId: `0x${string}`,
@@ -737,14 +737,14 @@ async function verifyPositionCheckpoint(
 
 // Sums token0 and token1 amounts into a value denominated in a single currency based on current tick price
 async function denominateTokenAmountsInTEL( //todo rename
-  lpData: Map<string, LPData>,
+  lpData: Map<Address, LPData>,
   denominator: Address,
   stateView: Address,
   positionManager: Address,
   poolId: `0x${string}`,
   client: PublicClient,
   blockNumber: bigint
-): Promise<Map<string, LPData>> {
+): Promise<Map<Address, LPData>> {
   // the position manager uses only the first 25 bytes of the poolId
   const [currency0, currency1] = await client.readContract({
     address: positionManager,
@@ -803,9 +803,9 @@ async function denominateTokenAmountsInTEL( //todo rename
 
 // allocates each LP the amount proportional to their share of the total reward amount
 function calculateRewardDistribution(
-  lpData: Map<string, LPData>,
+  lpData: Map<Address, LPData>,
   rewardAmount: bigint
-): Map<string, LPData> {
+): Map<Address, LPData> {
   const totalFees = Array.from(lpData.values())
     .map((data) => data.totalFeesTELDenominated!)
     .reduce((a, b) => a + b, 0n);
