@@ -16,25 +16,35 @@ import { NetworkConfig, parseAndSanitizeCLIArgs } from "helpers";
 dotenv.config();
 
 /// usage: `yarn ts-node backend/calculators/TELxRewardsCalculator.ts`
+/// 1. Fetches & updates all the pool's positions in checkpoint file using ModifyLiquidity events
+/// 2. For each ModifyLiquidity event, records the block, new liquidity, and position owner (fee recipient) at the time of the event. This handles ownership transfers on the ERC721 ledger
+/// 3. All positions are thus brought up to date, including an array of its liquidity modification events during the period
+/// 4. Once all position are up-to-date, process them to credit the active owner of the LP token with position's fee growth at the time of each liquidity modification event. For each modification:
+///   a. Identify the position's fee growth for each subperiod bounded by events (or period start/end): `liquidity * (getFeeGrowthInsideEnd - getFeeGrowthInsideStart) / Q128`
+///   b. LP token ownership may have changed between subperiod boundaries, so fees for each subperiod are credited to the position owner at the time of modification. This is the address that collects the fees at modification time.
+///   c. For positions that emitted no ModifyLiquidity events, the entire period is calculated with the last entry for liquidity value
+///   d. For positions that were created mid-period, a `LiquidityChange` with `liquidity == 0` is unshifted from the period start until position creation
 
 interface PositionState {
-  lp: Address;
+  lastOwner: Address;
   tickLower: number;
   tickUpper: number;
-  liquidity: bigint;
-  feeGrowthInsidePeriod0: bigint;
-  feeGrowthInsidePeriod1: bigint;
-  // the fee growth inside the range, as of the last modification event
-  feeGrowthInsideLast0: bigint;
-  feeGrowthInsideLast1: bigint;
-  // the block number when this position was last updated
-  lastUpdatedBlock: bigint;
+  liquidity: bigint; // the final liquidity amount after fully processing the period
+  feeGrowthInsidePeriod0: bigint; // currency0 final total fee growth after processing period
+  feeGrowthInsidePeriod1: bigint; // currency1 final total fee growth after processing period
+  liquidityModifications: LiquidityChange[];
+}
+
+interface LiquidityChange {
+  blockNumber: bigint;
+  newLiquidityAmount: bigint;
+  owner: Address;
 }
 
 interface LPData {
   periodFeesCurrency0: bigint;
   periodFeesCurrency1: bigint;
-  totalFeesTELDenominated?: bigint;
+  totalFeesCommonDenominator?: bigint;
   reward?: bigint;
 }
 
@@ -54,7 +64,6 @@ type PoolConfig = {
 };
 
 const PRECISION = 10n ** 18n;
-const CHECKPOINT_FILE = "./positions-checkpoint.json";
 const INITIALIZE_REWARD_AMOUNT = 0n;
 const FIRST_PERIOD_REWARD_AMOUNT_ETH_TEL = 101_851_851n; // prorated
 const PERIOD_REWARD_AMOUNT_ETH_TEL = 64_814_814n;
@@ -163,8 +172,7 @@ async function main() {
     config.positionManager,
     initialPositions
   );
-  /*
-  const lpData = await denominateTokenAmountsInTEL(
+  const lpData = await populateValuesCommonDenominator(
     lpFees,
     config.denominator,
     config.stateView,
@@ -175,7 +183,6 @@ async function main() {
   );
 
   const lpRewards = calculateRewardDistribution(lpData, config.rewardAmount);
-  */
 
   // write to the checkpoint file
   const newCheckpoint: CheckpointData = {
@@ -203,11 +210,6 @@ async function main() {
   console.log("Analysis complete. New checkpoint saved.");
 }
 
-//todo: fetch/update all positions
-//todo: for each position, fetch fee growth inside its range for the period (getFeeGrowthInsideB - getFeeGrowthInsideA)
-//todo: how to handle position modifications?
-// async function
-
 async function updateFeesAndPositions(
   poolId: `0x${string}`,
   startBlock: bigint,
@@ -221,116 +223,43 @@ async function updateFeesAndPositions(
   lpData: Map<Address, LPData>;
   finalPositions: Map<bigint, PositionState>;
 }> {
-  // Run the core analysis logic
-  const { lpData, finalPositions } = await fetchLPData(
+  // update positions by processing ModifyLiquidity events
+  const updatedPositions = await updatePositions(
     poolId,
     startBlock,
     endBlock,
     client,
     poolManager,
-    stateView,
     positionManager,
     initialPositions
   );
-
-  // assert final outputs are correct
-  for (const [key, position] of finalPositions) {
-    verifyPositionCheckpoint(
-      key,
-      position,
-      client,
-      poolId as `0x${string}`,
-      endBlock,
-      positionManager,
-      stateView
-    );
-  }
+  // use final positions to credit fees to LPs
+  const { lpData, finalPositions } = await processFees(
+    poolId,
+    client,
+    startBlock,
+    endBlock,
+    stateView,
+    positionManager,
+    updatedPositions
+  );
 
   return { lpData, finalPositions };
 }
 
-/**
- * Initialize the script run by loading previous state from checkpoint file if it exists
- * and resetting all per-period fee values such as `position.feeGrowthInsidePeriod0/1`
- */
-async function initialize(
-  checkpointFile: string,
-  period: number,
-  startBlock: bigint,
-  endBlock: bigint
-): Promise<Map<bigint, PositionState>> {
-  let initialPositions = new Map<bigint, PositionState>();
-
-  if (existsSync(checkpointFile)) {
-    if (period === 0)
-      throw new Error(
-        "Checkpoint file found but period is 0; delete checkpoint file"
-      );
-
-    console.log("Checkpoint file found, loading previous state...");
-    const fileContent = await readFile(checkpointFile, "utf-8");
-    const checkpoint: CheckpointData = JSON.parse(fileContent, (key, value) =>
-      typeof value === "string" && /^\d+n$/.test(value)
-        ? BigInt(value.slice(0, -1))
-        : value
-    );
-
-    const expectedStartBlock = BigInt(checkpoint.blockRange.endBlock) + 1n;
-    if (startBlock !== expectedStartBlock) {
-      throw new Error(
-        `Provided startBlock (${startBlock}) does not correspond to lastProcessedBlock + 1 (${expectedStartBlock})`
-      );
-    }
-
-    initialPositions = new Map(checkpoint.positions);
-  } else {
-    if (period !== 0) {
-      throw new Error(
-        `No checkpoint file found. Period must be 0 for first runs`
-      );
-    }
-  }
-
-  if (startBlock > endBlock) {
-    console.error("Already up to date. No new blocks to process.");
-    throw new Error("No new blocks to process");
-  }
-
-  // wipe all positions.feeGrowthInsidePeriod0/1 to 0n at start of period to track per-period fees
-  for (const [key, position] of initialPositions) {
-    updatePosition(initialPositions, key, {
-      feeGrowthInsidePeriod0: 0n,
-      feeGrowthInsidePeriod1: 0n,
-    });
-  }
-  console.log(`Analyzing fees from block ${startBlock} to ${endBlock}...`);
-
-  return initialPositions;
-}
-
-/**
- * Identifies cumulative fee totals for each liquidity provider
- * @return finalPositions Map of `tokenId => PositionState` tracking state of each unique position
- * @return lpData Map of `LP => LPData` tracking total fees per LP
- */
-async function fetchLPData(
+async function updatePositions(
   poolId: `0x${string}`,
   startBlock: bigint,
   endBlock: bigint,
   client: PublicClient,
   poolManager: Address,
-  stateView: Address,
   positionManager: Address,
   initialPositions: Map<bigint, PositionState>
-): Promise<{
-  lpData: Map<Address, LPData>;
-  finalPositions: Map<bigint, PositionState>;
-}> {
-  const lpData = new Map<Address, LPData>();
+): Promise<Map<bigint, PositionState>> {
   // use copy of initial positions fetched from checkpoint file
   const positions = new Map<bigint, PositionState>(initialPositions);
 
-  // 1. Fetch all ModifyPosition events in the new range
+  // fetch all ModifyPosition events in the new range
   const logs = await client.getLogs({
     address: poolManager,
     event: parseAbiItem(
@@ -341,7 +270,7 @@ async function fetchLPData(
     toBlock: endBlock,
   });
 
-  // Sort logs by block number and then log index to ensure chronological processing
+  // sort logs by block number and then log index to ensure chronological processing
   logs.sort((a, b) => {
     if (a.blockNumber === b.blockNumber) {
       return Number(a.logIndex) - Number(b.logIndex);
@@ -349,70 +278,7 @@ async function fetchLPData(
     return Number(a.blockNumber) - Number(b.blockNumber);
   });
 
-  // 2. Calculate fees for positions that existed before this period but had no modifications
-  for (const [key, position] of positions.entries()) {
-    if (position.liquidity > 0) {
-      // Check if this position was modified in any of the fetched ModifyLiquidity logs
-      const wasModified = logs.some(
-        (log) => hexToBigInt(log.args.salt!) === BigInt(key)
-      );
-      if (!wasModified) {
-        // If not modified, calculate its fees over the whole period and update its feeGrowth baseline
-        const feeGrowthAtStart = await getFeeGrowthInside(
-          client,
-          poolId,
-          stateView,
-          position.tickLower,
-          position.tickUpper,
-          startBlock
-        );
-        const feeGrowthAtEnd = await getFeeGrowthInside(
-          client,
-          poolId,
-          stateView,
-          position.tickLower,
-          position.tickUpper,
-          endBlock
-        );
-
-        const { token0Fees: feesEarned0, token1Fees: feesEarned1 } =
-          calculateUncollectedFees(
-            position.liquidity,
-            feeGrowthAtEnd.feeGrowthInside0,
-            feeGrowthAtEnd.feeGrowthInside1,
-            feeGrowthAtStart.feeGrowthInside0,
-            feeGrowthAtStart.feeGrowthInside1
-          );
-
-        // fetch current lp owner as of last block since lp may have changed
-        const lp = await client.readContract({
-          address: positionManager,
-          abi: POSITION_MANAGER_ABI,
-          functionName: "ownerOf",
-          args: [BigInt(key)],
-          blockNumber: endBlock,
-        });
-        const currentLpTotal = lpData.get(lp) ?? {
-          periodFeesCurrency0: 0n,
-          periodFeesCurrency1: 0n,
-        };
-        lpData.set(lp, {
-          periodFeesCurrency0: currentLpTotal.periodFeesCurrency0 + feesEarned0,
-          periodFeesCurrency1: currentLpTotal.periodFeesCurrency1 + feesEarned1,
-        });
-        updatePosition(positions, key, {
-          lp: lp,
-          feeGrowthInsidePeriod0: feesEarned0,
-          feeGrowthInsidePeriod1: feesEarned1,
-          feeGrowthInsideLast0: feeGrowthAtEnd.feeGrowthInside0,
-          feeGrowthInsideLast1: feeGrowthAtEnd.feeGrowthInside1,
-          lastUpdatedBlock: endBlock,
-        });
-      }
-    }
-  }
-
-  // 3. Identify collected fee totals by processing ModifyLiquidity events chronologically
+  // process logs to update position list, adding new ones when detected and marking liquidity changes on existing ones
   for (const log of logs) {
     if (!log.args || !log.blockNumber) continue;
     const { tickLower, tickUpper, liquidityDelta, salt } = log.args;
@@ -427,158 +293,207 @@ async function fetchLPData(
       blockNumber: log.blockNumber,
     });
 
-    // If position existed, its liquidity was active since last update; calculate subperiod's fees
     const currentPositionState = positions.get(tokenId);
-    // all positions.feeGrowthInsidePeriod0/1 are wiped to 0n at start of period so this assignment is period-specific
-    let feesEarnedThisPeriod0 = currentPositionState?.feeGrowthInsidePeriod0
-      ? currentPositionState?.feeGrowthInsidePeriod0
-      : 0n;
-    let feesEarnedThisPeriod1 = currentPositionState?.feeGrowthInsidePeriod1
-      ? currentPositionState?.feeGrowthInsidePeriod1
-      : 0n;
-    if (currentPositionState && currentPositionState.liquidity > 0) {
-      // calculate fees collected as part of this event (ie uncollected fee amount just before event)
-      const feeGrowthInsideNow = await getFeeGrowthInside(
-        client,
-        poolId,
-        stateView,
-        currentPositionState.tickLower,
-        currentPositionState.tickUpper,
-        log.blockNumber
-      );
-      const { token0Fees: feesEarned0, token1Fees: feesEarned1 } =
-        calculateUncollectedFees(
-          currentPositionState.liquidity,
-          feeGrowthInsideNow.feeGrowthInside0,
-          feeGrowthInsideNow.feeGrowthInside1,
-          currentPositionState.feeGrowthInsideLast0,
-          currentPositionState.feeGrowthInsideLast1
-        );
+    let newLiquidity = 0n;
+    if (currentPositionState) {
+      // previously existing position, mark subperiod with liquidity change
+      // Check if this is the first modification we've seen for this existing position in this period
+      if (currentPositionState.liquidityModifications.length === 0) {
+        // Add the initial state at the start of the period
+        currentPositionState.liquidityModifications.push({
+          blockNumber: startBlock,
+          newLiquidityAmount: currentPositionState.liquidity, // use pre-existing liquidity from checkpoint
+          owner: lp,
+        });
+      }
 
-      // add subperiod's collected fees to period total for this position
-      feesEarnedThisPeriod0 += feesEarned0;
-      feesEarnedThisPeriod1 += feesEarned1;
-
-      // add these collected fees to the LP's total
-      const currentLpTotal = lpData.get(lp) ?? {
-        periodFeesCurrency0: 0n,
-        periodFeesCurrency1: 0n,
+      // update the positions entry with new liquidity and append the liquidity modification event
+      newLiquidity = currentPositionState.liquidity + liquidityDelta!;
+      const change: LiquidityChange = {
+        blockNumber: log.blockNumber,
+        newLiquidityAmount: newLiquidity,
+        owner: lp,
       };
-      lpData.set(lp, {
-        periodFeesCurrency0: currentLpTotal.periodFeesCurrency0 + feesEarned0,
-        periodFeesCurrency1: currentLpTotal.periodFeesCurrency1 + feesEarned1,
+
+      positions.set(tokenId, {
+        ...currentPositionState,
+        liquidity: newLiquidity,
+        liquidityModifications: [
+          ...currentPositionState.liquidityModifications,
+          change,
+        ],
+      });
+    } else {
+      // this is a newly detected position; delta is the initial liquidity amount
+      newLiquidity = liquidityDelta!;
+      // new positions start period with a subperiod of 0 liquidity until creation time
+      const changes: LiquidityChange[] = [
+        { blockNumber: startBlock, newLiquidityAmount: 0n, owner: zeroAddress },
+        {
+          blockNumber: log.blockNumber,
+          newLiquidityAmount: newLiquidity,
+          owner: lp,
+        },
+      ];
+
+      // placeholders used for feeGrowth params until final processing step
+      positions.set(tokenId, {
+        lastOwner: lp,
+        tickLower: tickLower!,
+        tickUpper: tickUpper!,
+        liquidity: liquidityDelta!,
+        feeGrowthInsidePeriod0: 0n,
+        feeGrowthInsidePeriod1: 0n,
+        liquidityModifications: changes,
+      });
+    }
+  }
+
+  return positions;
+}
+
+/**
+ * Identifies cumulative fee totals for each liquidity provider
+ * @return finalPositions Map of `tokenId => PositionState` tracking state of each unique position
+ * @return lpData Map of `LP => LPData` tracking total fees per LP
+ */
+async function processFees(
+  poolId: `0x${string}`,
+  client: PublicClient,
+  startBlock: bigint,
+  endBlock: bigint,
+  stateView: Address,
+  positionManager: Address,
+  positions: Map<bigint, PositionState> // must be fully processed for the period
+): Promise<{
+  lpData: Map<Address, LPData>;
+  finalPositions: Map<bigint, PositionState>;
+}> {
+  // iterate over finalized PositionStates to construct lpData map<lpTokenOwnerAddress, totalFeesEarned>
+  const lpData = new Map<Address, LPData>();
+  for (const [tokenId, position] of positions.entries()) {
+    const ownerAtEndBlock = await client.readContract({
+      address: positionManager,
+      abi: POSITION_MANAGER_ABI,
+      functionName: "ownerOf",
+      args: [tokenId],
+      blockNumber: endBlock,
+    });
+
+    // construct new memory array which includes final chunk of time between last modification and period endBlock
+    const timelinePoints = [];
+    if (position.liquidityModifications.length === 0) {
+      // Case 1: Pre-existing position with NO modifications this period, but owner may have changed
+      // The timeline is just the start and end of the full period.
+      timelinePoints.push({
+        blockNumber: startBlock,
+        newLiquidityAmount: position.liquidity,
+        owner: position.lastOwner,
+      });
+      timelinePoints.push({
+        blockNumber: endBlock,
+        newLiquidityAmount: position.liquidity,
+        owner: ownerAtEndBlock,
+      });
+    } else {
+      // Case 2: Position was created or modified during the period.
+      // The timeline is its list of modifications, plus a final chunk until the endBlock.
+      timelinePoints.push(...position.liquidityModifications);
+      const lastChange = timelinePoints[timelinePoints.length - 1];
+      timelinePoints.push({
+        blockNumber: endBlock,
+        newLiquidityAmount: lastChange.newLiquidityAmount, // Liquidity carries over
+        owner: ownerAtEndBlock,
       });
     }
 
-    // save (add/update) the position's state to current event's block for the *next* iteration
-    // these become the new baseline for the next subperiod in case of another modification
-    const newLiquidity =
-      (currentPositionState?.liquidity ?? 0n) + liquidityDelta!;
-    const feeGrowthInsideAtEvent = await getFeeGrowthInside(
-      client,
-      poolId,
-      stateView,
-      tickLower!,
-      tickUpper!,
-      log.blockNumber
-    );
-    updatePosition(positions, tokenId, {
-      lp: lp,
-      poolId: poolId,
-      tickLower: tickLower!,
-      tickUpper: tickUpper!,
-      liquidity: newLiquidity,
-      feeGrowthInsidePeriod0: feesEarnedThisPeriod0,
-      feeGrowthInsidePeriod1: feesEarnedThisPeriod1,
-      feeGrowthInsideLast0: feeGrowthInsideAtEvent.feeGrowthInside0,
-      feeGrowthInsideLast1: feeGrowthInsideAtEvent.feeGrowthInside1,
-      lastUpdatedBlock: log.blockNumber,
-    });
-  }
+    // iterate over the liquidity modifications to process each sub-period
+    let feesEarnedThisPeriod0 = 0n;
+    let feesEarnedThisPeriod1 = 0n;
+    for (let i = 1; i < position.liquidityModifications.length; i++) {
+      // define the sub-period starting from the second item, as the first is the initial state at period start
+      const prevChange = position.liquidityModifications[i - 1];
+      const currChange = position.liquidityModifications[i];
 
-  // 4. Calculate final uncollected fees for all positions with liquidity modifications this period
-  for (const [key, position] of positions.entries()) {
-    if (position.liquidity > 0 && position.lastUpdatedBlock !== endBlock) {
-      const positionFinalFeeGrowth = await getFeeGrowthInside(
+      const subperiodStart = prevChange.blockNumber;
+      const subperiodEnd = currChange.blockNumber;
+      const liquidityForSubperiod = prevChange.newLiquidityAmount;
+
+      // todo: skip if no liquidity or if the period is zero blocks
+      // if (liquidityForSubperiod === 0n || startBlock === endBlock) {
+      // continue;
+      // }
+
+      // get fee growth values and calculate the subperiod delta
+      const feeGrowthStart = await getFeeGrowthInside(
         client,
         poolId,
         stateView,
         position.tickLower,
         position.tickUpper,
-        endBlock
+        subperiodStart
+      );
+      const feeGrowthEnd = await getFeeGrowthInside(
+        client,
+        poolId,
+        stateView,
+        position.tickLower,
+        position.tickUpper,
+        subperiodEnd
       );
 
-      // calculate uncollected fees since last modification up to endBlock
-      const { token0Fees: uncollectedFees0, token1Fees: uncollectedFees1 } =
-        calculateUncollectedFees(
-          position.liquidity,
-          positionFinalFeeGrowth.feeGrowthInside0,
-          positionFinalFeeGrowth.feeGrowthInside1,
-          position.feeGrowthInsideLast0,
-          position.feeGrowthInsideLast1
+      // calculate subperiod's fees and add to period total for this position
+      const { token0Fees: feesEarned0, token1Fees: feesEarned1 } =
+        calculateFees(
+          liquidityForSubperiod,
+          feeGrowthEnd.feeGrowthInside0,
+          feeGrowthEnd.feeGrowthInside1,
+          feeGrowthStart.feeGrowthInside0,
+          feeGrowthStart.feeGrowthInside1
         );
+      feesEarnedThisPeriod0 += feesEarned0;
+      feesEarnedThisPeriod1 += feesEarned1;
 
-      // add uncollected fees to previously identified collected fees
-      const totalFeesThisPeriod0 =
-        position.feeGrowthInsidePeriod0 + uncollectedFees0;
-      const totalFeesThisPeriod1 =
-        position.feeGrowthInsidePeriod1 + uncollectedFees1;
-
-      // owner may have changed; fetch current lp owner as of last block
-      const lp = await client.readContract({
-        address: positionManager,
-        abi: POSITION_MANAGER_ABI,
-        functionName: "ownerOf",
-        args: [BigInt(key)],
-        blockNumber: endBlock,
-      });
-      // update lpData with uncollected fees (credited to current position owner)
-      const currentLpTotal = lpData.get(lp) ?? {
+      // aggregate fees for the owner of the position at that time
+      const lp = currChange.owner;
+      const currentFees = lpData.get(lp) ?? {
         periodFeesCurrency0: 0n,
         periodFeesCurrency1: 0n,
       };
-      lpData.set(lp, {
-        periodFeesCurrency0:
-          currentLpTotal.periodFeesCurrency0 + uncollectedFees0,
-        periodFeesCurrency1:
-          currentLpTotal.periodFeesCurrency1 + uncollectedFees1,
-      });
 
-      // update position's feeGrowth baseline to the final state for this period
-      // liquidity is excluded since it is guaranteed the same after processing all events
-      updatePosition(positions, key, {
-        lp: lp,
-        feeGrowthInsidePeriod0: totalFeesThisPeriod0,
-        feeGrowthInsidePeriod1: totalFeesThisPeriod1,
-        feeGrowthInsideLast0: positionFinalFeeGrowth.feeGrowthInside0,
-        feeGrowthInsideLast1: positionFinalFeeGrowth.feeGrowthInside1,
-        lastUpdatedBlock: endBlock,
+      lpData.set(lp, {
+        periodFeesCurrency0: currentFees.periodFeesCurrency0 + feesEarned0,
+        periodFeesCurrency1: currentFees.periodFeesCurrency1 + feesEarned1,
       });
-    } else {
-      // liquidity is 0; delete it
-      positions.delete(key);
+      updatePosition(positions, tokenId, {
+        lastOwner: lp,
+        poolId: poolId,
+        feeGrowthInsidePeriod0: feesEarnedThisPeriod0,
+        feeGrowthInsidePeriod1: feesEarnedThisPeriod1,
+      });
     }
   }
 
   return { lpData, finalPositions: positions };
 }
 
-function calculateUncollectedFees(
+// calculates fees earned for the given `liquidity` between start and end checkpoints
+function calculateFees(
   liquidity: bigint,
-  feeGrowthInside0Current: bigint,
-  feeGrowthInside1Current: bigint,
-  feeGrowthInside0Last: bigint,
-  feeGrowthInside1Last: bigint
+  feeGrowthInside0End: bigint,
+  feeGrowthInside1End: bigint,
+  feeGrowthInside0Start: bigint,
+  feeGrowthInside1Start: bigint
 ): { token0Fees: bigint; token1Fees: bigint } {
   const Q128 = 2n ** 128n;
   // underflow protection: return 0 if current is less than last
   const feeGrowthDelta0 =
-    feeGrowthInside0Current >= feeGrowthInside0Last
-      ? feeGrowthInside0Current - feeGrowthInside0Last
+    feeGrowthInside0End >= feeGrowthInside0Start
+      ? feeGrowthInside0End - feeGrowthInside0Start
       : 0n;
   const feeGrowthDelta1 =
-    feeGrowthInside1Current >= feeGrowthInside1Last
-      ? feeGrowthInside1Current - feeGrowthInside1Last
+    feeGrowthInside1End >= feeGrowthInside1Start
+      ? feeGrowthInside1End - feeGrowthInside1Start
       : 0n;
 
   return {
@@ -594,16 +509,14 @@ function updatePosition(
   positions: Map<bigint, PositionState>,
   key: bigint,
   updates: {
-    lp?: Address;
+    lastOwner?: Address;
     poolId?: `0x${string}`;
     tickLower?: number;
     tickUpper?: number;
     liquidity?: bigint;
     feeGrowthInsidePeriod0?: bigint;
     feeGrowthInsidePeriod1?: bigint;
-    feeGrowthInsideLast0?: bigint;
-    feeGrowthInsideLast1?: bigint;
-    lastUpdatedBlock?: bigint;
+    liquidityModifications?: LiquidityChange[];
   }
 ) {
   const existing = positions.get(key);
@@ -617,16 +530,14 @@ function updatePosition(
   } else {
     // create new position entry; first validate required fields
     if (
-      !updates.lp ||
+      !updates.lastOwner ||
       !updates.poolId ||
       updates.tickLower === undefined ||
       updates.tickUpper === undefined ||
       updates.liquidity === undefined ||
       updates.feeGrowthInsidePeriod0 === undefined ||
       updates.feeGrowthInsidePeriod1 === undefined ||
-      updates.feeGrowthInsideLast0 === undefined ||
-      updates.feeGrowthInsideLast1 === undefined ||
-      updates.lastUpdatedBlock === undefined
+      updates.liquidityModifications === undefined
     ) {
       throw new Error(
         `Cannot create new position ${key}: due to missing required fields.`
@@ -635,15 +546,13 @@ function updatePosition(
 
     // create new position entry
     positions.set(key, {
-      lp: updates.lp,
+      lastOwner: updates.lastOwner,
       tickLower: updates.tickLower,
       tickUpper: updates.tickUpper,
       liquidity: updates.liquidity,
       feeGrowthInsidePeriod0: updates.feeGrowthInsidePeriod0,
       feeGrowthInsidePeriod1: updates.feeGrowthInsidePeriod1,
-      feeGrowthInsideLast0: updates.feeGrowthInsideLast0,
-      feeGrowthInsideLast1: updates.feeGrowthInsideLast1,
-      lastUpdatedBlock: updates.lastUpdatedBlock,
+      liquidityModifications: updates.liquidityModifications,
     });
   }
 }
@@ -692,64 +601,9 @@ async function getFeeGrowthInside(
   };
 }
 
-/**
- * Asserts that a position's stored state matches on-chain data at the end of the analyzed period.
- * Throws an error if any discrepancies are found.
- */
-async function verifyPositionCheckpoint(
-  key: bigint,
-  position: PositionState,
-  client: PublicClient,
-  poolId: `0x${string}`,
-  endBlock: bigint,
-  positionManager: Address,
-  stateView: Address
-) {
-  // ensure `lastUpdatedBlock === endBlock` for all positions
-  if (position.lastUpdatedBlock !== endBlock) {
-    throw new Error(
-      `Position ${key} lastUpdatedBlock ${position.lastUpdatedBlock} does not match endBlock ${endBlock}`
-    );
-  }
-  if (position.liquidity === 0n) {
-    throw new Error(
-      `Position ${key} has zero liquidity; should have been deleted`
-    );
-  }
-  // ensure position lp corresponds to ownerOf(tokenId)
-  const owner = await client.readContract({
-    address: positionManager,
-    abi: POSITION_MANAGER_ABI,
-    functionName: "ownerOf",
-    args: [BigInt(key)],
-    blockNumber: endBlock,
-  });
-  if (owner !== position.lp) {
-    throw new Error(
-      `Discrepancy found for tokenId ${key}: stored LP ${position.lp} vs on-chain owner ${owner}`
-    );
-  }
-  // ensure feeGrowthInside position's tick range was updated with latest on-chain state
-  const feeGrowthOnChain = await getFeeGrowthInside(
-    client,
-    poolId,
-    stateView,
-    position.tickLower,
-    position.tickUpper,
-    endBlock
-  );
-  if (
-    feeGrowthOnChain.feeGrowthInside0 !== position.feeGrowthInsideLast0 ||
-    feeGrowthOnChain.feeGrowthInside1 !== position.feeGrowthInsideLast1
-  ) {
-    throw new Error(
-      `Discrepancy found for tokenId ${key}: stored feeGrowthInsideLast0/1 (${position.feeGrowthInsideLast0}, ${position.feeGrowthInsideLast1}) vs on-chain (${feeGrowthOnChain.feeGrowthInside0}, ${feeGrowthOnChain.feeGrowthInside1})`
-    );
-  }
-}
-
 // Sums token0 and token1 amounts into a value denominated in a single currency based on current tick price
-async function denominateTokenAmountsInTEL( //todo rename
+// updates lpData map by setting `LPData.totalFeesDenominatedInTEL` for all entries
+async function populateValuesCommonDenominator(
   lpData: Map<Address, LPData>,
   denominator: Address,
   stateView: Address,
@@ -766,11 +620,11 @@ async function denominateTokenAmountsInTEL( //todo rename
     args: [poolId.slice(0, 52) as `0x${string}`],
   });
 
-  // Identify whether TEL is token0 or token1
-  const telIsCurrency0 = getAddress(currency0) === denominator;
-  const telIsCurrency1 = currency1 === denominator;
-  if (!telIsCurrency0 && !telIsCurrency1) {
-    throw new Error("TEL token not found in pool");
+  // Identify whether denominator is token0 or token1
+  const denominatorIsCurrency0 = getAddress(currency0) === denominator;
+  const denominatorIsCurrency1 = currency1 === denominator;
+  if (!denominatorIsCurrency0 && !denominatorIsCurrency1) {
+    throw new Error("denominator not found in pool");
   }
 
   // fetch price; uniswap uses token1/token0 convention + incorporates decimal difference
@@ -783,31 +637,32 @@ async function denominateTokenAmountsInTEL( //todo rename
   });
 
   const Q96 = 2n ** 96n;
-  // denominate both token amounts into TEL and sum;
+  // convert both amounts into denominator and sum;
   for (const [lpAddress, fees] of lpData) {
-    let totalFeesInTEL: bigint;
+    let totalFeesInDenominator: bigint;
 
-    if (telIsCurrency0) {
-      // periodFeesCurrency0 is already in TEL; convert periodFeesCurrency1 to TEL
+    if (denominatorIsCurrency0) {
+      // periodFeesCurrency0 is already in denominator; convert periodFeesCurrency1
       const scaledFees1 = fees.periodFeesCurrency1 * PRECISION;
-      // Price from tick represents token1/token0, ie nonTEL/TEL: `amount0 = amount1 * Q96^2 / sqrtPriceX96^2`
-      const nonTelAmountInTEL =
+      // Price from tick represents token1/token0, ie otherToken/denominator: `amount0 = amount1 * Q96^2 / sqrtPriceX96^2`
+      const amount1InDenominator =
         (scaledFees1 * Q96 * Q96) / (sqrtPriceX96 * sqrtPriceX96);
 
-      totalFeesInTEL = fees.periodFeesCurrency0 + nonTelAmountInTEL / PRECISION;
+      totalFeesInDenominator =
+        fees.periodFeesCurrency0 + amount1InDenominator / PRECISION;
     } else {
-      // TEL is currency1; periodFeesCurrency1 is already in TEL, so convert periodFeesCurrency0 to TEL
+      // periodFeesCurrency1 is already in denominator, so convert periodFeesCurrency0
       const scaledFees0 = fees.periodFeesCurrency0 * PRECISION;
-      // price is TEL/nonTEL; `amount1 = (amount0 * sqrtPriceX96^2) / Q96^2`
-      const nonTelAmount =
+      // price is denominator/otherToken; `amount1 = (amount0 * sqrtPriceX96^2) / Q96^2`
+      const amount0InDenominatorScaled =
         (scaledFees0 * sqrtPriceX96 * sqrtPriceX96) / (Q96 * Q96);
-      const nonTelAmountInTEL = nonTelAmount / PRECISION;
+      const amount0InDenominator = amount0InDenominatorScaled / PRECISION;
 
-      totalFeesInTEL = fees.periodFeesCurrency1 + nonTelAmountInTEL;
+      totalFeesInDenominator = fees.periodFeesCurrency1 + amount0InDenominator;
     }
 
     modifyLPData(lpData, lpAddress, {
-      totalFeesTELDenominated: totalFeesInTEL,
+      totalFeesCommonDenominator: totalFeesInDenominator,
     });
   }
 
@@ -820,7 +675,7 @@ function calculateRewardDistribution(
   rewardAmount: bigint
 ): Map<Address, LPData> {
   const totalFees = Array.from(lpData.values())
-    .map((data) => data.totalFeesTELDenominated!)
+    .map((data) => data.totalFeesCommonDenominator!)
     .reduce((a, b) => a + b, 0n);
   if (totalFees === 0n) return new Map();
 
@@ -828,7 +683,7 @@ function calculateRewardDistribution(
   for (const [lpAddress, lpFees] of lpData) {
     // identify proportional reward: (lpFeesTELDenominated / totalFees) * rewardAmount
     const scaledShare =
-      (lpFees.totalFeesTELDenominated! * PRECISION) / totalFees;
+      (lpFees.totalFeesCommonDenominator! * PRECISION) / totalFees;
     const lpReward = (scaledShare * rewardAmount) / PRECISION;
 
     modifyLPData(lpData, lpAddress, { reward: lpReward });
@@ -890,6 +745,66 @@ async function getPoolCreationBlock(
 }
 
 main();
+
+/**
+ * Initialize the script run by loading previous state from checkpoint file if it exists
+ * and resetting all per-period fee values such as `position.feeGrowthInsidePeriod0/1`
+ */
+async function initialize(
+  checkpointFile: string,
+  period: number,
+  startBlock: bigint,
+  endBlock: bigint
+): Promise<Map<bigint, PositionState>> {
+  let initialPositions = new Map<bigint, PositionState>();
+
+  if (existsSync(checkpointFile)) {
+    if (period === 0)
+      throw new Error(
+        "Checkpoint file found but period is 0; delete checkpoint file"
+      );
+
+    console.log("Checkpoint file found, loading previous state...");
+    const fileContent = await readFile(checkpointFile, "utf-8");
+    const checkpoint: CheckpointData = JSON.parse(fileContent, (key, value) =>
+      typeof value === "string" && /^\d+n$/.test(value)
+        ? BigInt(value.slice(0, -1))
+        : value
+    );
+
+    const expectedStartBlock = BigInt(checkpoint.blockRange.endBlock) + 1n;
+    if (startBlock !== expectedStartBlock) {
+      throw new Error(
+        `Provided startBlock (${startBlock}) does not correspond to lastProcessedBlock + 1 (${expectedStartBlock})`
+      );
+    }
+
+    initialPositions = new Map(checkpoint.positions);
+  } else {
+    if (period !== 0) {
+      throw new Error(
+        `No checkpoint file found. Period must be 0 for first runs`
+      );
+    }
+  }
+
+  if (startBlock > endBlock) {
+    console.error("Already up to date. No new blocks to process.");
+    throw new Error("No new blocks to process");
+  }
+
+  // wipe all positions.feeGrowthInsidePeriod0/1 to 0n at start of period to track per-period fees
+  for (const [key, position] of initialPositions) {
+    updatePosition(initialPositions, key, {
+      feeGrowthInsidePeriod0: 0n,
+      feeGrowthInsidePeriod1: 0n,
+      liquidityModifications: [],
+    });
+  }
+  console.log(`Analyzing fees from block ${startBlock} to ${endBlock}...`);
+
+  return initialPositions;
+}
 
 function setConfig(poolId_: `0x${string}`, period: number) {
   const POOLS = [BASE_ETH_TEL, POLYGON_ETH_TEL, POLYGON_USDC_EMXN];
