@@ -2,18 +2,17 @@ import * as dotenv from "dotenv";
 import { Observable } from "rxjs";
 dotenv.config();
 
-import fs from "fs";
-import path from "path";
+import fs, { existsSync } from "fs";
+import path, { join } from "path";
 import * as viem from "viem";
 import * as cliProgress from "cli-progress";
-import { writeFile } from "fs/promises";
+import { readFile, writeFile } from "fs/promises";
 import { ChainId, config } from "./config";
-import { Address, getContract, zeroAddress } from "viem";
+import { Address, getContract, PublicClient, zeroAddress } from "viem";
 import { tanIssuanceHistories } from "./data/tanIssuanceHistories";
-import { randomInt } from "crypto";
+import { createHash, randomInt } from "crypto";
 import * as xlsx from "xlsx";
 import { UserRewardEntry } from "calculators/ICalculator";
-import { addressResolverAbi } from "viem/_types/constants/abis";
 
 export interface Update<T> {
   progress: number;
@@ -480,6 +479,80 @@ export function unorderedArraysEqual<T>(a: T[], b: T[]) {
     return false;
   }
   return a.every((item) => b.includes(item));
+}
+
+export function toBigInt(value: any): bigint {
+  const type = typeof value;
+
+  if (type === "bigint") {
+    return value;
+  }
+
+  // Coerce object wrappers and strings to a string representation first
+  let strValue = String(value);
+
+  // If the string ends with 'n' (from a wrapper or bad data), remove it
+  if (strValue.endsWith("n")) {
+    strValue = strValue.slice(0, -1);
+  }
+
+  return BigInt(strValue);
+}
+
+// Caching Logic for testing/offline runs
+export const CACHE_DIR = "backend/rpc_cache";
+
+/**
+ * Custom replacer and reviver for JSON serialization to handle BigInts.
+ */
+export const jsonReplacer = (key: any, value: any) =>
+  typeof value === "bigint" ? value.toString() + "n" : value;
+export const jsonReviver = (key: any, value: any) =>
+  typeof value === "string" && /^\d+n$/.test(value)
+    ? BigInt(value.slice(0, -1))
+    : value;
+
+/**
+ * Generates a unique filename hash based on the RPC call parameters.
+ */
+export function generateCacheKey(prefix: string, params: object): string {
+  const jsonString = JSON.stringify(params, jsonReplacer);
+  const hash = createHash("sha256").update(jsonString).digest("hex");
+  return `${prefix}-${hash}.json`;
+}
+
+/**
+ * A wrapper for `client.readContract` that caches the result to a local file.
+ */
+export async function cachedReadContract(client: PublicClient, params: any) {
+  const cacheKey = generateCacheKey("readContract", params);
+  const cachePath = join(CACHE_DIR, cacheKey);
+
+  if (existsSync(cachePath)) {
+    const data = await readFile(cachePath, "utf-8");
+    return JSON.parse(data, jsonReviver);
+  }
+
+  const result = await client.readContract(params);
+  await writeFile(cachePath, JSON.stringify(result, jsonReplacer, 2), "utf-8");
+  return result;
+}
+
+/**
+ * A wrapper for `client.getLogs` that caches the result to a local file.
+ */
+export async function cachedGetLogs(client: PublicClient, params: any) {
+  const cacheKey = generateCacheKey("getLogs", params);
+  const cachePath = join(CACHE_DIR, cacheKey);
+
+  if (existsSync(cachePath)) {
+    const data = await readFile(cachePath, "utf-8");
+    return JSON.parse(data, jsonReviver);
+  }
+
+  const result = await client.getLogs(params);
+  await writeFile(cachePath, JSON.stringify(result, jsonReplacer, 2), "utf-8");
+  return result;
 }
 
 /**

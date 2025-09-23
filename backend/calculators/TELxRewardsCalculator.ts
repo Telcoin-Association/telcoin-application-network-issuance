@@ -11,8 +11,8 @@ import {
 } from "viem";
 import * as dotenv from "dotenv";
 import { existsSync } from "fs";
-import { readFile, writeFile } from "fs/promises";
-import { NetworkConfig, parseAndSanitizeCLIArgs } from "helpers";
+import { readFile, writeFile, mkdir } from "fs/promises";
+import { NetworkConfig, toBigInt } from "../helpers";
 dotenv.config();
 
 /// usage: `yarn ts-node backend/calculators/TELxRewardsCalculator.ts`
@@ -63,7 +63,7 @@ type PoolConfig = {
   rewardAmounts: { FIRST: bigint; PERIOD: bigint };
 };
 
-const PRECISION = 10n ** 18n;
+const PRECISION = 10n ** 64n;
 const INITIALIZE_REWARD_AMOUNT = 0n;
 const FIRST_PERIOD_REWARD_AMOUNT_ETH_TEL = 101_851_851n; // prorated
 const PERIOD_REWARD_AMOUNT_ETH_TEL = 64_814_814n;
@@ -155,13 +155,15 @@ async function main() {
   const config = setConfig(poolId, period);
 
   // Load state from checkpoint json if it exists and reset its period-specific fee fields
+  const client = createPublicClient({ transport: http(config.rpcUrl) });
   let initialPositions: Map<bigint, PositionState> = await initialize(
     config.checkpointFile,
     period,
     config.startBlock,
-    config.endBlock
+    config.endBlock,
+    client,
+    config.positionManager
   );
-  const client = createPublicClient({ transport: http(config.rpcUrl) });
   const { lpData: lpFees, finalPositions } = await updateFeesAndPositions(
     poolId,
     config.startBlock,
@@ -271,7 +273,7 @@ async function updatePositions(
   });
 
   // sort logs by block number and then log index to ensure chronological processing
-  logs.sort((a, b) => {
+  logs.sort((a: any, b: any) => {
     if (a.blockNumber === b.blockNumber) {
       return Number(a.logIndex) - Number(b.logIndex);
     }
@@ -281,7 +283,7 @@ async function updatePositions(
   // process logs to update position list, adding new ones when detected and marking liquidity changes on existing ones
   for (const log of logs) {
     if (!log.args || !log.blockNumber) continue;
-    const { tickLower, tickUpper, liquidityDelta, salt } = log.args;
+    const { tickLower, tickUpper, liquidityDelta, salt } = log.args as any;
     const tokenId = hexToBigInt(salt!);
     if (!tokenId) throw new Error("Missing tokenId in event args");
     // fees accrued are credited to the owner at the time of the event (since transfers do not settle fees)
@@ -297,18 +299,19 @@ async function updatePositions(
     let newLiquidity = 0n;
     if (currentPositionState) {
       // previously existing position, mark subperiod with liquidity change
+      const currentLiquidity = toBigInt(currentPositionState.liquidity);
       // Check if this is the first modification we've seen for this existing position in this period
       if (currentPositionState.liquidityModifications.length === 0) {
         // Add the initial state at the start of the period
         currentPositionState.liquidityModifications.push({
           blockNumber: startBlock,
-          newLiquidityAmount: currentPositionState.liquidity, // use pre-existing liquidity from checkpoint
+          newLiquidityAmount: currentLiquidity, // use pre-existing liquidity from checkpoint
           owner: lp,
         });
       }
 
       // update the positions entry with new liquidity and append the liquidity modification event
-      newLiquidity = currentPositionState.liquidity + liquidityDelta!;
+      newLiquidity = currentLiquidity + toBigInt(liquidityDelta!);
       const change: LiquidityChange = {
         blockNumber: log.blockNumber,
         newLiquidityAmount: newLiquidity,
@@ -325,7 +328,7 @@ async function updatePositions(
       });
     } else {
       // this is a newly detected position; delta is the initial liquidity amount
-      newLiquidity = liquidityDelta!;
+      newLiquidity = toBigInt(liquidityDelta!);
       // new positions start period with a subperiod of 0 liquidity until creation time
       const changes: LiquidityChange[] = [
         { blockNumber: startBlock, newLiquidityAmount: 0n, owner: zeroAddress },
@@ -372,7 +375,7 @@ async function processFees(
   // iterate over finalized PositionStates to construct lpData map<lpTokenOwnerAddress, totalFeesEarned>
   const lpData = new Map<Address, LPData>();
   for (const [tokenId, position] of positions.entries()) {
-    const ownerAtEndBlock = await client.readContract({
+    const ownerAtEndBlock: Address = await client.readContract({
       address: positionManager,
       abi: POSITION_MANAGER_ABI,
       functionName: "ownerOf",
@@ -407,22 +410,22 @@ async function processFees(
       });
     }
 
-    // iterate over the liquidity modifications to process each sub-period
+    // iterate over the liquidity modifications to process each sub-period, summing to fee growth over whole period
     let feesEarnedThisPeriod0 = 0n;
     let feesEarnedThisPeriod1 = 0n;
-    for (let i = 1; i < position.liquidityModifications.length; i++) {
+    for (let i = 1; i < timelinePoints.length; i++) {
       // define the sub-period starting from the second item, as the first is the initial state at period start
-      const prevChange = position.liquidityModifications[i - 1];
-      const currChange = position.liquidityModifications[i];
+      const prevChange = timelinePoints[i - 1];
+      const currChange = timelinePoints[i];
 
       const subperiodStart = prevChange.blockNumber;
       const subperiodEnd = currChange.blockNumber;
       const liquidityForSubperiod = prevChange.newLiquidityAmount;
 
-      // todo: skip if no liquidity or if the period is zero blocks
-      // if (liquidityForSubperiod === 0n || startBlock === endBlock) {
-      // continue;
-      // }
+      // skip if no liquidity or if the period is zero blocks
+      if (liquidityForSubperiod === 0n || startBlock === endBlock) {
+        continue;
+      }
 
       // get fee growth values and calculate the subperiod delta
       const feeGrowthStart = await getFeeGrowthInside(
@@ -586,7 +589,7 @@ async function getFeeGrowthInside(
   tickLower: number,
   tickUpper: number,
   blockNumber: bigint
-) {
+): Promise<{ feeGrowthInside0: bigint; feeGrowthInside1: bigint }> {
   const [feeGrowthInside0, feeGrowthInside1] = await client.readContract({
     address: stateView,
     abi: STATE_VIEW_ABI,
@@ -696,13 +699,13 @@ function calculateRewardDistribution(
  * Misc utility to find the block a pool was created at, which is useful for
  * identifying the INITIALIZE_BLOCK constant needed for first runs to build position state
  * ie:
- *   await getPoolCreationBlock(
- *     client,
- *     POOL_MANAGER_ADDRESS,
- *     POOL_ID as `0x${string}`,
- *     FROM_BLOCK,
- *     TO_BLOCK
- *   ).then((res) => console.log(res));
+ * await getPoolCreationBlock(
+ * client,
+ * POOL_MANAGER_ADDRESS,
+ * POOL_ID as `0x${string}`,
+ * FROM_BLOCK,
+ * TO_BLOCK
+ * ).then((res) => console.log(res));
  */
 async function getPoolCreationBlock(
   client: PublicClient,
@@ -726,7 +729,7 @@ async function getPoolCreationBlock(
   }
 
   // The first event is the initialization
-  const initEvent = events[0];
+  const initEvent = events[0] as any;
 
   return {
     blockNumber: initEvent.blockNumber,
@@ -754,7 +757,9 @@ async function initialize(
   checkpointFile: string,
   period: number,
   startBlock: bigint,
-  endBlock: bigint
+  endBlock: bigint,
+  client: PublicClient,
+  positionManager: Address
 ): Promise<Map<bigint, PositionState>> {
   let initialPositions = new Map<bigint, PositionState>();
 
@@ -793,13 +798,27 @@ async function initialize(
     throw new Error("No new blocks to process");
   }
 
-  // wipe all positions.feeGrowthInsidePeriod0/1 to 0n at start of period to track per-period fees
+  // initialize initialPositions
   for (const [key, position] of initialPositions) {
-    updatePosition(initialPositions, key, {
-      feeGrowthInsidePeriod0: 0n,
-      feeGrowthInsidePeriod1: 0n,
-      liquidityModifications: [],
-    });
+    // delete positions that were burned last period
+    if (position.liquidity === 0n) {
+      const tokenId = toBigInt(key);
+      const positionInfo = await client.readContract({
+        address: positionManager,
+        abi: POSITION_MANAGER_ABI,
+        functionName: "positionInfo",
+        args: [tokenId],
+        blockNumber: startBlock,
+      });
+      if (positionInfo === 0n) initialPositions.delete(key);
+    } else {
+      // wipe feeGrowthInsidePeriod0/1 to 0n at start of period to track per-period fees
+      updatePosition(initialPositions, key, {
+        feeGrowthInsidePeriod0: 0n,
+        feeGrowthInsidePeriod1: 0n,
+        liquidityModifications: [],
+      });
+    }
   }
   console.log(`Analyzing fees from block ${startBlock} to ${endBlock}...`);
 
