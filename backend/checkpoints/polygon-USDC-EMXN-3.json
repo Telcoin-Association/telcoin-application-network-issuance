@@ -1,8 +1,8 @@
 {
   "blockRange": {
     "network": "polygon",
-    "startBlock": "74970501n",
-    "endBlock": "75417060n"
+    "startBlock": "75697435n",
+    "endBlock": "75981194n"
   },
   "poolId": "0xfd56605f7f4620ab44dfc0860d70b9bd1d1f648a5a74558491b39e816a10b99a",
   "positions": [
@@ -13,8 +13,8 @@
         "tickLower": -887270,
         "tickUpper": 887270,
         "liquidity": "86597765742n",
-        "feeGrowthInsidePeriod0": "0n",
-        "feeGrowthInsidePeriod1": "0n",
+        "feeGrowthInsidePeriod0": "566947n",
+        "feeGrowthInsidePeriod1": "10958814n",
         "liquidityModifications": [],
         "poolId": "0xfd56605f7f4620ab44dfc0860d70b9bd1d1f648a5a74558491b39e816a10b99a"
       }
@@ -26,9 +26,25 @@
         "tickLower": -887270,
         "tickUpper": 887270,
         "liquidity": "0n",
-        "feeGrowthInsidePeriod0": "0n",
-        "feeGrowthInsidePeriod1": "0n",
-        "liquidityModifications": [],
+        "feeGrowthInsidePeriod0": "42092n",
+        "feeGrowthInsidePeriod1": "844320n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "74664812n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x0000000000000000000000000000000000000000"
+          },
+          {
+            "blockNumber": "74882653n",
+            "newLiquidityAmount": "13117190198n",
+            "owner": "0x4C61Ca2659603bfC893C749073EE0Ed379525Aa9"
+          },
+          {
+            "blockNumber": "74915545n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x4C61Ca2659603bfC893C749073EE0Ed379525Aa9"
+          }
+        ],
         "poolId": "0xfd56605f7f4620ab44dfc0860d70b9bd1d1f648a5a74558491b39e816a10b99a"
       }
     ],
@@ -38,10 +54,26 @@
         "lastOwner": "0xD98b537374623B2cFc2f083fcE50b525A697A6b7",
         "tickLower": 28680,
         "tickUpper": 29760,
-        "liquidity": "310718923993n",
-        "feeGrowthInsidePeriod0": "0n",
-        "feeGrowthInsidePeriod1": "0n",
-        "liquidityModifications": [],
+        "liquidity": "0n",
+        "feeGrowthInsidePeriod0": "7310084n",
+        "feeGrowthInsidePeriod1": "115737943n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "75697435n",
+            "newLiquidityAmount": "310718923993n",
+            "owner": "0xD98b537374623B2cFc2f083fcE50b525A697A6b7"
+          },
+          {
+            "blockNumber": "75887779n",
+            "newLiquidityAmount": "310718923993n",
+            "owner": "0xD98b537374623B2cFc2f083fcE50b525A697A6b7"
+          },
+          {
+            "blockNumber": "75887810n",
+            "newLiquidityAmount": "0n",
+            "owner": "0xD98b537374623B2cFc2f083fcE50b525A697A6b7"
+          }
+        ],
         "poolId": "0xfd56605f7f4620ab44dfc0860d70b9bd1d1f648a5a74558491b39e816a10b99a"
       }
     ],
@@ -52,9 +84,25 @@
         "tickLower": 28680,
         "tickUpper": 29760,
         "liquidity": "0n",
-        "feeGrowthInsidePeriod0": "0n",
-        "feeGrowthInsidePeriod1": "0n",
-        "liquidityModifications": [],
+        "feeGrowthInsidePeriod0": "891176n",
+        "feeGrowthInsidePeriod1": "15682583n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "74664812n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x0000000000000000000000000000000000000000"
+          },
+          {
+            "blockNumber": "74904410n",
+            "newLiquidityAmount": "200495296145n",
+            "owner": "0xC510e6E89918F84E28D3010959c6bf016154470d"
+          },
+          {
+            "blockNumber": "74962960n",
+            "newLiquidityAmount": "0n",
+            "owner": "0xC510e6E89918F84E28D3010959c6bf016154470d"
+          }
+        ],
         "poolId": "0xfd56605f7f4620ab44dfc0860d70b9bd1d1f648a5a74558491b39e816a10b99a"
       }
     ],
@@ -147,8 +195,8 @@
         "tickLower": 28570,
         "tickUpper": 29960,
         "liquidity": "51636719699n",
-        "feeGrowthInsidePeriod0": "0n",
-        "feeGrowthInsidePeriod1": "0n",
+        "feeGrowthInsidePeriod0": "338060n",
+        "feeGrowthInsidePeriod1": "6534547n",
         "liquidityModifications": [],
         "poolId": "0xfd56605f7f4620ab44dfc0860d70b9bd1d1f648a5a74558491b39e816a10b99a"
       }
@@ -159,10 +207,21 @@
         "lastOwner": "0x93Cf0a22a26895650A8AaE960Bf85a01ec6A551C",
         "tickLower": 29090,
         "tickUpper": 29310,
-        "liquidity": "2002563652291n",
-        "feeGrowthInsidePeriod0": "0n",
-        "feeGrowthInsidePeriod1": "0n",
-        "liquidityModifications": [],
+        "liquidity": "0n",
+        "feeGrowthInsidePeriod0": "56296203n",
+        "feeGrowthInsidePeriod1": "879644396n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "75417061n",
+            "newLiquidityAmount": "2002563652291n",
+            "owner": "0x93Cf0a22a26895650A8AaE960Bf85a01ec6A551C"
+          },
+          {
+            "blockNumber": "75444484n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x93Cf0a22a26895650A8AaE960Bf85a01ec6A551C"
+          }
+        ],
         "poolId": "0xfd56605f7f4620ab44dfc0860d70b9bd1d1f648a5a74558491b39e816a10b99a"
       }
     ],
@@ -400,18 +459,18 @@
         "lastOwner": "0x911dD4c504359bBfb20e8FA8662303749a1C7114",
         "tickLower": -887270,
         "tickUpper": 887270,
-        "liquidity": "215478283n",
-        "feeGrowthInsidePeriod0": "0n",
-        "feeGrowthInsidePeriod1": "0n",
+        "liquidity": "0n",
+        "feeGrowthInsidePeriod0": "348n",
+        "feeGrowthInsidePeriod1": "4814n",
         "liquidityModifications": [
           {
-            "blockNumber": "74970501n",
-            "newLiquidityAmount": "0n",
-            "owner": "0x0000000000000000000000000000000000000000"
+            "blockNumber": "75417061n",
+            "newLiquidityAmount": "215478283n",
+            "owner": "0x911dD4c504359bBfb20e8FA8662303749a1C7114"
           },
           {
-            "blockNumber": "74996819n",
-            "newLiquidityAmount": "215478283n",
+            "blockNumber": "75552027n",
+            "newLiquidityAmount": "0n",
             "owner": "0x911dD4c504359bBfb20e8FA8662303749a1C7114"
           }
         ],
@@ -614,18 +673,23 @@
         "lastOwner": "0xa60209fbC5e75fBE99dAcEe53CD763850615fE10",
         "tickLower": 29050,
         "tickUpper": 29350,
-        "liquidity": "608928058729n",
-        "feeGrowthInsidePeriod0": "0n",
-        "feeGrowthInsidePeriod1": "0n",
+        "liquidity": "0n",
+        "feeGrowthInsidePeriod0": "18267237n",
+        "feeGrowthInsidePeriod1": "285363023n",
         "liquidityModifications": [
           {
-            "blockNumber": "74970501n",
-            "newLiquidityAmount": "0n",
-            "owner": "0x0000000000000000000000000000000000000000"
+            "blockNumber": "75417061n",
+            "newLiquidityAmount": "608928058729n",
+            "owner": "0xa60209fbC5e75fBE99dAcEe53CD763850615fE10"
           },
           {
-            "blockNumber": "75062695n",
+            "blockNumber": "75627913n",
             "newLiquidityAmount": "608928058729n",
+            "owner": "0xa60209fbC5e75fBE99dAcEe53CD763850615fE10"
+          },
+          {
+            "blockNumber": "75627921n",
+            "newLiquidityAmount": "0n",
             "owner": "0xa60209fbC5e75fBE99dAcEe53CD763850615fE10"
           }
         ],
@@ -668,20 +732,9 @@
         "tickLower": 28650,
         "tickUpper": 29700,
         "liquidity": "8614516254460n",
-        "feeGrowthInsidePeriod0": "0n",
-        "feeGrowthInsidePeriod1": "0n",
-        "liquidityModifications": [
-          {
-            "blockNumber": "74970501n",
-            "newLiquidityAmount": "0n",
-            "owner": "0x0000000000000000000000000000000000000000"
-          },
-          {
-            "blockNumber": "75080003n",
-            "newLiquidityAmount": "8614516254460n",
-            "owner": "0x0776b74e2dC3fe4f25FdAf18c0eBB274b574dba8"
-          }
-        ],
+        "feeGrowthInsidePeriod0": "56398398n",
+        "feeGrowthInsidePeriod1": "1090153787n",
+        "liquidityModifications": [],
         "poolId": "0xfd56605f7f4620ab44dfc0860d70b9bd1d1f648a5a74558491b39e816a10b99a"
       }
     ],
@@ -692,25 +745,9 @@
         "tickLower": -887270,
         "tickUpper": 887270,
         "liquidity": "3998216683n",
-        "feeGrowthInsidePeriod0": "76n",
-        "feeGrowthInsidePeriod1": "3110n",
-        "liquidityModifications": [
-          {
-            "blockNumber": "74970501n",
-            "newLiquidityAmount": "0n",
-            "owner": "0x0000000000000000000000000000000000000000"
-          },
-          {
-            "blockNumber": "75109372n",
-            "newLiquidityAmount": "4253422003n",
-            "owner": "0x17c1eD4a2584611549Efa3aCEFFCe9c1f36d4A8E"
-          },
-          {
-            "blockNumber": "75239328n",
-            "newLiquidityAmount": "3998216683n",
-            "owner": "0x17c1eD4a2584611549Efa3aCEFFCe9c1f36d4A8E"
-          }
-        ],
+        "feeGrowthInsidePeriod0": "26175n",
+        "feeGrowthInsidePeriod1": "505968n",
+        "liquidityModifications": [],
         "poolId": "0xfd56605f7f4620ab44dfc0860d70b9bd1d1f648a5a74558491b39e816a10b99a"
       }
     ],
@@ -930,20 +967,9 @@
         "tickLower": 27860,
         "tickUpper": 31000,
         "liquidity": "318443481786n",
-        "feeGrowthInsidePeriod0": "0n",
-        "feeGrowthInsidePeriod1": "0n",
-        "liquidityModifications": [
-          {
-            "blockNumber": "74970501n",
-            "newLiquidityAmount": "0n",
-            "owner": "0x0000000000000000000000000000000000000000"
-          },
-          {
-            "blockNumber": "75332494n",
-            "newLiquidityAmount": "318443481786n",
-            "owner": "0xE71A7e9866325995f1071e3C79e01595cf88bE30"
-          }
-        ],
+        "feeGrowthInsidePeriod0": "2084818n",
+        "feeGrowthInsidePeriod1": "40298533n",
+        "liquidityModifications": [],
         "poolId": "0xfd56605f7f4620ab44dfc0860d70b9bd1d1f648a5a74558491b39e816a10b99a"
       }
     ],
@@ -954,20 +980,9 @@
         "tickLower": 29220,
         "tickUpper": 29480,
         "liquidity": "153992756911n",
-        "feeGrowthInsidePeriod0": "0n",
-        "feeGrowthInsidePeriod1": "0n",
-        "liquidityModifications": [
-          {
-            "blockNumber": "74970501n",
-            "newLiquidityAmount": "0n",
-            "owner": "0x0000000000000000000000000000000000000000"
-          },
-          {
-            "blockNumber": "75356853n",
-            "newLiquidityAmount": "153992756911n",
-            "owner": "0xB4a82f35be17A0a634F74F07Bf6074A58bA17693"
-          }
-        ],
+        "feeGrowthInsidePeriod0": "1003521n",
+        "feeGrowthInsidePeriod1": "19401112n",
+        "liquidityModifications": [],
         "poolId": "0xfd56605f7f4620ab44dfc0860d70b9bd1d1f648a5a74558491b39e816a10b99a"
       }
     ],
@@ -977,18 +992,18 @@
         "lastOwner": "0xC510e6E89918F84E28D3010959c6bf016154470d",
         "tickLower": 29280,
         "tickUpper": 29410,
-        "liquidity": "2870512848628n",
+        "liquidity": "0n",
         "feeGrowthInsidePeriod0": "0n",
         "feeGrowthInsidePeriod1": "0n",
         "liquidityModifications": [
           {
-            "blockNumber": "74970501n",
-            "newLiquidityAmount": "0n",
-            "owner": "0x0000000000000000000000000000000000000000"
+            "blockNumber": "75417061n",
+            "newLiquidityAmount": "2870512848628n",
+            "owner": "0xC510e6E89918F84E28D3010959c6bf016154470d"
           },
           {
-            "blockNumber": "75365105n",
-            "newLiquidityAmount": "2870512848628n",
+            "blockNumber": "75550688n",
+            "newLiquidityAmount": "0n",
             "owner": "0xC510e6E89918F84E28D3010959c6bf016154470d"
           }
         ],
@@ -1035,18 +1050,23 @@
         "lastOwner": "0xB12Ab623e0F271485F536E6bdB1D922085f72Ec7",
         "tickLower": 29300,
         "tickUpper": 29370,
-        "liquidity": "52683750432n",
-        "feeGrowthInsidePeriod0": "0n",
-        "feeGrowthInsidePeriod1": "0n",
+        "liquidity": "0n",
+        "feeGrowthInsidePeriod0": "73657n",
+        "feeGrowthInsidePeriod1": "1118338n",
         "liquidityModifications": [
           {
-            "blockNumber": "74970501n",
-            "newLiquidityAmount": "0n",
-            "owner": "0x0000000000000000000000000000000000000000"
+            "blockNumber": "75417061n",
+            "newLiquidityAmount": "52683750432n",
+            "owner": "0xB12Ab623e0F271485F536E6bdB1D922085f72Ec7"
           },
           {
-            "blockNumber": "75402065n",
+            "blockNumber": "75545036n",
             "newLiquidityAmount": "52683750432n",
+            "owner": "0xB12Ab623e0F271485F536E6bdB1D922085f72Ec7"
+          },
+          {
+            "blockNumber": "75545049n",
+            "newLiquidityAmount": "0n",
             "owner": "0xB12Ab623e0F271485F536E6bdB1D922085f72Ec7"
           }
         ],
@@ -1060,20 +1080,9 @@
         "tickLower": 28590,
         "tickUpper": 30130,
         "liquidity": "18693285001n",
-        "feeGrowthInsidePeriod0": "0n",
-        "feeGrowthInsidePeriod1": "0n",
-        "liquidityModifications": [
-          {
-            "blockNumber": "74970501n",
-            "newLiquidityAmount": "0n",
-            "owner": "0x0000000000000000000000000000000000000000"
-          },
-          {
-            "blockNumber": "75409687n",
-            "newLiquidityAmount": "18693285001n",
-            "owner": "0xCDA0c8a5f22565ae0efB889E5dBb6CE60498d0b4"
-          }
-        ],
+        "feeGrowthInsidePeriod0": "122383n",
+        "feeGrowthInsidePeriod1": "2365606n",
+        "liquidityModifications": [],
         "poolId": "0xfd56605f7f4620ab44dfc0860d70b9bd1d1f648a5a74558491b39e816a10b99a"
       }
     ],
@@ -1083,23 +1092,312 @@
         "lastOwner": "0xC35Bd8e35D5C866F90bD8Db563680712560A9765",
         "tickLower": 29310,
         "tickUpper": 29380,
-        "liquidity": "8371372988025n",
-        "feeGrowthInsidePeriod0": "37631n",
+        "liquidity": "0n",
+        "feeGrowthInsidePeriod0": "0n",
         "feeGrowthInsidePeriod1": "0n",
         "liquidityModifications": [
           {
-            "blockNumber": "74970501n",
+            "blockNumber": "75417061n",
+            "newLiquidityAmount": "8371372988025n",
+            "owner": "0xC35Bd8e35D5C866F90bD8Db563680712560A9765"
+          },
+          {
+            "blockNumber": "75521537n",
+            "newLiquidityAmount": "0n",
+            "owner": "0xC35Bd8e35D5C866F90bD8Db563680712560A9765"
+          }
+        ],
+        "poolId": "0xfd56605f7f4620ab44dfc0860d70b9bd1d1f648a5a74558491b39e816a10b99a"
+      }
+    ],
+    [
+      "39240n",
+      {
+        "lastOwner": "0xD12eabdDA283287cBe21EB1DaAdff5110B44be03",
+        "tickLower": -887270,
+        "tickUpper": 887270,
+        "liquidity": "108422855638n",
+        "feeGrowthInsidePeriod0": "709833n",
+        "feeGrowthInsidePeriod1": "13720745n",
+        "liquidityModifications": [],
+        "poolId": "0xfd56605f7f4620ab44dfc0860d70b9bd1d1f648a5a74558491b39e816a10b99a"
+      }
+    ],
+    [
+      "39327n",
+      {
+        "lastOwner": "0x93Cf0a22a26895650A8AaE960Bf85a01ec6A551C",
+        "tickLower": 29210,
+        "tickUpper": 29430,
+        "liquidity": "1986118853023n",
+        "feeGrowthInsidePeriod0": "13002926n",
+        "feeGrowthInsidePeriod1": "251340287n",
+        "liquidityModifications": [],
+        "poolId": "0xfd56605f7f4620ab44dfc0860d70b9bd1d1f648a5a74558491b39e816a10b99a"
+      }
+    ],
+    [
+      "39698n",
+      {
+        "lastOwner": "0xC35Bd8e35D5C866F90bD8Db563680712560A9765",
+        "tickLower": 29290,
+        "tickUpper": 29310,
+        "liquidity": "0n",
+        "feeGrowthInsidePeriod0": "0n",
+        "feeGrowthInsidePeriod1": "0n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "75417061n",
             "newLiquidityAmount": "0n",
             "owner": "0x0000000000000000000000000000000000000000"
           },
           {
-            "blockNumber": "75412858n",
-            "newLiquidityAmount": "7896368465814n",
+            "blockNumber": "75521608n",
+            "newLiquidityAmount": "7319161869720n",
             "owner": "0xC35Bd8e35D5C866F90bD8Db563680712560A9765"
           },
           {
-            "blockNumber": "75412926n",
-            "newLiquidityAmount": "8371372988025n",
+            "blockNumber": "75533983n",
+            "newLiquidityAmount": "0n",
+            "owner": "0xC35Bd8e35D5C866F90bD8Db563680712560A9765"
+          }
+        ],
+        "poolId": "0xfd56605f7f4620ab44dfc0860d70b9bd1d1f648a5a74558491b39e816a10b99a"
+      }
+    ],
+    [
+      "39829n",
+      {
+        "lastOwner": "0xC35Bd8e35D5C866F90bD8Db563680712560A9765",
+        "tickLower": 29250,
+        "tickUpper": 29300,
+        "liquidity": "0n",
+        "feeGrowthInsidePeriod0": "0n",
+        "feeGrowthInsidePeriod1": "0n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "75417061n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x0000000000000000000000000000000000000000"
+          },
+          {
+            "blockNumber": "75534096n",
+            "newLiquidityAmount": "9873955854771n",
+            "owner": "0xC35Bd8e35D5C866F90bD8Db563680712560A9765"
+          },
+          {
+            "blockNumber": "75596183n",
+            "newLiquidityAmount": "0n",
+            "owner": "0xC35Bd8e35D5C866F90bD8Db563680712560A9765"
+          }
+        ],
+        "poolId": "0xfd56605f7f4620ab44dfc0860d70b9bd1d1f648a5a74558491b39e816a10b99a"
+      }
+    ],
+    [
+      "39888n",
+      {
+        "lastOwner": "0x076c48f5e0C570F49eBe79B961c8C78d1366B96b",
+        "tickLower": -887270,
+        "tickUpper": 887270,
+        "liquidity": "0n",
+        "feeGrowthInsidePeriod0": "1136n",
+        "feeGrowthInsidePeriod1": "21717n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "75697435n",
+            "newLiquidityAmount": "793845273n",
+            "owner": "0x076c48f5e0C570F49eBe79B961c8C78d1366B96b"
+          },
+          {
+            "blockNumber": "75813795n",
+            "newLiquidityAmount": "793845273n",
+            "owner": "0x076c48f5e0C570F49eBe79B961c8C78d1366B96b"
+          },
+          {
+            "blockNumber": "75813816n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x076c48f5e0C570F49eBe79B961c8C78d1366B96b"
+          }
+        ],
+        "poolId": "0xfd56605f7f4620ab44dfc0860d70b9bd1d1f648a5a74558491b39e816a10b99a"
+      }
+    ],
+    [
+      "39938n",
+      {
+        "lastOwner": "0xC510e6E89918F84E28D3010959c6bf016154470d",
+        "tickLower": 29230,
+        "tickUpper": 29390,
+        "liquidity": "0n",
+        "feeGrowthInsidePeriod0": "111706522n",
+        "feeGrowthInsidePeriod1": "1816501464n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "75417061n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x0000000000000000000000000000000000000000"
+          },
+          {
+            "blockNumber": "75550873n",
+            "newLiquidityAmount": "1984713558748n",
+            "owner": "0xC510e6E89918F84E28D3010959c6bf016154470d"
+          },
+          {
+            "blockNumber": "75550935n",
+            "newLiquidityAmount": "2228003756413n",
+            "owner": "0xC510e6E89918F84E28D3010959c6bf016154470d"
+          },
+          {
+            "blockNumber": "75550996n",
+            "newLiquidityAmount": "2327659065836n",
+            "owner": "0xC510e6E89918F84E28D3010959c6bf016154470d"
+          },
+          {
+            "blockNumber": "75551269n",
+            "newLiquidityAmount": "3464521388596n",
+            "owner": "0xC510e6E89918F84E28D3010959c6bf016154470d"
+          },
+          {
+            "blockNumber": "75551348n",
+            "newLiquidityAmount": "3483024483188n",
+            "owner": "0xC510e6E89918F84E28D3010959c6bf016154470d"
+          },
+          {
+            "blockNumber": "75559452n",
+            "newLiquidityAmount": "0n",
+            "owner": "0xC510e6E89918F84E28D3010959c6bf016154470d"
+          }
+        ],
+        "poolId": "0xfd56605f7f4620ab44dfc0860d70b9bd1d1f648a5a74558491b39e816a10b99a"
+      }
+    ],
+    [
+      "40172n",
+      {
+        "lastOwner": "0xC35Bd8e35D5C866F90bD8Db563680712560A9765",
+        "tickLower": 29350,
+        "tickUpper": 29450,
+        "liquidity": "0n",
+        "feeGrowthInsidePeriod0": "0n",
+        "feeGrowthInsidePeriod1": "0n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "75417061n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x0000000000000000000000000000000000000000"
+          },
+          {
+            "blockNumber": "75596303n",
+            "newLiquidityAmount": "5483961365517n",
+            "owner": "0xC35Bd8e35D5C866F90bD8Db563680712560A9765"
+          },
+          {
+            "blockNumber": "75655677n",
+            "newLiquidityAmount": "0n",
+            "owner": "0xC35Bd8e35D5C866F90bD8Db563680712560A9765"
+          }
+        ],
+        "poolId": "0xfd56605f7f4620ab44dfc0860d70b9bd1d1f648a5a74558491b39e816a10b99a"
+      }
+    ],
+    [
+      "40348n",
+      {
+        "lastOwner": "0xa60209fbC5e75fBE99dAcEe53CD763850615fE10",
+        "tickLower": 29110,
+        "tickUpper": 29490,
+        "liquidity": "865207357794n",
+        "feeGrowthInsidePeriod0": "5664428n",
+        "feeGrowthInsidePeriod1": "109490660n",
+        "liquidityModifications": [],
+        "poolId": "0xfd56605f7f4620ab44dfc0860d70b9bd1d1f648a5a74558491b39e816a10b99a"
+      }
+    ],
+    [
+      "40441n",
+      {
+        "lastOwner": "0xB70D29deCca758BB72Cd2967a989782F3acAd3e6",
+        "tickLower": 28040,
+        "tickUpper": 30680,
+        "liquidity": "639839207938n",
+        "feeGrowthInsidePeriod0": "4188964n",
+        "feeGrowthInsidePeriod1": "80970668n",
+        "liquidityModifications": [],
+        "poolId": "0xfd56605f7f4620ab44dfc0860d70b9bd1d1f648a5a74558491b39e816a10b99a"
+      }
+    ],
+    [
+      "40507n",
+      {
+        "lastOwner": "0xC35Bd8e35D5C866F90bD8Db563680712560A9765",
+        "tickLower": 29240,
+        "tickUpper": 29330,
+        "liquidity": "0n",
+        "feeGrowthInsidePeriod0": "0n",
+        "feeGrowthInsidePeriod1": "0n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "75697435n",
+            "newLiquidityAmount": "5671985480338n",
+            "owner": "0xC35Bd8e35D5C866F90bD8Db563680712560A9765"
+          },
+          {
+            "blockNumber": "75921341n",
+            "newLiquidityAmount": "0n",
+            "owner": "0xC35Bd8e35D5C866F90bD8Db563680712560A9765"
+          }
+        ],
+        "poolId": "0xfd56605f7f4620ab44dfc0860d70b9bd1d1f648a5a74558491b39e816a10b99a"
+      }
+    ],
+    [
+      "41844n",
+      {
+        "lastOwner": "0xC35Bd8e35D5C866F90bD8Db563680712560A9765",
+        "tickLower": 29180,
+        "tickUpper": 29290,
+        "liquidity": "0n",
+        "feeGrowthInsidePeriod0": "0n",
+        "feeGrowthInsidePeriod1": "0n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "75697435n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x0000000000000000000000000000000000000000"
+          },
+          {
+            "blockNumber": "75921395n",
+            "newLiquidityAmount": "4626922939234n",
+            "owner": "0xC35Bd8e35D5C866F90bD8Db563680712560A9765"
+          },
+          {
+            "blockNumber": "75962536n",
+            "newLiquidityAmount": "0n",
+            "owner": "0xC35Bd8e35D5C866F90bD8Db563680712560A9765"
+          }
+        ],
+        "poolId": "0xfd56605f7f4620ab44dfc0860d70b9bd1d1f648a5a74558491b39e816a10b99a"
+      }
+    ],
+    [
+      "42063n",
+      {
+        "lastOwner": "0xC35Bd8e35D5C866F90bD8Db563680712560A9765",
+        "tickLower": 29220,
+        "tickUpper": 29410,
+        "liquidity": "3013032016314n",
+        "feeGrowthInsidePeriod0": "2193379n",
+        "feeGrowthInsidePeriod1": "19502536n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "75697435n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x0000000000000000000000000000000000000000"
+          },
+          {
+            "blockNumber": "75962633n",
+            "newLiquidityAmount": "3013032016314n",
             "owner": "0xC35Bd8e35D5C866F90bD8Db563680712560A9765"
           }
         ],
@@ -1109,48 +1407,84 @@
   ],
   "lpData": [
     [
+      "0xE71A7e9866325995f1071e3C79e01595cf88bE30",
+      {
+        "periodFeesCurrency0": "2651765n",
+        "periodFeesCurrency1": "51257347n",
+        "totalFeesCommonDenominator": "5389651n",
+        "reward": "0n"
+      }
+    ],
+    [
       "0x4C61Ca2659603bfC893C749073EE0Ed379525Aa9",
       {
-        "periodFeesCurrency0": "14936n",
-        "periodFeesCurrency1": "0n",
-        "totalFeesCommonDenominator": "14936n",
+        "periodFeesCurrency0": "57028n",
+        "periodFeesCurrency1": "844320n",
+        "totalFeesCommonDenominator": "102126n",
         "reward": "0n"
       }
     ],
     [
-      "0xa60209fbC5e75fBE99dAcEe53CD763850615fE10",
+      "0xD98b537374623B2cFc2f083fcE50b525A697A6b7",
       {
-        "periodFeesCurrency0": "89217n",
-        "periodFeesCurrency1": "1675806n",
-        "totalFeesCommonDenominator": "178299n",
-        "reward": "0n"
-      }
-    ],
-    [
-      "0xB12Ab623e0F271485F536E6bdB1D922085f72Ec7",
-      {
-        "periodFeesCurrency0": "224n",
-        "periodFeesCurrency1": "155933n",
-        "totalFeesCommonDenominator": "8513n",
+        "periodFeesCurrency0": "7310084n",
+        "periodFeesCurrency1": "115737943n",
+        "totalFeesCommonDenominator": "13492170n",
         "reward": "0n"
       }
     ],
     [
       "0xC510e6E89918F84E28D3010959c6bf016154470d",
       {
-        "periodFeesCurrency0": "11241923n",
-        "periodFeesCurrency1": "175992978n",
-        "totalFeesCommonDenominator": "20597332n",
+        "periodFeesCurrency0": "123839621n",
+        "periodFeesCurrency1": "2008177025n",
+        "totalFeesCommonDenominator": "231105428n",
+        "reward": "0n"
+      }
+    ],
+    [
+      "0xa60209fbC5e75fBE99dAcEe53CD763850615fE10",
+      {
+        "periodFeesCurrency0": "24020882n",
+        "periodFeesCurrency1": "396529489n",
+        "totalFeesCommonDenominator": "45201313n",
+        "reward": "0n"
+      }
+    ],
+    [
+      "0xB12Ab623e0F271485F536E6bdB1D922085f72Ec7",
+      {
+        "periodFeesCurrency0": "73881n",
+        "periodFeesCurrency1": "1274271n",
+        "totalFeesCommonDenominator": "141945n",
+        "reward": "0n"
+      }
+    ],
+    [
+      "0xE00E509c1968b4D586102a79Fabe9dcefEfb07f9",
+      {
+        "periodFeesCurrency0": "338060n",
+        "periodFeesCurrency1": "6534547n",
+        "totalFeesCommonDenominator": "687099n",
+        "reward": "0n"
+      }
+    ],
+    [
+      "0x93Cf0a22a26895650A8AaE960Bf85a01ec6A551C",
+      {
+        "periodFeesCurrency0": "69299129n",
+        "periodFeesCurrency1": "1130984683n",
+        "totalFeesCommonDenominator": "129710130n",
         "reward": "0n"
       }
     ],
     [
       "0xC35Bd8e35D5C866F90bD8Db563680712560A9765",
       {
-        "periodFeesCurrency0": "6637508430711606341101234602156488996798959693917203n",
-        "periodFeesCurrency1": "6637508430711606341101234602156488996798962140742056n",
-        "totalFeesCommonDenominator": "6990344140193071272467316365492189277787303924907788n",
-        "reward": "83444285n"
+        "periodFeesCurrency0": "6637508430711606341101234602156488996798959696072951n",
+        "periodFeesCurrency1": "6637508430711606341101234602156488996798962160244592n",
+        "totalFeesCommonDenominator": "6992047742285620693069502952497500579263384676477158n",
+        "reward": "53100909n"
       }
     ],
     [
@@ -1158,8 +1492,8 @@
       {
         "periodFeesCurrency0": "362380623302884391003762577027637426423537940118213n",
         "periodFeesCurrency1": "362380623302884391003762577027637426423537567954451n",
-        "totalFeesCommonDenominator": "381643999863552767715741298416243862363967875278466n",
-        "reward": "4555714n"
+        "totalFeesCommonDenominator": "381737009521408971887237898118714567491392402543345n",
+        "reward": "2899090n"
       }
     ],
     [
@@ -1167,16 +1501,16 @@
       {
         "periodFeesCurrency0": "24451623n",
         "periodFeesCurrency1": "383849380n",
-        "totalFeesCommonDenominator": "44856232n",
+        "totalFeesCommonDenominator": "44954752n",
         "reward": "0n"
       }
     ],
     [
       "0x911dD4c504359bBfb20e8FA8662303749a1C7114",
       {
-        "periodFeesCurrency0": "0n",
-        "periodFeesCurrency1": "0n",
-        "totalFeesCommonDenominator": "0n",
+        "periodFeesCurrency0": "348n",
+        "periodFeesCurrency1": "4814n",
+        "totalFeesCommonDenominator": "605n",
         "reward": "0n"
       }
     ],
@@ -1185,7 +1519,7 @@
       {
         "periodFeesCurrency0": "127n",
         "periodFeesCurrency1": "4226n",
-        "totalFeesCommonDenominator": "351n",
+        "totalFeesCommonDenominator": "352n",
         "reward": "0n"
       }
     ],
@@ -1194,52 +1528,70 @@
       {
         "periodFeesCurrency0": "49003286n",
         "periodFeesCurrency1": "767270942n",
-        "totalFeesCommonDenominator": "89789763n",
+        "totalFeesCommonDenominator": "89986693n",
         "reward": "0n"
       }
     ],
     [
       "0x0776b74e2dC3fe4f25FdAf18c0eBB274b574dba8",
       {
-        "periodFeesCurrency0": "0n",
-        "periodFeesCurrency1": "0n",
-        "totalFeesCommonDenominator": "0n",
+        "periodFeesCurrency0": "56398398n",
+        "periodFeesCurrency1": "1090153787n",
+        "totalFeesCommonDenominator": "114628436n",
         "reward": "0n"
       }
     ],
     [
       "0x17c1eD4a2584611549Efa3aCEFFCe9c1f36d4A8E",
       {
-        "periodFeesCurrency0": "76n",
-        "periodFeesCurrency1": "3110n",
-        "totalFeesCommonDenominator": "241n",
+        "periodFeesCurrency0": "26175n",
+        "periodFeesCurrency1": "505968n",
+        "totalFeesCommonDenominator": "53201n",
         "reward": "0n"
       }
     ],
     [
       "0xB4a82f35be17A0a634F74F07Bf6074A58bA17693",
       {
-        "periodFeesCurrency0": "2467n",
-        "periodFeesCurrency1": "1975143n",
-        "totalFeesCommonDenominator": "107461n",
+        "periodFeesCurrency0": "1005988n",
+        "periodFeesCurrency1": "21376255n",
+        "totalFeesCommonDenominator": "2147790n",
         "reward": "0n"
       }
     ],
     [
       "0xCDA0c8a5f22565ae0efB889E5dBb6CE60498d0b4",
       {
-        "periodFeesCurrency0": "23n",
-        "periodFeesCurrency1": "651580n",
-        "totalFeesCommonDenominator": "34659n",
+        "periodFeesCurrency0": "122406n",
+        "periodFeesCurrency1": "3017186n",
+        "totalFeesCommonDenominator": "283567n",
         "reward": "0n"
       }
     ],
     [
-      "0xE71A7e9866325995f1071e3C79e01595cf88bE30",
+      "0xD12eabdDA283287cBe21EB1DaAdff5110B44be03",
       {
-        "periodFeesCurrency0": "0n",
-        "periodFeesCurrency1": "0n",
-        "totalFeesCommonDenominator": "0n",
+        "periodFeesCurrency0": "709833n",
+        "periodFeesCurrency1": "13720745n",
+        "totalFeesCommonDenominator": "1442719n",
+        "reward": "0n"
+      }
+    ],
+    [
+      "0x076c48f5e0C570F49eBe79B961c8C78d1366B96b",
+      {
+        "periodFeesCurrency0": "1136n",
+        "periodFeesCurrency1": "21717n",
+        "totalFeesCommonDenominator": "2296n",
+        "reward": "0n"
+      }
+    ],
+    [
+      "0xB70D29deCca758BB72Cd2967a989782F3acAd3e6",
+      {
+        "periodFeesCurrency0": "4188964n",
+        "periodFeesCurrency1": "80970668n",
+        "totalFeesCommonDenominator": "8513973n",
         "reward": "0n"
       }
     ]
