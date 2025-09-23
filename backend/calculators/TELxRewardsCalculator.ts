@@ -22,8 +22,9 @@ dotenv.config();
 /// 4. Once all position are up-to-date, process them to credit the active owner of the LP token with position's fee growth at the time of each liquidity modification event. For each modification:
 ///   a. Identify the position's fee growth for each subperiod bounded by events (or period start/end): `liquidity * (getFeeGrowthInsideEnd - getFeeGrowthInsideStart) / Q128`
 ///   b. LP token ownership may have changed between subperiod boundaries, so fees for each subperiod are credited to the position owner at the time of modification. This is the address that collects the fees at modification time.
-///   c. For positions that emitted no ModifyLiquidity events, the entire period is calculated with the last entry for liquidity value
-///   d. For positions that were created mid-period, a `LiquidityChange` with `liquidity == 0` is unshifted from the period start until position creation
+///   c. For all positions, a `LiquidityChange` is appended from the position's last modification until the period end to represent unclaimed fees earned since last modification and enforce unanimous endBlocks for the period
+///   d. In vice-versa vein, for positions that were created mid-period, a `LiquidityChange` with `liquidity == 0` is unshifted from the period start until position creation to enforce unanimous startBlocks for the period
+///   e. For positions that emitted no ModifyLiquidity events, the entire period is calculated with the checkpoint's last entry for liquidity value, complying with unanimous start and end blocks
 
 interface PositionState {
   lastOwner: Address;
@@ -57,6 +58,7 @@ interface CheckpointData {
 
 type PoolConfig = {
   network: "polygon" | "base";
+  name: string;
   poolId: `0x${string}`;
   denominator: Address;
   initializeBlock: bigint;
@@ -87,6 +89,7 @@ const POSITION_MANAGER_ABI = parseAbi([
 // BASE — ETH/TEL
 const BASE_ETH_TEL: PoolConfig = {
   network: "base",
+  name: "ETH-TEL",
   poolId: "0xb6d004fca4f9a34197862176485c45ceab7117c86f07422d1fe3d9cfd6e9d1da",
   denominator: getAddress("0x09bE1692ca16e06f536F0038fF11D1dA8524aDB1"), // TEL
   initializeBlock: 25_832_462n,
@@ -99,6 +102,7 @@ const BASE_ETH_TEL: PoolConfig = {
 // POLYGON — ETH/TEL
 const POLYGON_ETH_TEL: PoolConfig = {
   network: "polygon",
+  name: "ETH-TEL",
   poolId: "0x9a005a0c12cc2ef01b34e9a7f3fb91a0e6304d377b5479bd3f08f8c29cdf5deb",
   denominator: getAddress("0xdF7837DE1F2Fa4631D716CF2502f8b230F1dcc32"), // TEL
   initializeBlock: 67_949_841n,
@@ -111,6 +115,7 @@ const POLYGON_ETH_TEL: PoolConfig = {
 // POLYGON — USDC/eMXN
 const POLYGON_USDC_EMXN: PoolConfig = {
   network: "polygon",
+  name: "USDC-EMXN",
   poolId: "0xfd56605f7f4620ab44dfc0860d70b9bd1d1f648a5a74558491b39e816a10b99a",
   denominator: getAddress("0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359"), // USDC
   initializeBlock: 74_664_812n,
@@ -197,7 +202,7 @@ async function main() {
     positions: Array.from(finalPositions.entries()),
     lpData: Array.from(lpRewards.entries()),
   };
-  const outputFile = `backend/checkpoints/${config.poolId}-${period}.json`;
+  const outputFile = `backend/checkpoints/${config.network}-${config.name}-${period}.json`;
   await writeFile(
     outputFile,
     JSON.stringify(
@@ -625,7 +630,7 @@ async function populateValuesCommonDenominator(
 
   // Identify whether denominator is token0 or token1
   const denominatorIsCurrency0 = getAddress(currency0) === denominator;
-  const denominatorIsCurrency1 = currency1 === denominator;
+  const denominatorIsCurrency1 = getAddress(currency1) === denominator;
   if (!denominatorIsCurrency0 && !denominatorIsCurrency1) {
     throw new Error("denominator not found in pool");
   }
@@ -646,22 +651,29 @@ async function populateValuesCommonDenominator(
 
     if (denominatorIsCurrency0) {
       // periodFeesCurrency0 is already in denominator; convert periodFeesCurrency1
+      const amount0InDenominatorScaled = fees.periodFeesCurrency0 * PRECISION;
       const scaledFees1 = fees.periodFeesCurrency1 * PRECISION;
       // Price from tick represents token1/token0, ie otherToken/denominator: `amount0 = amount1 * Q96^2 / sqrtPriceX96^2`
-      const amount1InDenominator =
+      const amount1InDenominatorScaled =
         (scaledFees1 * Q96 * Q96) / (sqrtPriceX96 * sqrtPriceX96);
 
-      totalFeesInDenominator =
-        fees.periodFeesCurrency0 + amount1InDenominator / PRECISION;
+      // sum both scaled terms first before unscaling
+      const totalFeesScaled =
+        amount0InDenominatorScaled + amount1InDenominatorScaled;
+
+      totalFeesInDenominator = totalFeesScaled / PRECISION;
     } else {
       // periodFeesCurrency1 is already in denominator, so convert periodFeesCurrency0
+      const amount1InDenominatorScaled = fees.periodFeesCurrency1 * PRECISION;
       const scaledFees0 = fees.periodFeesCurrency0 * PRECISION;
       // price is denominator/otherToken; `amount1 = (amount0 * sqrtPriceX96^2) / Q96^2`
       const amount0InDenominatorScaled =
         (scaledFees0 * sqrtPriceX96 * sqrtPriceX96) / (Q96 * Q96);
-      const amount0InDenominator = amount0InDenominatorScaled / PRECISION;
 
-      totalFeesInDenominator = fees.periodFeesCurrency1 + amount0InDenominator;
+      const totalFeesScaled =
+        amount1InDenominatorScaled + amount0InDenominatorScaled;
+
+      totalFeesInDenominator = totalFeesScaled / PRECISION;
     }
 
     modifyLPData(lpData, lpAddress, {
@@ -830,7 +842,7 @@ function setConfig(poolId_: `0x${string}`, period: number) {
   const pool = POOLS.find((p) => p.poolId === poolId_);
   if (!pool) throw new Error("Unrecognized pool ID");
 
-  const { network, denominator } = pool;
+  const { network, denominator, name } = pool;
   const { poolManager, positionManager, stateView, rpcEnv } = NETWORKS[network];
   const rpcUrl =
     process.env[rpcEnv] ??
@@ -845,6 +857,7 @@ function setConfig(poolId_: `0x${string}`, period: number) {
 
   return {
     network,
+    name,
     rpcUrl,
     poolId: pool.poolId,
     poolManager,
