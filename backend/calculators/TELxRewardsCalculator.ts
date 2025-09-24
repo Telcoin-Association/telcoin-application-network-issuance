@@ -162,61 +162,6 @@ async function main() {
   // Load state from checkpoint json if it exists and reset its period-specific fee fields
   const client = createPublicClient({ transport: http(config.rpcUrl) });
 
-  // Data for position 38899n
-  const position = {
-    tickLower: 29310,
-    tickUpper: 29340,
-    // From your JSON: liquidity was added/modified and finally removed
-    startBlock: 75372284n, // Block of first liquidity deposit
-    endBlock: 75412793n, // Block where liquidity was fully removed
-  };
-
-  // The specific `Swap` event signature from the Uniswap v4 `IPoolManager` interface
-  const swapEventAbi = parseAbiItem(
-    "event Swap(bytes32 indexed id, address indexed sender, int128 amount0, int128 amount1, uint160 sqrtPriceX96, uint128 liquidity, int24 tick, uint24 fee)"
-  );
-
-  const swapLogs = await client.getLogs({
-    address: config.poolManager,
-    event: swapEventAbi,
-    args: {
-      id: poolId as `0x${string}`, // Filter by our specific pool
-    },
-    fromBlock: position.startBlock,
-    toBlock: position.endBlock,
-  });
-
-  let swapsInPositionRange = 0;
-  const matchingSwaps: any[] = [];
-  for (const log of swapLogs) {
-    const { tick } = log.args;
-
-    // Check if the swap occurred within the position's active tick range
-    if (tick && tick >= position.tickLower && tick <= position.tickUpper) {
-      swapsInPositionRange++;
-      matchingSwaps.push({
-        transactionHash: log.transactionHash,
-        blockNumber: log.blockNumber,
-        tick: tick,
-        amountIn: log.args.amount0,
-        amountOut: log.args.amount1,
-        fee: log.args.fee,
-      });
-    }
-  }
-  console.log("\n--- Analysis Complete ---");
-  console.log(`Position Range: [${position.tickLower}, ${position.tickUpper}]`);
-  console.log(`Total swaps found in the pool: ${swapLogs.length}`);
-  console.log(
-    `Swaps that occurred inside the position's range: ${swapsInPositionRange}`
-  );
-
-  if (matchingSwaps.length > 0) {
-    console.log("\nFirst 10 matching swaps:");
-    console.table(matchingSwaps.slice(0, 10));
-  }
-  return;
-
   let initialPositions: Map<bigint, PositionState> = await initialize(
     config.checkpointFile,
     period,
