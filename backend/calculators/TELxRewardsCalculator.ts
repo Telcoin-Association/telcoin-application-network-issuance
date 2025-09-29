@@ -80,14 +80,15 @@ const STATE_VIEW_ABI = parseAbi([
   "function getSlot0(bytes32 id) external view returns (uint160 sqrtPriceX96, int24 tick, uint24 protocolFee, uint24 lpFee)",
   "function getFeeGrowthInside(bytes32 poolId, int24 tickLower, int24 tickUpper) external view returns (uint256 feeGrowthInside0X128, uint256 feeGrowthInside1X128)",
   "function getTickBitmap(bytes32 poolId, int16 wordPosition) external view returns (uint256)",
+  "function getTickInfo(bytes32 poolId, int24 tick) external view returns (uint128 liquidityGross,int128 liquidityNet,uint256 feeGrowthOutside0X128,uint256 feeGrowthOutside1X128)",
 ]);
 const POSITION_MANAGER_ABI = parseAbi([
   "function positionInfo(uint256 tokenId) external view returns (uint256)",
   "function ownerOf(uint256 id) public view returns (address owner)",
   "function poolKeys(bytes25 poolId) external view returns (address token0, address token1, uint24 fee, int24 tickSpacing, address hooks)",
 ]);
-// underflow detection threshold less than type(uint256).max but far larger than any realistic fee growth
-const UNDERFLOW_THRESHOLD = 2n ** 250n;
+// threshold for ignoring excessive JIT liquidity actions or underflows, recognizing only fee growth less than type(uint256).max
+const IGNORE_THRESHOLD = 2n ** 250n;
 
 // ---------------- Pool Definitions ----------------
 
@@ -169,23 +170,6 @@ async function main() {
 
   // Load state from checkpoint json if it exists and reset its period-specific fee fields
   const client = createPublicClient({ transport: http(config.rpcUrl) });
-
-  // const tickLower = 29050;
-  // const tickUpper = 29350;
-  // const startBlock = 75417061n;
-  // const endBlock = 75444484n;
-  // await inspectSwaps(
-  //   client,
-  //   poolId,
-  //   config.poolManager,
-  //   config.stateView,
-  //   tickLower,
-  //   tickUpper,
-  //   config.tickSpacing,
-  //   startBlock,
-  //   endBlock
-  // );
-  // return;
 
   let initialPositions: Map<bigint, PositionState> = await initialize(
     config.checkpointFile,
@@ -275,7 +259,6 @@ async function updateFeesAndPositions(
     startBlock,
     endBlock,
     stateView,
-    positionManager,
     tickSpacing,
     updatedPositions
   );
@@ -339,7 +322,7 @@ async function updatePositions(
         // Add the initial state at the start of the period
         currentPositionState.liquidityModifications.push({
           blockNumber: startBlock,
-          newLiquidityAmount: currentLiquidity, // use pre-existing liquidity from checkpoint
+          newLiquidityAmount: currentLiquidity, // use checkpoint liquidity (persisted as opposed to liquidityModifications wipe in initialize())
           owner: lp,
         });
       }
@@ -386,6 +369,57 @@ async function updatePositions(
     }
   }
 
+  // loop over map again to append final subperiod chunk from last update to endBlock
+  for (const [tokenId, position] of positions.entries()) {
+    const ownerAtEndBlock: Address = await client.readContract({
+      address: positionManager,
+      abi: POSITION_MANAGER_ABI,
+      functionName: "ownerOf",
+      args: [tokenId],
+      blockNumber: endBlock,
+    });
+
+    // construct new memory array which includes final chunk of time between last modification and period endBlock
+    const timelinePoints = [];
+    if (position.liquidityModifications.length === 0) {
+      // Case 1: Pre-existing position with NO modifications this period, but owner may have changed
+      // first delete irrelevant positions; even if not burned they will be recognized as new if liquidity is re-added
+      if (position.liquidity === 0n) {
+        positions.delete(tokenId);
+        continue;
+      }
+      // The timeline is just the start and end of the full period.
+      timelinePoints.push({
+        blockNumber: startBlock,
+        newLiquidityAmount: position.liquidity,
+        owner: position.lastOwner,
+      });
+      timelinePoints.push({
+        blockNumber: endBlock,
+        newLiquidityAmount: position.liquidity,
+        owner: ownerAtEndBlock,
+      });
+
+      updatePosition(positions, tokenId, {
+        liquidityModifications: timelinePoints,
+      });
+    } else {
+      // Case 2: Position was created or modified during the period.
+      // The timeline is its list of modifications prepended with pre-chunk from startBlock; append post-chunk until endBlock
+      timelinePoints.push(...position.liquidityModifications);
+      const lastChange = timelinePoints[timelinePoints.length - 1];
+      timelinePoints.push({
+        blockNumber: endBlock,
+        newLiquidityAmount: lastChange.newLiquidityAmount, // Liquidity carries over til endBlock
+        owner: ownerAtEndBlock,
+      });
+
+      updatePosition(positions, tokenId, {
+        liquidityModifications: timelinePoints,
+      });
+    }
+  }
+
   return positions;
 }
 
@@ -400,7 +434,6 @@ async function processFees(
   startBlock: bigint,
   endBlock: bigint,
   stateView: Address,
-  positionManager: Address,
   tickSpacing: number,
   positions: Map<bigint, PositionState> // must be fully processed for the period
 ): Promise<{
@@ -410,48 +443,13 @@ async function processFees(
   // iterate over finalized PositionStates to construct lpData map<lpTokenOwnerAddress, totalFeesEarned>
   const lpData = new Map<Address, LPData>();
   for (const [tokenId, position] of positions.entries()) {
-    const ownerAtEndBlock: Address = await client.readContract({
-      address: positionManager,
-      abi: POSITION_MANAGER_ABI,
-      functionName: "ownerOf",
-      args: [tokenId],
-      blockNumber: endBlock,
-    });
-
-    // construct new memory array which includes final chunk of time between last modification and period endBlock
-    const timelinePoints = [];
-    if (position.liquidityModifications.length === 0) {
-      // Case 1: Pre-existing position with NO modifications this period, but owner may have changed
-      // The timeline is just the start and end of the full period.
-      timelinePoints.push({
-        blockNumber: startBlock,
-        newLiquidityAmount: position.liquidity,
-        owner: position.lastOwner,
-      });
-      timelinePoints.push({
-        blockNumber: endBlock,
-        newLiquidityAmount: position.liquidity,
-        owner: ownerAtEndBlock,
-      });
-    } else {
-      // Case 2: Position was created or modified during the period.
-      // The timeline is its list of modifications, plus a final chunk until the endBlock.
-      timelinePoints.push(...position.liquidityModifications);
-      const lastChange = timelinePoints[timelinePoints.length - 1];
-      timelinePoints.push({
-        blockNumber: endBlock,
-        newLiquidityAmount: lastChange.newLiquidityAmount, // Liquidity carries over
-        owner: ownerAtEndBlock,
-      });
-    }
-
     // iterate over the liquidity modifications to process each sub-period, summing to fee growth over whole period
     let feesEarnedThisPeriod0 = 0n;
     let feesEarnedThisPeriod1 = 0n;
-    for (let i = 1; i < timelinePoints.length; i++) {
+    for (let i = 1; i < position.liquidityModifications.length; i++) {
       // define the sub-period starting from the second item, as the first is the initial state at period start
-      const prevChange = timelinePoints[i - 1];
-      const currChange = timelinePoints[i];
+      const prevChange = position.liquidityModifications[i - 1];
+      const currChange = position.liquidityModifications[i];
 
       const subperiodStart = prevChange.blockNumber;
       const subperiodEnd = currChange.blockNumber;
@@ -481,15 +479,23 @@ async function processFees(
         tickSpacing,
         subperiodEnd
       );
+      if (
+        feeGrowthStart.feeGrowthInside0X128 < 0 ||
+        feeGrowthStart.feeGrowthInside1X128 < 0 ||
+        feeGrowthEnd.feeGrowthInside0X128 < 0 ||
+        feeGrowthEnd.feeGrowthInside1X128 < 0
+      ) {
+        throw new Error("UNDERFLOW");
+      }
 
       // calculate subperiod's fees and add to period total for this position
       const { token0Fees: feesEarned0, token1Fees: feesEarned1 } =
         calculateFees(
           liquidityForSubperiod,
-          feeGrowthEnd.feeGrowthInside0,
-          feeGrowthEnd.feeGrowthInside1,
-          feeGrowthStart.feeGrowthInside0,
-          feeGrowthStart.feeGrowthInside1
+          feeGrowthEnd.feeGrowthInside0X128,
+          feeGrowthEnd.feeGrowthInside1X128,
+          feeGrowthStart.feeGrowthInside0X128,
+          feeGrowthStart.feeGrowthInside1X128
         );
       feesEarnedThisPeriod0 += feesEarned0;
       feesEarnedThisPeriod1 += feesEarned1;
@@ -628,7 +634,7 @@ async function getFeeGrowthInsideHandleInitializedTicks(
   tickUpper: number,
   tickSpacing: number,
   blockNumber: bigint
-): Promise<{ feeGrowthInside0: bigint; feeGrowthInside1: bigint }> {
+): Promise<{ feeGrowthInside0X128: bigint; feeGrowthInside1X128: bigint }> {
   // Find the safe lower tick boundary
   const safeTickLower = await findInitializedTickOver(
     client,
@@ -649,37 +655,38 @@ async function getFeeGrowthInsideHandleInitializedTicks(
     blockNumber
   );
 
-  // If no initialized ticks are found in the range, no fees could have accrued.
+  // If none or only one initialized ticks are found in the range, no fees could have accrued.
   if (
     safeTickLower === null ||
     safeTickUpper === null ||
     safeTickLower >= safeTickUpper
   ) {
-    return { feeGrowthInside0: 0n, feeGrowthInside1: 0n };
+    return { feeGrowthInside0X128: 0n, feeGrowthInside1X128: 0n };
   }
 
-  const [feeGrowthInside0, feeGrowthInside1] = await client.readContract({
-    address: stateView,
-    abi: STATE_VIEW_ABI,
-    functionName: "getFeeGrowthInside",
-    args: [poolId, safeTickLower, safeTickUpper],
-    blockNumber: blockNumber,
-  });
+  const [feeGrowthInside0X128, feeGrowthInside1X128] =
+    await client.readContract({
+      address: stateView,
+      abi: STATE_VIEW_ABI,
+      functionName: "getFeeGrowthInside",
+      args: [poolId, safeTickLower, safeTickUpper],
+      blockNumber: blockNumber,
+    });
 
-  // ignore underflows for initialized ticks never crossed by actual price
+  // ignore extreme values caused by JIT liquidity actions or underflows for initialized ticks never crossed by actual price
   if (
-    feeGrowthInside0 > UNDERFLOW_THRESHOLD ||
-    feeGrowthInside1 > UNDERFLOW_THRESHOLD
+    feeGrowthInside0X128 > IGNORE_THRESHOLD ||
+    feeGrowthInside1X128 > IGNORE_THRESHOLD
   ) {
     console.warn(
-      `Initialized tick never crossed by price for block ${blockNumber}, position range [${tickLower}, ${tickUpper}], safe range [${safeTickLower}, ${safeTickUpper}]. `
+      `Ignoring extreme fee growth found for block ${blockNumber}, position range [${tickLower}, ${tickUpper}], safe range [${safeTickLower}, ${safeTickUpper}]. `
     );
-    return { feeGrowthInside0: 0n, feeGrowthInside1: 0n };
+    return { feeGrowthInside0X128: 0n, feeGrowthInside1X128: 0n };
   }
 
   return {
-    feeGrowthInside0: feeGrowthInside0,
-    feeGrowthInside1: feeGrowthInside1,
+    feeGrowthInside0X128: feeGrowthInside0X128,
+    feeGrowthInside1X128: feeGrowthInside1X128,
   };
 }
 
@@ -695,40 +702,47 @@ async function findInitializedTickOver(
   blockNumber: bigint,
   searchLimit: number = 2560 // Safety limit: search up to 10 words
 ): Promise<number | null> {
-  // Start search from the compressed tick space (only compressed ticks are initializable)
-  let currentCompressedTick = Math.floor(startTick / tickSpacing);
-  let compressedTicksSearched = 0;
+  // Start from the word containing our tick
+  const startWord = tickToWord(startTick, tickSpacing);
 
-  while (compressedTicksSearched < searchLimit) {
-    // must use math.floor to handle negative numbers
-    const wordPos = Math.floor(currentCompressedTick / 256);
-    // likewise true modulo is required for negative numbers
-    const bitPos = ((currentCompressedTick % 256) + 256) % 256;
-    if (bitPos < 0) throw new Error("Negative index invalid");
+  // Calculate which bit position within the starting word
+  let startCompressed = Math.floor(startTick / tickSpacing);
+  if (startTick < 0 && startTick % tickSpacing !== 0) {
+    startCompressed -= 1;
+  }
+  const startBitPos = startCompressed & 255; // Equivalent to startCompressed % 256 but always positive
 
-    const word = await getTickBitmap(
+  // Search through words
+  for (let wordOffset = 0; wordOffset < searchLimit; wordOffset++) {
+    const currentWord = startWord + wordOffset;
+
+    const bitmap = await getTickBitmap(
       client,
       poolId,
       stateView,
-      wordPos,
+      currentWord,
       blockNumber
     );
 
-    // Scan the rest of the current word
-    for (let i = bitPos; i < 256; i++) {
-      if ((word >> BigInt(i)) & 1n) {
-        const foundCompressedTick = wordPos * 256 + i;
-        return foundCompressedTick * tickSpacing;
-      }
-      compressedTicksSearched++;
-      if (compressedTicksSearched >= searchLimit) return null;
-    }
+    if (bitmap !== 0n) {
+      // Determine starting bit position for this word
+      const startBit = wordOffset === 0 ? startBitPos : 0;
 
-    // Move to the start of the next word
-    currentCompressedTick = (wordPos + 1) * 256;
+      // Check each bit in the word from startBit to 255
+      for (let i = startBit; i < 256; i++) {
+        const bit = 1n;
+        const initialized = (bitmap & (bit << BigInt(i))) !== 0n;
+
+        if (initialized) {
+          // Calculate the actual tick index
+          const tickIndex = (currentWord * 256 + i) * tickSpacing;
+          return tickIndex;
+        }
+      }
+    }
   }
 
-  return null; // Not found within the limit
+  return null;
 }
 
 /**
@@ -743,39 +757,59 @@ async function findInitializedTickUnder(
   blockNumber: bigint,
   searchLimit: number = 2560 // Safety limit: search up to 10 words
 ): Promise<number | null> {
-  // Start search from the compressed tick space (only compressed ticks are initializable)
-  let currentCompressedTick = Math.floor(startTick / tickSpacing);
-  let compressedTicksSearched = 0;
+  // Start from the word containing our tick
+  const startWord = tickToWord(startTick, tickSpacing);
 
-  while (compressedTicksSearched < searchLimit) {
-    // must use math.floor to handle negative numbers
-    const wordPos = Math.floor(currentCompressedTick / 256);
-    // likewise true modulo is required for negative numbers
-    const bitPos = ((currentCompressedTick % 256) + 256) % 256;
+  // Calculate which bit position within the starting word
+  let startCompressed = Math.floor(startTick / tickSpacing);
+  if (startTick < 0 && startTick % tickSpacing !== 0) {
+    startCompressed -= 1;
+  }
+  const startBitPos = startCompressed & 255; // Equivalent to startCompressed % 256 but always positive
 
-    const word = await getTickBitmap(
+  // Search through words going backwards
+  for (let wordOffset = 0; wordOffset < searchLimit; wordOffset++) {
+    const currentWord = startWord - wordOffset;
+
+    const bitmap = await getTickBitmap(
       client,
       poolId,
       stateView,
-      wordPos,
+      currentWord,
       blockNumber
     );
 
-    // Scan the rest of the current word downwards
-    for (let i = bitPos; i >= 0; i--) {
-      if ((word >> BigInt(i)) & 1n) {
-        const foundCompressedTick = wordPos * 256 + i;
-        return foundCompressedTick * tickSpacing;
-      }
-      compressedTicksSearched++;
-      if (compressedTicksSearched >= searchLimit) return null;
-    }
+    if (bitmap !== 0n) {
+      // Determine starting bit position for this word
+      const startBit = wordOffset === 0 ? startBitPos : 255;
 
-    // Move to the end of the previous word
-    currentCompressedTick = (wordPos - 1) * 256 + 255;
+      // Check each bit in the word from startBit down to 0
+      for (let i = startBit; i >= 0; i--) {
+        const bit = 1n;
+        const initialized = (bitmap & (bit << BigInt(i))) !== 0n;
+
+        if (initialized) {
+          // Calculate the actual tick index
+          const tickIndex = (currentWord * 256 + i) * tickSpacing;
+          return tickIndex;
+        }
+      }
+    }
   }
 
-  return null; // Not found within the limit
+  return null;
+}
+
+/**
+ * Convert a tick to its word position in the bitmap
+ * This follows the exact formula from the Uniswap V4 documentation
+ */
+function tickToWord(tick: number, tickSpacing: number): number {
+  let compressed = Math.floor(tick / tickSpacing);
+  if (tick < 0 && tick % tickSpacing !== 0) {
+    compressed -= 1;
+  }
+  return compressed >> 8; // Right shift by 8 bits (divide by 256)
 }
 
 async function getTickBitmap(
