@@ -13,6 +13,7 @@ import * as dotenv from "dotenv";
 import { existsSync } from "fs";
 import { readFile, writeFile, mkdir } from "fs/promises";
 import { NetworkConfig, toBigInt } from "../helpers";
+import { inspect } from "util";
 dotenv.config();
 
 /// usage: `yarn ts-node backend/calculators/TELxRewardsCalculator.ts`
@@ -85,6 +86,8 @@ const POSITION_MANAGER_ABI = parseAbi([
   "function ownerOf(uint256 id) public view returns (address owner)",
   "function poolKeys(bytes25 poolId) external view returns (address token0, address token1, uint24 fee, int24 tickSpacing, address hooks)",
 ]);
+// underflow detection threshold less than type(uint256).max but far larger than any realistic fee growth
+const UNDERFLOW_THRESHOLD = 2n ** 250n;
 
 // ---------------- Pool Definitions ----------------
 
@@ -166,6 +169,23 @@ async function main() {
 
   // Load state from checkpoint json if it exists and reset its period-specific fee fields
   const client = createPublicClient({ transport: http(config.rpcUrl) });
+
+  // const tickLower = 29050;
+  // const tickUpper = 29350;
+  // const startBlock = 75417061n;
+  // const endBlock = 75444484n;
+  // await inspectSwaps(
+  //   client,
+  //   poolId,
+  //   config.poolManager,
+  //   config.stateView,
+  //   tickLower,
+  //   tickUpper,
+  //   config.tickSpacing,
+  //   startBlock,
+  //   endBlock
+  // );
+  // return;
 
   let initialPositions: Map<bigint, PositionState> = await initialize(
     config.checkpointFile,
@@ -646,6 +666,17 @@ async function getFeeGrowthInsideHandleInitializedTicks(
     blockNumber: blockNumber,
   });
 
+  // ignore underflows for initialized ticks never crossed by actual price
+  if (
+    feeGrowthInside0 > UNDERFLOW_THRESHOLD ||
+    feeGrowthInside1 > UNDERFLOW_THRESHOLD
+  ) {
+    console.warn(
+      `Initialized tick never crossed by price for block ${blockNumber}, position range [${tickLower}, ${tickUpper}], safe range [${safeTickLower}, ${safeTickUpper}]. `
+    );
+    return { feeGrowthInside0: 0n, feeGrowthInside1: 0n };
+  }
+
   return {
     feeGrowthInside0: feeGrowthInside0,
     feeGrowthInside1: feeGrowthInside1,
@@ -917,6 +948,105 @@ async function getPoolCreationBlock(
   };
 }
 
+async function inspectSwaps(
+  client: PublicClient,
+  poolId: `0x${string}`,
+  poolManager: Address,
+  stateView: Address,
+  tickLower: number,
+  tickUpper: number,
+  tickSpacing: number,
+  startBlock: bigint,
+  endBlock: bigint
+) {
+  const position = {
+    tickLower: tickLower,
+    tickUpper: tickUpper,
+    startBlock: startBlock,
+    endBlock: endBlock,
+  };
+
+  // The specific `Swap` event signature from the Uniswap v4 `IPoolManager` interface
+  const swapEventAbi = parseAbiItem(
+    "event Swap(bytes32 indexed id, address indexed sender, int128 amount0, int128 amount1, uint160 sqrtPriceX96, uint128 liquidity, int24 tick, uint24 fee)"
+  );
+
+  const swapLogs = await client.getLogs({
+    address: poolManager,
+    event: swapEventAbi,
+    args: {
+      id: poolId as `0x${string}`, // Filter by our specific pool
+    },
+    fromBlock: position.startBlock,
+    toBlock: position.endBlock,
+  });
+
+  let swapsInPositionRange = 0;
+  const matchingSwaps: any[] = [];
+  for (const log of swapLogs) {
+    const { tick } = log.args;
+
+    // Check if the swap occurred within the position's active tick range
+    if (tick && tick >= position.tickLower && tick <= position.tickUpper) {
+      swapsInPositionRange++;
+      matchingSwaps.push({
+        transactionHash: log.transactionHash,
+        blockNumber: log.blockNumber,
+        tick: tick,
+        amountIn: log.args.amount0,
+        amountOut: log.args.amount1,
+        fee: log.args.fee,
+      });
+    }
+  }
+
+  console.log(`Total swaps: ${swapLogs.length}`);
+  console.log(`Swaps inside range: ${swapsInPositionRange}`);
+
+  if (matchingSwaps.length > 0) {
+    console.log("\nFirst 10 matching swaps:");
+    console.table(matchingSwaps.slice(0, 10));
+  }
+  const growthSafe = await getFeeGrowthInsideHandleInitializedTicks(
+    client,
+    poolId,
+    stateView,
+    tickLower,
+    tickUpper,
+    tickSpacing,
+    endBlock
+  );
+  console.log(growthSafe);
+  const lowerSafe = await findInitializedTickOver(
+    client,
+    poolId,
+    stateView,
+    tickLower,
+    tickSpacing,
+    endBlock
+  );
+  const upperSafe = await findInitializedTickUnder(
+    client,
+    poolId,
+    stateView,
+    tickUpper,
+    tickSpacing,
+    endBlock
+  );
+  console.log(lowerSafe);
+  console.log(upperSafe);
+  const growthUnsafe = await client.readContract({
+    address: stateView,
+    abi: STATE_VIEW_ABI,
+    functionName: "getFeeGrowthInside",
+    args: [poolId, tickLower, tickUpper],
+    blockNumber: endBlock,
+  });
+  console.log(growthUnsafe);
+  console.log(tickLower);
+  console.log(tickUpper);
+}
+
 main();
 
 /**
@@ -981,14 +1111,14 @@ async function initialize(
         blockNumber: startBlock,
       });
       if (positionInfo === 0n) initialPositions.delete(key);
-    } else {
-      // wipe feeGrowthInsidePeriod0/1 to 0n at start of period to track per-period fees
-      updatePosition(initialPositions, key, {
-        feeGrowthInsidePeriod0: 0n,
-        feeGrowthInsidePeriod1: 0n,
-        liquidityModifications: [],
-      });
     }
+
+    // wipe feeGrowthInsidePeriod0/1 to 0n at start of period to track per-period fees
+    updatePosition(initialPositions, key, {
+      feeGrowthInsidePeriod0: 0n,
+      feeGrowthInsidePeriod1: 0n,
+      liquidityModifications: [],
+    });
   }
   console.log(`Analyzing fees from block ${startBlock} to ${endBlock}...`);
 
