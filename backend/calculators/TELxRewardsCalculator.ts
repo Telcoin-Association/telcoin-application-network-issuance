@@ -62,6 +62,7 @@ type PoolConfig = {
   poolId: `0x${string}`;
   denominator: Address;
   initializeBlock: bigint;
+  tickSpacing: number;
   rewardAmounts: { FIRST: bigint; PERIOD: bigint };
 };
 
@@ -77,6 +78,7 @@ const POOL_MANAGER_ABI = parseAbi([
 const STATE_VIEW_ABI = parseAbi([
   "function getSlot0(bytes32 id) external view returns (uint160 sqrtPriceX96, int24 tick, uint24 protocolFee, uint24 lpFee)",
   "function getFeeGrowthInside(bytes32 poolId, int24 tickLower, int24 tickUpper) external view returns (uint256 feeGrowthInside0X128, uint256 feeGrowthInside1X128)",
+  "function getTickBitmap(bytes32 poolId, int16 wordPosition) external view returns (uint256)",
 ]);
 const POSITION_MANAGER_ABI = parseAbi([
   "function positionInfo(uint256 tokenId) external view returns (uint256)",
@@ -93,6 +95,7 @@ const BASE_ETH_TEL: PoolConfig = {
   poolId: "0xb6d004fca4f9a34197862176485c45ceab7117c86f07422d1fe3d9cfd6e9d1da",
   denominator: getAddress("0x09bE1692ca16e06f536F0038fF11D1dA8524aDB1"), // TEL
   initializeBlock: 25_832_462n,
+  tickSpacing: 60,
   rewardAmounts: {
     FIRST: FIRST_PERIOD_REWARD_AMOUNT_ETH_TEL,
     PERIOD: PERIOD_REWARD_AMOUNT_ETH_TEL,
@@ -106,6 +109,7 @@ const POLYGON_ETH_TEL: PoolConfig = {
   poolId: "0x9a005a0c12cc2ef01b34e9a7f3fb91a0e6304d377b5479bd3f08f8c29cdf5deb",
   denominator: getAddress("0xdF7837DE1F2Fa4631D716CF2502f8b230F1dcc32"), // TEL
   initializeBlock: 67_949_841n,
+  tickSpacing: 60,
   rewardAmounts: {
     FIRST: FIRST_PERIOD_REWARD_AMOUNT_ETH_TEL,
     PERIOD: PERIOD_REWARD_AMOUNT_ETH_TEL,
@@ -119,6 +123,7 @@ const POLYGON_USDC_EMXN: PoolConfig = {
   poolId: "0xfd56605f7f4620ab44dfc0860d70b9bd1d1f648a5a74558491b39e816a10b99a",
   denominator: getAddress("0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359"), // USDC
   initializeBlock: 74_664_812n,
+  tickSpacing: 10,
   rewardAmounts: {
     FIRST: FIRST_PERIOD_REWARD_AMOUNT_USDC_EMXN,
     PERIOD: PERIOD_REWARD_AMOUNT_USDC_EMXN,
@@ -178,6 +183,7 @@ async function main() {
     config.poolManager,
     config.stateView,
     config.positionManager,
+    config.tickSpacing,
     initialPositions
   );
   const lpData = await populateValuesCommonDenominator(
@@ -226,6 +232,7 @@ async function updateFeesAndPositions(
   poolManager: Address,
   stateView: Address,
   positionManager: Address,
+  tickSpacing: number,
   initialPositions: Map<bigint, PositionState>
 ): Promise<{
   lpData: Map<Address, LPData>;
@@ -249,6 +256,7 @@ async function updateFeesAndPositions(
     endBlock,
     stateView,
     positionManager,
+    tickSpacing,
     updatedPositions
   );
 
@@ -273,7 +281,7 @@ async function updatePositions(
     event: parseAbiItem(
       "event ModifyLiquidity(bytes32 indexed id, address indexed sender, int24 tickLower, int24 tickUpper, int256 liquidityDelta, bytes32 salt)"
     ),
-    args: { id: poolId as `0x${string}` },
+    args: { id: poolId },
     fromBlock: startBlock,
     toBlock: endBlock,
   });
@@ -373,6 +381,7 @@ async function processFees(
   endBlock: bigint,
   stateView: Address,
   positionManager: Address,
+  tickSpacing: number,
   positions: Map<bigint, PositionState> // must be fully processed for the period
 ): Promise<{
   lpData: Map<Address, LPData>;
@@ -434,20 +443,22 @@ async function processFees(
       }
 
       // get fee growth values and calculate the subperiod delta
-      const feeGrowthStart = await getFeeGrowthInside(
+      const feeGrowthStart = await getFeeGrowthInsideHandleInitializedTicks(
         client,
         poolId,
         stateView,
         position.tickLower,
         position.tickUpper,
+        tickSpacing,
         subperiodStart
       );
-      const feeGrowthEnd = await getFeeGrowthInside(
+      const feeGrowthEnd = await getFeeGrowthInsideHandleInitializedTicks(
         client,
         poolId,
         stateView,
         position.tickLower,
         position.tickUpper,
+        tickSpacing,
         subperiodEnd
       );
 
@@ -586,21 +597,52 @@ function modifyLPData(
 }
 
 /**
- * Uses v4 StateView contract to get the fee growth inside a tick range.
+ * Rescopes lower and upper tick bounds by identifying nearest "safe" initialized ticks
+ * Then calls v4 StateView to fetch fee growth inside the safe initialized tick range.
  */
-async function getFeeGrowthInside(
+async function getFeeGrowthInsideHandleInitializedTicks(
   client: PublicClient,
-  poolId: string,
+  poolId: `0x${string}`,
   stateView: Address,
   tickLower: number,
   tickUpper: number,
+  tickSpacing: number,
   blockNumber: bigint
 ): Promise<{ feeGrowthInside0: bigint; feeGrowthInside1: bigint }> {
+  // Find the safe lower tick boundary
+  const safeTickLower = await findInitializedTickOver(
+    client,
+    poolId,
+    stateView,
+    tickLower,
+    tickSpacing,
+    blockNumber
+  );
+
+  // Find the safe upper tick boundary
+  const safeTickUpper = await findInitializedTickUnder(
+    client,
+    poolId,
+    stateView,
+    tickUpper,
+    tickSpacing,
+    blockNumber
+  );
+
+  // If no initialized ticks are found in the range, no fees could have accrued.
+  if (
+    safeTickLower === null ||
+    safeTickUpper === null ||
+    safeTickLower >= safeTickUpper
+  ) {
+    return { feeGrowthInside0: 0n, feeGrowthInside1: 0n };
+  }
+
   const [feeGrowthInside0, feeGrowthInside1] = await client.readContract({
     address: stateView,
     abi: STATE_VIEW_ABI,
     functionName: "getFeeGrowthInside",
-    args: [poolId as `0x${string}`, tickLower, tickUpper],
+    args: [poolId, safeTickLower, safeTickUpper],
     blockNumber: blockNumber,
   });
 
@@ -608,6 +650,121 @@ async function getFeeGrowthInside(
     feeGrowthInside0: feeGrowthInside0,
     feeGrowthInside1: feeGrowthInside1,
   };
+}
+
+/**
+ * Finds the lowest safe initialized tick above `startTick` by searching upward (inclusive)
+ */
+async function findInitializedTickOver(
+  client: PublicClient,
+  poolId: `0x${string}`,
+  stateView: Address,
+  startTick: number,
+  tickSpacing: number,
+  blockNumber: bigint,
+  searchLimit: number = 2560 // Safety limit: search up to 10 words
+): Promise<number | null> {
+  // Start search from the compressed tick space (only compressed ticks are initializable)
+  let currentCompressedTick = Math.floor(startTick / tickSpacing);
+  let compressedTicksSearched = 0;
+
+  while (compressedTicksSearched < searchLimit) {
+    // must use math.floor to handle negative numbers
+    const wordPos = Math.floor(currentCompressedTick / 256);
+    // likewise true modulo is required for negative numbers
+    const bitPos = ((currentCompressedTick % 256) + 256) % 256;
+    if (bitPos < 0) throw new Error("Negative index invalid");
+
+    const word = await getTickBitmap(
+      client,
+      poolId,
+      stateView,
+      wordPos,
+      blockNumber
+    );
+
+    // Scan the rest of the current word
+    for (let i = bitPos; i < 256; i++) {
+      if ((word >> BigInt(i)) & 1n) {
+        const foundCompressedTick = wordPos * 256 + i;
+        return foundCompressedTick * tickSpacing;
+      }
+      compressedTicksSearched++;
+      if (compressedTicksSearched >= searchLimit) return null;
+    }
+
+    // Move to the start of the next word
+    currentCompressedTick = (wordPos + 1) * 256;
+  }
+
+  return null; // Not found within the limit
+}
+
+/**
+ * Finds the highest safe initialized tick under `startTick` by searching downward (inclusive)
+ */
+async function findInitializedTickUnder(
+  client: PublicClient,
+  poolId: `0x${string}`,
+  stateView: Address,
+  startTick: number,
+  tickSpacing: number,
+  blockNumber: bigint,
+  searchLimit: number = 2560 // Safety limit: search up to 10 words
+): Promise<number | null> {
+  // Start search from the compressed tick space (only compressed ticks are initializable)
+  let currentCompressedTick = Math.floor(startTick / tickSpacing);
+  let compressedTicksSearched = 0;
+
+  while (compressedTicksSearched < searchLimit) {
+    // must use math.floor to handle negative numbers
+    const wordPos = Math.floor(currentCompressedTick / 256);
+    // likewise true modulo is required for negative numbers
+    const bitPos = ((currentCompressedTick % 256) + 256) % 256;
+
+    const word = await getTickBitmap(
+      client,
+      poolId,
+      stateView,
+      wordPos,
+      blockNumber
+    );
+
+    // Scan the rest of the current word downwards
+    for (let i = bitPos; i >= 0; i--) {
+      if ((word >> BigInt(i)) & 1n) {
+        const foundCompressedTick = wordPos * 256 + i;
+        return foundCompressedTick * tickSpacing;
+      }
+      compressedTicksSearched++;
+      if (compressedTicksSearched >= searchLimit) return null;
+    }
+
+    // Move to the end of the previous word
+    currentCompressedTick = (wordPos - 1) * 256 + 255;
+  }
+
+  return null; // Not found within the limit
+}
+
+async function getTickBitmap(
+  client: PublicClient,
+  poolId: `0x${string}`,
+  stateView: Address,
+  wordPosition: number,
+  blockNumber: bigint
+): Promise<bigint> {
+  if (wordPosition < -32768 || wordPosition > 32767) {
+    throw new Error("Word position out of int16 range");
+  }
+
+  return client.readContract({
+    address: stateView,
+    abi: STATE_VIEW_ABI,
+    functionName: "getTickBitmap",
+    args: [poolId, wordPosition],
+    blockNumber: blockNumber,
+  });
 }
 
 // Sums token0 and token1 amounts into a value denominated in a single currency based on current tick price
@@ -715,7 +872,7 @@ function calculateRewardDistribution(
  * await getPoolCreationBlock(
  * client,
  * POOL_MANAGER_ADDRESS,
- * POOL_ID as `0x${string}`,
+ * POOL_ID,
  * FROM_BLOCK,
  * TO_BLOCK
  * ).then((res) => console.log(res));
@@ -868,6 +1025,7 @@ function setConfig(poolId_: `0x${string}`, period: number) {
     rewardAmount: reward,
     startBlock: start,
     endBlock: end,
+    tickSpacing: pool.tickSpacing,
     checkpointFile,
   };
 }
