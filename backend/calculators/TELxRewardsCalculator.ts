@@ -14,6 +14,7 @@ import { existsSync } from "fs";
 import { readFile, writeFile, mkdir } from "fs/promises";
 import { NetworkConfig, toBigInt } from "../helpers";
 import { inspect } from "util";
+import { start } from "repl";
 dotenv.config();
 
 /// usage: `yarn ts-node backend/calculators/TELxRewardsCalculator.ts`
@@ -205,14 +206,20 @@ async function main() {
     config.tickSpacing,
     initialPositions
   );
-  const lpData = await populateValuesCommonDenominator(
+  const [vwapPriceScaled, denominatorIsCurrency0] =
+    await getVolumeWeightedAveragePriceScaled(
+      client,
+      poolId,
+      config.stateView,
+      config.positionManager,
+      config.startBlock,
+      config.endBlock,
+      config.denominator
+    );
+  const lpData = await populateTotalFeesCommonDenominator(
     lpFees,
-    config.denominator,
-    config.stateView,
-    config.positionManager,
-    poolId,
-    client,
-    config.endBlock
+    vwapPriceScaled,
+    denominatorIsCurrency0
   );
 
   const lpRewards = calculateRewardDistribution(lpData, config.rewardAmount);
@@ -631,61 +638,9 @@ function modifyLPData(
 
 /**
  * Rescopes lower and upper tick bounds by identifying nearest "safe" initialized ticks
- * Then calls v4 StateView to fetch fee growth inside the safe initialized tick range.
+ * Then calls v4 StateView to fetch fee growth outside using safe initialized tick range
+ * To derive the fee growth inside the range in line with onchain Solidity derivation
  */
-async function getFeeGrowthInsideHandleInitializedTicks(
-  client: PublicClient,
-  poolId: `0x${string}`,
-  stateView: Address,
-  tickLower: number,
-  tickUpper: number,
-  tickSpacing: number,
-  blockNumber: bigint
-): Promise<{ feeGrowthInside0X128: bigint; feeGrowthInside1X128: bigint }> {
-  // Find the safe lower tick boundary
-  const safeTickLower = await findInitializedTickUnder(
-    client,
-    poolId,
-    stateView,
-    tickLower,
-    tickSpacing,
-    blockNumber
-  );
-
-  // Find the safe upper tick boundary
-  const safeTickUpper = await findInitializedTickUnder(
-    client,
-    poolId,
-    stateView,
-    tickUpper,
-    tickSpacing,
-    blockNumber
-  );
-
-  // If none or only one initialized ticks are found in the range, no fees could have accrued.
-  if (
-    safeTickLower === null ||
-    safeTickUpper === null ||
-    safeTickLower >= safeTickUpper
-  ) {
-    return { feeGrowthInside0X128: 0n, feeGrowthInside1X128: 0n };
-  }
-
-  const [feeGrowthInside0X128, feeGrowthInside1X128] =
-    await client.readContract({
-      address: stateView,
-      abi: STATE_VIEW_ABI,
-      functionName: "getFeeGrowthInside",
-      args: [poolId, safeTickLower, safeTickUpper],
-      blockNumber: blockNumber,
-    });
-
-  return {
-    feeGrowthInside0X128: feeGrowthInside0X128,
-    feeGrowthInside1X128: feeGrowthInside1X128,
-  };
-}
-
 async function getFeeGrowthInsideOffchain(
   client: PublicClient,
   poolId: `0x${string}`,
@@ -890,15 +845,94 @@ async function getTickBitmap(
 
 // Sums token0 and token1 amounts into a value denominated in a single currency based on current tick price
 // updates lpData map by setting `LPData.totalFeesDenominatedInTEL` for all entries
-async function populateValuesCommonDenominator(
+async function populateTotalFeesCommonDenominator(
   lpData: Map<Address, LPData>,
-  denominator: Address,
+  vwapPriceScaled: bigint,
+  denominatorIsCurrency0: boolean
+): Promise<Map<Address, LPData>> {
+  // convert both amounts into denominator and sum;
+  for (const [lpAddress, fees] of lpData) {
+    let totalFeesInDenominator: bigint;
+
+    if (denominatorIsCurrency0) {
+      // periodFeesCurrency0 is already in denominator; convert periodFeesCurrency1
+      const amount1InDenominator =
+        (fees.periodFeesCurrency1 * vwapPriceScaled) / PRECISION; // unscale
+      totalFeesInDenominator = fees.periodFeesCurrency0 + amount1InDenominator;
+    } else {
+      // periodFeesCurrency1 is already in denominator, so convert periodFeesCurrency0
+      const amount0InDenominator =
+        (fees.periodFeesCurrency0 * vwapPriceScaled) / PRECISION; // unscale
+      totalFeesInDenominator = fees.periodFeesCurrency1 + amount0InDenominator;
+    }
+
+    modifyLPData(lpData, lpAddress, {
+      totalFeesCommonDenominator: totalFeesInDenominator,
+    });
+  }
+
+  return lpData;
+}
+
+async function getFeeGrowthGlobalsPeriodDelta(
+  client: PublicClient,
+  poolId: `0x${string}`,
+  stateView: Address,
+  startBlock: bigint,
+  endBlock: bigint
+): Promise<{ feeGrowthDelta0: bigint; feeGrowthDelta1: bigint }> {
+  // Fetch fee growth at start and end of period
+  const [startGrowth, endGrowth] = await Promise.all([
+    client.readContract({
+      address: stateView,
+      abi: STATE_VIEW_ABI,
+      functionName: "getFeeGrowthGlobals",
+      args: [poolId],
+      blockNumber: startBlock,
+    }),
+    client.readContract({
+      address: stateView,
+      abi: STATE_VIEW_ABI,
+      functionName: "getFeeGrowthGlobals",
+      args: [poolId],
+      blockNumber: endBlock,
+    }),
+  ]);
+
+  // calculate fee growth deltas using modular arithmetic
+  const MAX_UINT256 = 2n ** 256n;
+  const feeGrowthDelta0 =
+    (endGrowth[0] - startGrowth[0] + MAX_UINT256) % MAX_UINT256;
+  const feeGrowthDelta1 =
+    (endGrowth[1] - startGrowth[1] + MAX_UINT256) % MAX_UINT256;
+
+  if (feeGrowthDelta0 === 0n || feeGrowthDelta1 === 0n) {
+    throw new Error("No fee growth in one or both assets during the period.");
+  }
+
+  return { feeGrowthDelta0, feeGrowthDelta1 };
+}
+
+// Use total global fee growth of period to calculate deltas as VWAP
+async function getVolumeWeightedAveragePriceScaled(
+  client: PublicClient,
+  poolId: `0x${string}`,
   stateView: Address,
   positionManager: Address,
-  poolId: `0x${string}`,
-  client: PublicClient,
-  blockNumber: bigint
-): Promise<Map<Address, LPData>> {
+  startBlock: bigint,
+  endBlock: bigint,
+  denominator: Address
+): Promise<[bigint, boolean]> {
+  // fetch fee growth at start and end of period
+  const { feeGrowthDelta0, feeGrowthDelta1 } =
+    await getFeeGrowthGlobalsPeriodDelta(
+      client,
+      poolId,
+      stateView,
+      startBlock,
+      endBlock
+    );
+
   // the position manager uses only the first 25 bytes of the poolId
   const [currency0, currency1] = await client.readContract({
     address: positionManager,
@@ -913,54 +947,17 @@ async function populateValuesCommonDenominator(
   if (!denominatorIsCurrency0 && !denominatorIsCurrency1) {
     throw new Error("denominator not found in pool");
   }
-
-  // fetch price; uniswap uses token1/token0 convention + incorporates decimal difference
-  const [sqrtPriceX96] = await client.readContract({
-    address: stateView,
-    abi: STATE_VIEW_ABI,
-    functionName: "getSlot0",
-    args: [poolId],
-    blockNumber: blockNumber,
-  });
-
-  const Q96 = 2n ** 96n;
-  // convert both amounts into denominator and sum;
-  for (const [lpAddress, fees] of lpData) {
-    let totalFeesInDenominator: bigint;
-
-    if (denominatorIsCurrency0) {
-      // periodFeesCurrency0 is already in denominator; convert periodFeesCurrency1
-      const amount0InDenominatorScaled = fees.periodFeesCurrency0 * PRECISION;
-      const scaledFees1 = fees.periodFeesCurrency1 * PRECISION;
-      // Price from tick represents token1/token0, ie otherToken/denominator: `amount0 = amount1 * Q96^2 / sqrtPriceX96^2`
-      const amount1InDenominatorScaled =
-        (scaledFees1 * Q96 * Q96) / (sqrtPriceX96 * sqrtPriceX96);
-
-      // sum both scaled terms first before unscaling
-      const totalFeesScaled =
-        amount0InDenominatorScaled + amount1InDenominatorScaled;
-
-      totalFeesInDenominator = totalFeesScaled / PRECISION;
-    } else {
-      // periodFeesCurrency1 is already in denominator, so convert periodFeesCurrency0
-      const amount1InDenominatorScaled = fees.periodFeesCurrency1 * PRECISION;
-      const scaledFees0 = fees.periodFeesCurrency0 * PRECISION;
-      // price is denominator/otherToken; `amount1 = (amount0 * sqrtPriceX96^2) / Q96^2`
-      const amount0InDenominatorScaled =
-        (scaledFees0 * sqrtPriceX96 * sqrtPriceX96) / (Q96 * Q96);
-
-      const totalFeesScaled =
-        amount1InDenominatorScaled + amount0InDenominatorScaled;
-
-      totalFeesInDenominator = totalFeesScaled / PRECISION;
-    }
-
-    modifyLPData(lpData, lpAddress, {
-      totalFeesCommonDenominator: totalFeesInDenominator,
-    });
+  // Calculate VWAP based on fee ratio, representing average exchange rate for period
+  let scaledVwapPrice: bigint;
+  if (denominatorIsCurrency0) {
+    // Price = token1 / token0
+    scaledVwapPrice = (feeGrowthDelta0 * PRECISION) / feeGrowthDelta1;
+    return [scaledVwapPrice, denominatorIsCurrency0];
+  } else {
+    // Price = token0 / token1
+    scaledVwapPrice = (feeGrowthDelta1 * PRECISION) / feeGrowthDelta0;
+    return [scaledVwapPrice, denominatorIsCurrency0];
   }
-
-  return lpData;
 }
 
 // allocates each LP the amount proportional to their share of the total reward amount
@@ -1097,7 +1094,7 @@ async function inspectSwaps(
     console.log("\nFirst 10 matching swaps:");
     console.table(matchingSwaps.slice(0, 10));
   }
-  const growthSafe = await getFeeGrowthInsideHandleInitializedTicks(
+  const growthSafe = await getFeeGrowthInsideOffchain(
     client,
     poolId,
     stateView,
