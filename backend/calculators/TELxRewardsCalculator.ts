@@ -79,6 +79,7 @@ const POOL_MANAGER_ABI = parseAbi([
 const STATE_VIEW_ABI = parseAbi([
   "function getSlot0(bytes32 id) external view returns (uint160 sqrtPriceX96, int24 tick, uint24 protocolFee, uint24 lpFee)",
   "function getFeeGrowthInside(bytes32 poolId, int24 tickLower, int24 tickUpper) external view returns (uint256 feeGrowthInside0X128, uint256 feeGrowthInside1X128)",
+  "function getFeeGrowthGlobals(bytes32 poolId) external view returns (uint256 feeGrowthGlobal0, uint256 feeGrowthGlobal1)",
   "function getTickBitmap(bytes32 poolId, int16 wordPosition) external view returns (uint256)",
   "function getTickInfo(bytes32 poolId, int24 tick) external view returns (uint128 liquidityGross,int128 liquidityNet,uint256 feeGrowthOutside0X128,uint256 feeGrowthOutside1X128)",
 ]);
@@ -170,6 +171,20 @@ async function main() {
 
   // Load state from checkpoint json if it exists and reset its period-specific fee fields
   const client = createPublicClient({ transport: http(config.rpcUrl) });
+
+  //todo
+  // await inspectSwaps(
+  //   client,
+  //   poolId,
+  //   config.poolManager,
+  //   config.stateView,
+  //   29090,
+  //   29310,
+  //   config.tickSpacing,
+  //   75417061n,
+  //   75697434n
+  // );
+  // return;
 
   let initialPositions: Map<bigint, PositionState> = await initialize(
     config.checkpointFile,
@@ -461,7 +476,7 @@ async function processFees(
       }
 
       // get fee growth values and calculate the subperiod delta
-      const feeGrowthStart = await getFeeGrowthInsideHandleInitializedTicks(
+      const feeGrowthStart = await getFeeGrowthInsideOffchain(
         client,
         poolId,
         stateView,
@@ -470,7 +485,7 @@ async function processFees(
         tickSpacing,
         subperiodStart
       );
-      const feeGrowthEnd = await getFeeGrowthInsideHandleInitializedTicks(
+      const feeGrowthEnd = await getFeeGrowthInsideOffchain(
         client,
         poolId,
         stateView,
@@ -479,14 +494,6 @@ async function processFees(
         tickSpacing,
         subperiodEnd
       );
-      if (
-        feeGrowthStart.feeGrowthInside0X128 < 0 ||
-        feeGrowthStart.feeGrowthInside1X128 < 0 ||
-        feeGrowthEnd.feeGrowthInside0X128 < 0 ||
-        feeGrowthEnd.feeGrowthInside1X128 < 0
-      ) {
-        throw new Error("UNDERFLOW");
-      }
 
       // calculate subperiod's fees and add to period total for this position
       const { token0Fees: feesEarned0, token1Fees: feesEarned1 } =
@@ -532,7 +539,7 @@ function calculateFees(
   feeGrowthInside1Start: bigint
 ): { token0Fees: bigint; token1Fees: bigint } {
   const Q128 = 2n ** 128n;
-  // underflow protection: return 0 if current is less than last
+  // underflow protection: return 0 if current is less than last. this also ignores massive fee growth gained by JIT liquidity actions
   const feeGrowthDelta0 =
     feeGrowthInside0End >= feeGrowthInside0Start
       ? feeGrowthInside0End - feeGrowthInside0Start
@@ -636,7 +643,7 @@ async function getFeeGrowthInsideHandleInitializedTicks(
   blockNumber: bigint
 ): Promise<{ feeGrowthInside0X128: bigint; feeGrowthInside1X128: bigint }> {
   // Find the safe lower tick boundary
-  const safeTickLower = await findInitializedTickOver(
+  const safeTickLower = await findInitializedTickUnder(
     client,
     poolId,
     stateView,
@@ -673,76 +680,125 @@ async function getFeeGrowthInsideHandleInitializedTicks(
       blockNumber: blockNumber,
     });
 
-  // ignore extreme values caused by JIT liquidity actions or underflows for initialized ticks never crossed by actual price
-  if (
-    feeGrowthInside0X128 > IGNORE_THRESHOLD ||
-    feeGrowthInside1X128 > IGNORE_THRESHOLD
-  ) {
-    console.warn(
-      `Ignoring extreme fee growth found for block ${blockNumber}, position range [${tickLower}, ${tickUpper}], safe range [${safeTickLower}, ${safeTickUpper}]. `
-    );
-    return { feeGrowthInside0X128: 0n, feeGrowthInside1X128: 0n };
-  }
-
   return {
     feeGrowthInside0X128: feeGrowthInside0X128,
     feeGrowthInside1X128: feeGrowthInside1X128,
   };
 }
 
-/**
- * Finds the lowest safe initialized tick above `startTick` by searching upward (inclusive)
- */
-async function findInitializedTickOver(
+async function getFeeGrowthInsideOffchain(
   client: PublicClient,
   poolId: `0x${string}`,
   stateView: Address,
-  startTick: number,
+  tickLower: number,
+  tickUpper: number,
   tickSpacing: number,
-  blockNumber: bigint,
-  searchLimit: number = 2560 // Safety limit: search up to 10 words
-): Promise<number | null> {
-  // Start from the word containing our tick
-  const startWord = tickToWord(startTick, tickSpacing);
+  blockNumber: bigint
+): Promise<{ feeGrowthInside0X128: bigint; feeGrowthInside1X128: bigint }> {
+  const [, currentTick] = await client.readContract({
+    address: stateView,
+    abi: STATE_VIEW_ABI,
+    functionName: "getSlot0",
+    args: [poolId],
+    blockNumber,
+  });
+  const [feeGrowthGlobal0X128, feeGrowthGlobal1X128] =
+    await client.readContract({
+      address: stateView,
+      abi: STATE_VIEW_ABI,
+      functionName: "getFeeGrowthGlobals",
+      args: [poolId],
+      blockNumber,
+    });
 
-  // Calculate which bit position within the starting word
-  let startCompressed = Math.floor(startTick / tickSpacing);
-  if (startTick < 0 && startTick % tickSpacing !== 0) {
-    startCompressed -= 1;
+  // find nearest initialized ticks by searching DOWNWARD for both
+  const safeTickLower = await findInitializedTickUnder(
+    client,
+    poolId,
+    stateView,
+    tickLower,
+    tickSpacing,
+    blockNumber
+  );
+  const safeTickUpper = await findInitializedTickUnder(
+    client,
+    poolId,
+    stateView,
+    tickUpper,
+    tickSpacing,
+    blockNumber
+  );
+
+  if (
+    safeTickLower === null ||
+    safeTickUpper === null ||
+    safeTickLower >= safeTickUpper
+  ) {
+    return { feeGrowthInside0X128: 0n, feeGrowthInside1X128: 0n };
   }
-  const startBitPos = startCompressed & 255; // Equivalent to startCompressed % 256 but always positive
 
-  // Search through words
-  for (let wordOffset = 0; wordOffset < searchLimit; wordOffset++) {
-    const currentWord = startWord + wordOffset;
+  // replicate getFeeGrowthInside on-chain logic
+  const [lowerTickInfoResult, upperTickInfoResult] = await Promise.all([
+    client.readContract({
+      address: stateView,
+      abi: STATE_VIEW_ABI,
+      functionName: "getTickInfo",
+      args: [poolId, safeTickLower],
+      blockNumber,
+    }),
+    client.readContract({
+      address: stateView,
+      abi: STATE_VIEW_ABI,
+      functionName: "getTickInfo",
+      args: [poolId, safeTickUpper],
+      blockNumber,
+    }),
+  ]);
 
-    const bitmap = await getTickBitmap(
-      client,
-      poolId,
-      stateView,
-      currentWord,
-      blockNumber
-    );
+  const lowerTickInfo = parseTickInfo(lowerTickInfoResult);
+  const upperTickInfo = parseTickInfo(upperTickInfoResult);
 
-    if (bitmap !== 0n) {
-      // Determine starting bit position for this word
-      const startBit = wordOffset === 0 ? startBitPos : 0;
-
-      // Check each bit in the word from startBit to 255
-      for (let i = startBit; i < 256; i++) {
-        const bit = 1n;
-        const initialized = (bitmap & (bit << BigInt(i))) !== 0n;
-
-        if (initialized) {
-          // Calculate the actual tick index
-          const tickIndex = (currentWord * 256 + i) * tickSpacing;
-          return tickIndex;
-        }
-      }
-    }
+  let feeGrowthBelow0X128: bigint;
+  let feeGrowthBelow1X128: bigint;
+  if (currentTick >= tickLower) {
+    feeGrowthBelow0X128 = lowerTickInfo.feeGrowthOutside0X128;
+    feeGrowthBelow1X128 = lowerTickInfo.feeGrowthOutside1X128;
+  } else {
+    feeGrowthBelow0X128 =
+      feeGrowthGlobal0X128 - lowerTickInfo.feeGrowthOutside0X128;
+    feeGrowthBelow1X128 =
+      feeGrowthGlobal1X128 - lowerTickInfo.feeGrowthOutside1X128;
   }
 
-  return null;
+  let feeGrowthAbove0X128: bigint;
+  let feeGrowthAbove1X128: bigint;
+  if (currentTick < tickUpper) {
+    feeGrowthAbove0X128 = upperTickInfo.feeGrowthOutside0X128;
+    feeGrowthAbove1X128 = upperTickInfo.feeGrowthOutside1X128;
+  } else {
+    feeGrowthAbove0X128 =
+      feeGrowthGlobal0X128 - upperTickInfo.feeGrowthOutside0X128;
+    feeGrowthAbove1X128 =
+      feeGrowthGlobal1X128 - upperTickInfo.feeGrowthOutside1X128;
+  }
+
+  const feeGrowthInside0X128 =
+    feeGrowthGlobal0X128 - feeGrowthBelow0X128 - feeGrowthAbove0X128;
+  const feeGrowthInside1X128 =
+    feeGrowthGlobal1X128 - feeGrowthBelow1X128 - feeGrowthAbove1X128;
+
+  return { feeGrowthInside0X128, feeGrowthInside1X128 };
+}
+
+// Helper function to destructure TickInfo results, which come back as an array
+function parseTickInfo(tickInfo: readonly [bigint, bigint, bigint, bigint]): {
+  feeGrowthOutside0X128: bigint;
+  feeGrowthOutside1X128: bigint;
+} {
+  return {
+    feeGrowthOutside0X128: tickInfo[2],
+    feeGrowthOutside1X128: tickInfo[3],
+  };
 }
 
 /**
@@ -1051,7 +1107,7 @@ async function inspectSwaps(
     endBlock
   );
   console.log(growthSafe);
-  const lowerSafe = await findInitializedTickOver(
+  const lowerSafe = await findInitializedTickUnder(
     client,
     poolId,
     stateView,
