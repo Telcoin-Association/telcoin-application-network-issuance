@@ -89,8 +89,6 @@ const POSITION_MANAGER_ABI = parseAbi([
   "function ownerOf(uint256 id) public view returns (address owner)",
   "function poolKeys(bytes25 poolId) external view returns (address token0, address token1, uint24 fee, int24 tickSpacing, address hooks)",
 ]);
-// threshold for ignoring excessive JIT liquidity actions or underflows, recognizing only fee growth less than type(uint256).max
-const IGNORE_THRESHOLD = 2n ** 250n;
 
 // ---------------- Pool Definitions ----------------
 
@@ -148,6 +146,8 @@ const NETWORKS = {
       75_697_435n,
       75_981_195n,
       76_265_454n,
+      76_539_088n,
+      76_822_629n,
     ],
   },
   base: {
@@ -161,6 +161,8 @@ const NETWORKS = {
       34_731_727n,
       35_034_127n,
       35_336_526n,
+      35_638_926n,
+      35_941_326n,
     ],
   },
 };
@@ -172,20 +174,6 @@ async function main() {
 
   // Load state from checkpoint json if it exists and reset its period-specific fee fields
   const client = createPublicClient({ transport: http(config.rpcUrl) });
-
-  //todo
-  // await inspectSwaps(
-  //   client,
-  //   poolId,
-  //   config.poolManager,
-  //   config.stateView,
-  //   29090,
-  //   29310,
-  //   config.tickSpacing,
-  //   75417061n,
-  //   75697434n
-  // );
-  // return;
 
   let initialPositions: Map<bigint, PositionState> = await initialize(
     config.checkpointFile,
@@ -1256,8 +1244,8 @@ function parseCLIArgs(args: string[]): [`0x${string}`, number] {
     throw new Error("Invalid poolId format");
   }
   const period = Number(periodStr);
-  if (isNaN(period) || period < 0 || period > 4) {
-    throw new Error("Invalid period, must be 0–4");
+  if (isNaN(period) || period < 0 || period > 7) {
+    throw new Error("Invalid period, must be 0–7");
   }
   return [poolId as `0x${string}`, period];
 }
