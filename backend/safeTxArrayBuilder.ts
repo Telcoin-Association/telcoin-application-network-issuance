@@ -20,10 +20,10 @@ export interface StakerIncentive {
 
 // TELx specific data structures
 interface LpData {
-  reward: bigint;
-  periodFeesCurrency1?: bigint; // unused
-  periodFeesCurrency0?: bigint; // unused
-  totalFeesCommonDenominator?: bigint; // unused
+  reward: string;
+  periodFeesCurrency1?: string; // unused
+  periodFeesCurrency0?: string; // unused
+  totalFeesCommonDenominator?: string; // unused
 }
 type LpDataEntry = [Address, LpData];
 export interface TelxIncentivesJson {
@@ -152,7 +152,7 @@ function processTelxRewards(jsonData: TelxIncentivesJson): TelxOutput {
   let totalAmount = 0n;
 
   for (const [address, data] of jsonData.lpData) {
-    const reward = data.reward;
+    const reward = BigInt(data.reward.slice(0, -1));
     if (reward === 0n) continue;
 
     totalAmount += reward;
