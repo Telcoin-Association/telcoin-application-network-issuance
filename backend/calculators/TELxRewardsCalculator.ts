@@ -134,6 +134,8 @@ const POLYGON_USDC_EMXN: PoolConfig = {
   },
 };
 
+export const POOLS = [BASE_ETH_TEL, POLYGON_ETH_TEL, POLYGON_USDC_EMXN];
+
 const NETWORKS = {
   polygon: {
     poolManager: getAddress("0x67366782805870060151383f4bbff9dab53e5cd6"),
@@ -1122,7 +1124,9 @@ async function inspectSwaps(
   console.log(tickUpper);
 }
 
-main();
+if (require.main === module) {
+  main();
+}
 
 /**
  * Initialize the script run by loading previous state from checkpoint file if it exists
@@ -1201,7 +1205,6 @@ async function initialize(
 }
 
 function setConfig(poolId_: `0x${string}`, period: number) {
-  const POOLS = [BASE_ETH_TEL, POLYGON_ETH_TEL, POLYGON_USDC_EMXN];
   const pool = POOLS.find((p) => p.poolId === poolId_);
   if (!pool) throw new Error("Unrecognized pool ID");
 
