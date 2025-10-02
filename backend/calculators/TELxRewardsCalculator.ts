@@ -12,9 +12,8 @@ import {
 import * as dotenv from "dotenv";
 import { existsSync } from "fs";
 import { readFile, writeFile, mkdir } from "fs/promises";
-import { NetworkConfig, toBigInt } from "../helpers";
-import { inspect } from "util";
-import { start } from "repl";
+import { createRpcClient, NetworkConfig, toBigInt } from "../helpers";
+import { ChainId, config } from "../config";
 dotenv.config();
 
 /// usage: `yarn ts-node backend/calculators/TELxRewardsCalculator.ts`
@@ -28,7 +27,7 @@ dotenv.config();
 ///   d. In vice-versa vein, for positions that were created mid-period, a `LiquidityChange` with `liquidity == 0` is unshifted from the period start until position creation to enforce unanimous startBlocks for the period
 ///   e. For positions that emitted no ModifyLiquidity events, the entire period is calculated with the checkpoint's last entry for liquidity value, complying with unanimous start and end blocks
 
-interface PositionState {
+export interface PositionState {
   lastOwner: Address;
   tickLower: number;
   tickUpper: number;
@@ -44,7 +43,7 @@ interface LiquidityChange {
   owner: Address;
 }
 
-interface LPData {
+export interface LPData {
   periodFeesCurrency0: bigint;
   periodFeesCurrency1: bigint;
   totalFeesCommonDenominator?: bigint;
@@ -54,15 +53,20 @@ interface LPData {
 interface CheckpointData {
   blockRange: NetworkConfig;
   poolId: `0x${string}`;
+  denominator: Address;
+  currency0: Address;
+  currency1: Address;
   positions: [bigint, PositionState][];
   lpData: [Address, LPData][];
 }
 
-type PoolConfig = {
-  network: "polygon" | "base";
+export type PoolConfig = {
+  network: ChainId;
   name: string;
   poolId: `0x${string}`;
   denominator: Address;
+  currency0: Address;
+  currency1: Address;
   initializeBlock: bigint;
   tickSpacing: number;
   rewardAmounts: { FIRST: bigint; PERIOD: bigint };
@@ -94,9 +98,11 @@ const POSITION_MANAGER_ABI = parseAbi([
 
 // BASE — ETH/TEL
 const BASE_ETH_TEL: PoolConfig = {
-  network: "base",
-  name: "ETH-TEL",
+  network: ChainId.Base,
+  name: "base-ETH-TEL",
   poolId: "0xb6d004fca4f9a34197862176485c45ceab7117c86f07422d1fe3d9cfd6e9d1da",
+  currency0: zeroAddress,
+  currency1: getAddress("0x09bE1692ca16e06f536F0038fF11D1dA8524aDB1"),
   denominator: getAddress("0x09bE1692ca16e06f536F0038fF11D1dA8524aDB1"), // TEL
   initializeBlock: 25_832_462n,
   tickSpacing: 60,
@@ -108,9 +114,11 @@ const BASE_ETH_TEL: PoolConfig = {
 
 // POLYGON — ETH/TEL
 const POLYGON_ETH_TEL: PoolConfig = {
-  network: "polygon",
-  name: "ETH-TEL",
+  network: ChainId.Polygon,
+  name: "polygon-ETH-TEL",
   poolId: "0x9a005a0c12cc2ef01b34e9a7f3fb91a0e6304d377b5479bd3f08f8c29cdf5deb",
+  currency0: getAddress("0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619"),
+  currency1: getAddress("0xdF7837DE1F2Fa4631D716CF2502f8b230F1dcc32"),
   denominator: getAddress("0xdF7837DE1F2Fa4631D716CF2502f8b230F1dcc32"), // TEL
   initializeBlock: 67_949_841n,
   tickSpacing: 60,
@@ -122,9 +130,11 @@ const POLYGON_ETH_TEL: PoolConfig = {
 
 // POLYGON — USDC/eMXN
 const POLYGON_USDC_EMXN: PoolConfig = {
-  network: "polygon",
-  name: "USDC-EMXN",
+  network: ChainId.Polygon,
+  name: "polygon-USDC-EMXN",
   poolId: "0xfd56605f7f4620ab44dfc0860d70b9bd1d1f648a5a74558491b39e816a10b99a",
+  currency0: getAddress("0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359"),
+  currency1: getAddress("0x68727e573D21a49c767c3c86A92D9F24bd933c99"),
   denominator: getAddress("0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359"), // USDC
   initializeBlock: 74_664_812n,
   tickSpacing: 10,
@@ -136,12 +146,12 @@ const POLYGON_USDC_EMXN: PoolConfig = {
 
 export const POOLS = [BASE_ETH_TEL, POLYGON_ETH_TEL, POLYGON_USDC_EMXN];
 
+export type SupportedChainId = ChainId.Polygon | ChainId.Base;
 const NETWORKS = {
-  polygon: {
+  [ChainId.Polygon]: {
     poolManager: getAddress("0x67366782805870060151383f4bbff9dab53e5cd6"),
     positionManager: getAddress("0x1Ec2eBf4F37E7363FDfe3551602425af0B3ceef9"),
     stateView: getAddress("0x5ea1bd7974c8a611cbab0bdcafcb1d9cc9b3ba5a"),
-    rpcEnv: "POLYGON_RPC_URL",
     periodStarts: [
       74_970_501n, // programStart
       75_417_061n,
@@ -150,13 +160,13 @@ const NETWORKS = {
       76_265_454n,
       76_539_088n,
       76_822_629n,
+      77_126_356n,
     ],
   },
-  base: {
+  [ChainId.Base]: {
     poolManager: getAddress("0x498581fF718922c3f8e6A244956aF099B2652b2b"),
     positionManager: getAddress("0x7C5f5A4bBd8fD63184577525326123B519429bDc"),
     stateView: getAddress("0xa3c0c9b65bad0b08107aa264b0f3db444b867a71"),
-    rpcEnv: "BASE_RPC_URL",
     periodStarts: [
       33_954_128n, // programStart
       34_429_327n,
@@ -165,6 +175,7 @@ const NETWORKS = {
       35_336_526n,
       35_638_926n,
       35_941_326n,
+      36_265_326n,
     ],
   },
 };
@@ -172,60 +183,69 @@ const NETWORKS = {
 async function main() {
   const args = process.argv.slice(2);
   const [poolId, period] = parseCLIArgs(args);
-  const config = setConfig(poolId, period);
+  const poolConfig = setPoolConfig(poolId, period);
 
   // Load state from checkpoint json if it exists and reset its period-specific fee fields
-  const client = createPublicClient({ transport: http(config.rpcUrl) });
+  const client = createRpcClient(poolConfig.network);
 
   let initialPositions: Map<bigint, PositionState> = await initialize(
-    config.checkpointFile,
+    poolConfig.checkpointFile,
     period,
-    config.startBlock,
-    config.endBlock,
+    poolConfig.startBlock,
+    poolConfig.endBlock,
     client,
-    config.positionManager
+    poolConfig.positionManager
   );
   const { lpData: lpFees, finalPositions } = await updateFeesAndPositions(
     poolId,
-    config.startBlock,
-    config.endBlock,
+    poolConfig.startBlock,
+    poolConfig.endBlock,
     client,
-    config.poolManager,
-    config.stateView,
-    config.positionManager,
-    config.tickSpacing,
+    poolConfig.poolManager,
+    poolConfig.stateView,
+    poolConfig.positionManager,
+    poolConfig.tickSpacing,
     initialPositions
   );
-  const [vwapPriceScaled, denominatorIsCurrency0] =
-    await getVolumeWeightedAveragePriceScaled(
-      client,
-      poolId,
-      config.stateView,
-      config.positionManager,
-      config.startBlock,
-      config.endBlock,
-      config.denominator
-    );
+  const denominatorIsCurrency0 = denominatorIsCurrencyZero(
+    poolConfig.denominator,
+    poolConfig.currency0,
+    poolConfig.currency1
+  );
+  const vwapPriceScaled = await getVolumeWeightedAveragePriceScaled(
+    client,
+    poolId,
+    poolConfig.stateView,
+    poolConfig.startBlock,
+    poolConfig.endBlock,
+    denominatorIsCurrency0
+  );
   const lpData = await populateTotalFeesCommonDenominator(
     lpFees,
     vwapPriceScaled,
     denominatorIsCurrency0
   );
 
-  const lpRewards = calculateRewardDistribution(lpData, config.rewardAmount);
+  const lpRewards = calculateRewardDistribution(
+    lpData,
+    poolConfig.rewardAmount
+  );
 
   // write to the checkpoint file
   const newCheckpoint: CheckpointData = {
     blockRange: {
-      network: config.network,
-      startBlock: config.startBlock,
-      endBlock: config.endBlock,
+      network: config.chains.find((c) => c.id === poolConfig.network)!.name,
+      startBlock: poolConfig.startBlock,
+      endBlock: poolConfig.endBlock,
     },
     poolId: poolId,
+    denominator: poolConfig.denominator,
+    currency0: poolConfig.currency0,
+    currency1: poolConfig.currency1,
     positions: Array.from(finalPositions.entries()),
     lpData: Array.from(lpRewards.entries()),
   };
-  const outputFile = `backend/checkpoints/${config.network}-${config.name}-${period}.json`;
+  const outputFile = `backend/checkpoints/${poolConfig.name}-${period}.json`;
   await writeFile(
     outputFile,
     JSON.stringify(
@@ -517,7 +537,6 @@ async function processFees(
       });
       updatePosition(positions, tokenId, {
         lastOwner: lp,
-        poolId: poolId,
         feeGrowthInsidePeriod0: feesEarnedThisPeriod0,
         feeGrowthInsidePeriod1: feesEarnedThisPeriod1,
       });
@@ -560,7 +579,6 @@ function updatePosition(
   key: bigint,
   updates: {
     lastOwner?: Address;
-    poolId?: `0x${string}`;
     tickLower?: number;
     tickUpper?: number;
     liquidity?: bigint;
@@ -581,7 +599,6 @@ function updatePosition(
     // create new position entry; first validate required fields
     if (
       !updates.lastOwner ||
-      !updates.poolId ||
       updates.tickLower === undefined ||
       updates.tickUpper === undefined ||
       updates.liquidity === undefined ||
@@ -908,11 +925,10 @@ async function getVolumeWeightedAveragePriceScaled(
   client: PublicClient,
   poolId: `0x${string}`,
   stateView: Address,
-  positionManager: Address,
   startBlock: bigint,
   endBlock: bigint,
-  denominator: Address
-): Promise<[bigint, boolean]> {
+  denominatorIsCurrency0: boolean
+): Promise<bigint> {
   // fetch fee growth at start and end of period
   const { feeGrowthDelta0, feeGrowthDelta1 } =
     await getFeeGrowthGlobalsPeriodDelta(
@@ -923,30 +939,16 @@ async function getVolumeWeightedAveragePriceScaled(
       endBlock
     );
 
-  // the position manager uses only the first 25 bytes of the poolId
-  const [currency0, currency1] = await client.readContract({
-    address: positionManager,
-    abi: POSITION_MANAGER_ABI,
-    functionName: "poolKeys",
-    args: [poolId.slice(0, 52) as `0x${string}`],
-  });
-
-  // Identify whether denominator is token0 or token1
-  const denominatorIsCurrency0 = getAddress(currency0) === denominator;
-  const denominatorIsCurrency1 = getAddress(currency1) === denominator;
-  if (!denominatorIsCurrency0 && !denominatorIsCurrency1) {
-    throw new Error("denominator not found in pool");
-  }
   // Calculate VWAP based on fee ratio, representing average exchange rate for period
   let scaledVwapPrice: bigint;
   if (denominatorIsCurrency0) {
     // Price = token1 / token0
     scaledVwapPrice = (feeGrowthDelta0 * PRECISION) / feeGrowthDelta1;
-    return [scaledVwapPrice, denominatorIsCurrency0];
+    return scaledVwapPrice;
   } else {
     // Price = token0 / token1
     scaledVwapPrice = (feeGrowthDelta1 * PRECISION) / feeGrowthDelta0;
-    return [scaledVwapPrice, denominatorIsCurrency0];
+    return scaledVwapPrice;
   }
 }
 
@@ -1204,32 +1206,30 @@ async function initialize(
   return initialPositions;
 }
 
-function setConfig(poolId_: `0x${string}`, period: number) {
+function setPoolConfig(poolId_: `0x${string}`, period: number) {
   const pool = POOLS.find((p) => p.poolId === poolId_);
   if (!pool) throw new Error("Unrecognized pool ID");
 
-  const { network, denominator, name } = pool;
-  const { poolManager, positionManager, stateView, rpcEnv } = NETWORKS[network];
-  const rpcUrl =
-    process.env[rpcEnv] ??
-    (() => {
-      throw new Error(`${rpcEnv} environment variable is not set`);
-    })();
-  const checkpointFile = `backend/checkpoints/${pool.network}-${pool.name}-${
-    period - 1
-  }.json`;
+  const { network, denominator, name, currency0, currency1 } = pool;
+  if (!(network in NETWORKS)) {
+    throw new Error(`Network ${network} is not supported`);
+  }
+  const { poolManager, positionManager, stateView } =
+    NETWORKS[network as SupportedChainId];
+  const checkpointFile = `backend/checkpoints/${pool.name}-${period - 1}.json`;
 
   const { reward, start, end } = buildPeriodConfig(pool, period);
 
   return {
     network,
     name,
-    rpcUrl,
     poolId: pool.poolId,
     poolManager,
     positionManager,
     stateView,
     denominator,
+    currency0,
+    currency1,
     rewardAmount: reward,
     startBlock: start,
     endBlock: end,
@@ -1254,7 +1254,7 @@ function parseCLIArgs(args: string[]): [`0x${string}`, number] {
 }
 
 function buildPeriodConfig(pool: PoolConfig, period: number) {
-  const networkCfg = NETWORKS[pool.network];
+  const networkCfg = NETWORKS[pool.network as SupportedChainId];
   if (period === 0) {
     return {
       reward: INITIALIZE_REWARD_AMOUNT,
@@ -1270,4 +1270,19 @@ function buildPeriodConfig(pool: PoolConfig, period: number) {
     period === 1 ? pool.rewardAmounts.FIRST : pool.rewardAmounts.PERIOD;
 
   return { reward, start, end };
+}
+
+// identifies whether denominator is token0 or token1
+function denominatorIsCurrencyZero(
+  denominator: Address,
+  currency0: Address,
+  currency1: Address
+): boolean {
+  const denominatorIsCurrency0 = getAddress(currency0) === denominator;
+  const denominatorIsCurrency1 = getAddress(currency1) === denominator;
+  if (!denominatorIsCurrency0 && !denominatorIsCurrency1) {
+    throw new Error("denominator not found in pool");
+  }
+
+  return denominatorIsCurrency0;
 }

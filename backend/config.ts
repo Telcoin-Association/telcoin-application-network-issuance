@@ -2,13 +2,14 @@ import * as dotenv from "dotenv";
 dotenv.config();
 
 import { Address, getAddress } from "viem";
-import { mainnet, polygon } from "viem/chains";
+import { base, mainnet, polygon } from "viem/chains";
 
 // TODO: add Telcoin Network to the list of supported chains and to the ChainId enum
 // see: https://viem.sh/docs/clients/chains.html#build-your-own
 export enum ChainId {
   Polygon = 137,
   Mainnet = 1,
+  Base = 8453,
 }
 
 export type Token = {
@@ -18,9 +19,13 @@ export type Token = {
 };
 
 export const config = {
-  reorgSafeDepth: { [ChainId.Polygon]: 500n, [ChainId.Mainnet]: 64n },
+  reorgSafeDepth: {
+    [ChainId.Polygon]: 500n,
+    [ChainId.Mainnet]: 64n,
+    [ChainId.Base]: 300n,
+  },
   blocksSyncTimer: 10000, // 10 seconds
-  chains: [polygon, mainnet], // TODO: add Telcoin Network to the list of supported chains (mainnet can be replaced, tests require >=2 chains)
+  chains: [polygon, mainnet, base], // TODO: add Telcoin Network to the list of supported chains (mainnet can be replaced, tests require >=2 chains)
   canonicalDecimals: 18n, // Amounts are scaled to this number of decimals
   blocksSyncBatchSize: 50, // number of blocks to sync in each batch in sync.ts
   weekZeroStartTimestamp: 1684348360n, // timestamp of the start of week zero
@@ -48,7 +53,7 @@ export const config = {
       (() => {
         throw new Error("MAINNET_RPC_URL environment variable is not set");
       })(),
-    // [ChainId.TelcoinNetwork]: ...
+    [ChainId.Base]: process.env.BASE_RPC_URL,
   },
   telToken: {
     [ChainId.Polygon]: {

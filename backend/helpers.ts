@@ -13,6 +13,7 @@ import { tanIssuanceHistories } from "./data/tanIssuanceHistories";
 import { createHash, randomInt } from "crypto";
 import * as xlsx from "xlsx";
 import { UserRewardEntry } from "calculators/ICalculator";
+import { PublicActionsL1 } from "viem/zksync";
 
 export interface Update<T> {
   progress: number;
@@ -97,7 +98,7 @@ export function flatten2DArray<T>(arr: T[][]) {
   return arr.reduce((acc, val) => acc.concat(val), []);
 }
 
-export function createRpcClient(chain: ChainId) {
+export function createRpcClient(chain: ChainId): PublicClient {
   const chainObj = config.chains.find((c) => c.id === chain);
   if (!chainObj) {
     throw new Error(`Unsupported chain: ${chain}`);
@@ -105,7 +106,7 @@ export function createRpcClient(chain: ChainId) {
   return viem.createPublicClient({
     chain: chainObj,
     transport: viem.http(config.rpcUrls[chain]),
-  });
+  }) as PublicClient;
 }
 
 export function observableToPromise<T>(obs: Observable<Update<T>>): Promise<T> {
