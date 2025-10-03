@@ -145,6 +145,8 @@ const POLYGON_USDC_EMXN: PoolConfig = {
 };
 
 export const POOLS = [BASE_ETH_TEL, POLYGON_ETH_TEL, POLYGON_USDC_EMXN];
+export const PERIODS = Array.from({ length: 8 }, (_, i) => i); // [0, 1, 2, 3, 4, 5, 6, 7]
+export const TELX_BASE_PATH = "backend/checkpoints";
 
 export type SupportedChainId = ChainId.Polygon | ChainId.Base;
 const NETWORKS = {
@@ -245,7 +247,7 @@ async function main() {
     positions: Array.from(finalPositions.entries()),
     lpData: Array.from(lpRewards.entries()),
   };
-  const outputFile = `backend/checkpoints/${poolConfig.name}-${period}.json`;
+  const outputFile = `${TELX_BASE_PATH}/${poolConfig.name}-${period}.json`;
   await writeFile(
     outputFile,
     JSON.stringify(
@@ -1216,7 +1218,7 @@ function setPoolConfig(poolId_: `0x${string}`, period: number) {
   }
   const { poolManager, positionManager, stateView } =
     NETWORKS[network as SupportedChainId];
-  const checkpointFile = `backend/checkpoints/${pool.name}-${period - 1}.json`;
+  const checkpointFile = `${TELX_BASE_PATH}/${pool.name}-${period - 1}.json`;
 
   const { reward, start, end } = buildPeriodConfig(pool, period);
 

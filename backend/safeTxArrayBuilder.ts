@@ -4,7 +4,8 @@ import * as path from "path";
 import { NetworkConfig } from "./helpers";
 import { ChainId, config } from "./config";
 import { UserMetadata } from "./calculators/ICalculator";
-import { POOLS } from "./calculators/TELxRewardsCalculator";
+import { PERIODS, POOLS } from "./calculators/TELxRewardsCalculator";
+
 // interface for the incentives output JSON file, eg `staker_incentives.json`
 export interface IncentivesJson {
   blockRanges: NetworkConfig[];
@@ -66,8 +67,8 @@ async function main() {
     } else {
       // project === "telx"
       const poolConfigs = POOLS.map((pool) => ({
-        fileName: `backend/checkpoints/${pool.network}-${pool.name}-${period}.json`,
-        poolIdentifier: `${pool.network}-${pool.name}`,
+        fileName: `backend/checkpoints/${pool.name}-${period}.json`,
+        poolIdentifier: `${pool.name}`,
       }));
       console.log("Reading TELx reward files...");
 
@@ -262,7 +263,7 @@ async function writeOutputFiles(
       // use pool identifier to divert output file target path
       const outputFilePath = path.join(
         outputDir,
-        `safe_param_period_${period}_telx__${poolIdentifier}_chunk_${chunkIndex}.json`
+        `safe_param_period_${period}_telx_${poolIdentifier}_chunk_${chunkIndex}.json`
       );
       await fs.writeFile(outputFilePath, JSON.stringify(outputData, null, 2));
       console.log(
@@ -270,5 +271,123 @@ async function writeOutputFiles(
       );
       chunkIndex++;
     }
+  }
+}
+
+/**
+ * @dev Utility to sum all rewards across rewards files for specified periods
+ * @todo This is a utility function, not part of the main flow. It can be invoked manually when necessary
+ */
+async function sumMultiplePeriods(periods: number[], project: "tan" | "telx") {
+  // parse reward arrays and sum into aggregate map of address => totalReward
+  const aggregateMap: Map<string, bigint> = new Map();
+  for (const period of periods) {
+    if (project === "tan") {
+      // fetch content of each specified period's file as array
+      const fileName = `rewards/staker_rewards_period_${period}.json`;
+      console.log(`Reading TAN rewards file: ${fileName}`);
+      try {
+        const rawData = await fs.readFile(fileName, "utf-8");
+        const jsonData = JSON.parse(rawData) as IncentivesJson;
+
+        // sum into map
+        for (const stakerIncentive of jsonData.stakerIncentives) {
+          const rewardee = stakerIncentive.address;
+          const reward = BigInt(stakerIncentive.reward);
+          if (reward === 0n) continue;
+
+          const currentTotal = aggregateMap.get(rewardee) || 0n;
+          aggregateMap.set(rewardee, currentTotal + reward);
+        }
+      } catch (err) {
+        console.error(`Unable to parse file at ${fileName}`);
+        throw err;
+      }
+    } else {
+      // project === "telx"
+      const poolConfigs = POOLS.map((pool) => ({
+        fileName: `backend/checkpoints/${pool.name}-${period}.json`,
+        poolIdentifier: `${pool.name}`,
+      }));
+      console.log(`Reading TELx reward files for period ${period}`);
+
+      for (const config of poolConfigs) {
+        try {
+          console.log(`\nProcessing pool: ${config.poolIdentifier}`);
+
+          // fetch content of each specified period's file as array
+          const rawData = await fs.readFile(config.fileName, "utf-8");
+          const jsonData = JSON.parse(rawData) as TelxIncentivesJson;
+
+          if (!jsonData.lpData || jsonData.lpData.length === 0)
+            throw new Error(`No rewards in ${config.fileName}`);
+
+          for (const [address, data] of jsonData.lpData) {
+            const reward = BigInt(data.reward.slice(0, -1));
+            if (reward === 0n) continue;
+            const currentTotal = aggregateMap.get(address) || 0n;
+            aggregateMap.set(address, currentTotal + reward);
+          }
+        } catch (err) {
+          throw new Error(
+            `Could not process file for pool ${config.poolIdentifier}`
+          );
+        }
+      }
+    }
+  }
+
+  // convert map back to output format and write to file
+  let totalAmount = 0n;
+  if (project === "tan") {
+    const issuanceRewards: TanOutput = [];
+    for (const [address, totalReward] of aggregateMap) {
+      totalAmount += totalReward;
+      issuanceRewards.push([address, totalReward.toString()]);
+    }
+    // write to file
+    const outputFilePath = path.join(
+      __dirname,
+      "temp",
+      `safe_param_periods_${periods.join("_")}_tan_aggregate.json`
+    );
+    await fs.writeFile(
+      outputFilePath,
+      JSON.stringify(issuanceRewards, null, 2)
+    );
+    console.log(
+      `\nAggregate TAN rewards for periods ${periods.join(
+        ", "
+      )} written to:\n  ${outputFilePath}`
+    );
+
+    return issuanceRewards;
+  } else {
+    // project === 'telx'
+    const wallets: string[] = [];
+    const amounts: string[] = [];
+
+    for (const [address, reward] of aggregateMap) {
+      totalAmount += reward;
+      wallets.push(address);
+      amounts.push(reward.toString());
+    }
+    console.log(
+      `Total amount of TEL in raw EVM value to approve (no decimals applied): ${totalAmount}`
+    );
+    const outputFilePath = path.join(
+      __dirname,
+      "temp",
+      `safe_param_periods_${periods.join("_")}_telx_aggregate.json`
+    );
+    const outputData = { wallets, amounts };
+    await fs.writeFile(outputFilePath, JSON.stringify(outputData, null, 2));
+    console.log(
+      `\nAggregate TELx rewards for periods ${periods.join(
+        ", "
+      )} written to:\n  ${outputFilePath}`
+    );
+
+    return outputData;
   }
 }

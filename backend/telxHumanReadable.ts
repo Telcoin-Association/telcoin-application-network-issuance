@@ -3,10 +3,12 @@ import { promises as fs } from "fs";
 import { formatUnits, Address, erc20Abi, zeroAddress, getAddress } from "viem";
 import {
   LPData,
+  PERIODS,
   PoolConfig,
   POOLS,
   PositionState,
   SupportedChainId,
+  TELX_BASE_PATH,
 } from "./calculators/TELxRewardsCalculator";
 import { createRpcClient, jsonReviver } from "./helpers";
 
@@ -27,15 +29,13 @@ type PositionEntry = [string, PositionState];
 type LPDataEntry = [Address, LPData];
 
 const TEL_DECIMALS = 2;
-const PERIODS = Array.from({ length: 8 }, (_, i) => i); // [0, 1, 2, 3, 4, 5, 6, 7]
-const BASE_PATH = "backend/checkpoints";
 
 async function processFiles() {
   for (const pool of POOLS) {
     for (const period of PERIODS) {
       const fileNameBase = `${pool.name}-${period}`;
-      const inputFile = `${BASE_PATH}/${fileNameBase}.json`;
-      const outputFile = `${BASE_PATH}/${fileNameBase}.xlsx`;
+      const inputFile = `${TELX_BASE_PATH}/${fileNameBase}.json`;
+      const outputFile = `${TELX_BASE_PATH}/${fileNameBase}.xlsx`;
 
       try {
         // Check if the file exists before trying to process
