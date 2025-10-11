@@ -1,20 +1,28 @@
 # Activating TEL Issuance at the Application Layer
 
-This codebase is designed to calculate and distribute TAN incentives, establishing the platform's application layer incentive mechanisms. These mechanisms must be voted on and approved by the TAN council.
+This codebase is designed to calculate and distribute TAN and TELx incentives, establishing the platform's application layer incentive mechanisms. These mechanisms must be voted on and approved by the TAN and TELx councils.
 
-With 194.44M TEL in the TAN Council Safe, weekly distributions of TEL will flow to stakers based on their share of platform production. This initiates the unified staking model and activates essential platform adoption incentives.
+With 194.44M TEL in the TAN Council Safe and 60.33M TEL in the TELx Council Safe, weekly distributions of TEL will flow to stakers based on their share of platform production. This initiates unified staking and liquidity provision models and activates essential platform adoption incentives while optimizing for user experiences.
 
 ## Motivation
 
-The Telcoin Platform requires active application layer participation to achieve its vision of universal mobile-enabled blockchain services. By implementing TEL issuance for stakers, we aim to:
+The Telcoin Platform requires active application layer participation to achieve its vision of universal mobile-enabled blockchain services. By implementing TEL issuance for stakers and liquidity providers, we aim to:
 
 - **Drive user adoption through staker referrals**
+- **Improve swap UX and onchain liquidity through incentivized liquidity**
 - **Foster an on-chain ecosystem aligned with natural market incentives**
 - **Empower the entire value chain with ownership rights**, fulfilling the Association's constitutional mandate for inclusive, decentralized governance
 
-While multiple incentive programs are planned for the future, the Staker Incentives Calculator implementation, which issues incentives based on the TANIP-1 referral program, is currently in production. A future issuance program in development is the Developer incentives, which will aim to encourage GSMA member application development.
+While multiple incentive programs are planned for the future such as Developer incentives, which will aim to encourage GSMA member application development, the programs currently in production include:
+
+- Staker Incentives Calculator implementation, which issues incentives based on the TANIP-1 referral program, has been paused as of Period 26
+- TELx Rewards Calculator implementation, which issues liquidity incentives to LPs via the use of the Uniswap v4 hook `TELxIncentivesHook`
+
+[The Uniswap v4 hook used for TELx liquidity incentives can be viewed here](https://github.com/Telcoin-Association/telcoin-laboratories-contracts/blob/foundry/contracts/telx/core/TELxIncentiveHook.sol)
 
 ## Staker Issuance Specification
+
+TANIP-1 Staker Incentives Issuance has been paused for the time being.
 
 ### TEL Distribution Framework
 
