@@ -30,6 +30,7 @@ type LPDataEntry = [Address, LPData];
 
 const TEL_DECIMALS = 2;
 
+/// @dev Usage: `yarn ts-node backend/telxHumanReadable.ts`
 async function processFiles() {
   for (const pool of POOLS) {
     for (const period of PERIODS) {
@@ -40,6 +41,18 @@ async function processFiles() {
       try {
         // Check if the file exists before trying to process
         await fs.access(inputFile);
+
+        // Check if the output file already exists
+        try {
+          await fs.access(outputFile);
+          console.log(
+            `\n--- Skipping: Output file already exists: ${outputFile} ---`
+          );
+          continue;
+        } catch (error: unknown) {
+          // Output file doesn't exist, proceed with conversion
+        }
+
         await convertFile(inputFile, outputFile, pool);
       } catch (error: unknown) {
         if (error && typeof error === "object" && "code" in error) {
