@@ -153,7 +153,7 @@ async function generateFakeData(
         developerTotal +
           scaleDecimals(
             newClaimable - oldClaimable,
-            config.telToken[plugin.chain].decimals,
+            getTelTokenDecimals(plugin.chain),
             config.canonicalDecimals
           )
       );
@@ -166,6 +166,15 @@ async function generateFakeData(
     simplePlugins,
     referralsPerDeveloper,
   };
+}
+
+function getTelTokenDecimals(chain: ChainId): bigint {
+  const telTokens = config.telToken as Record<number, { decimals: bigint }>;
+  const entry = telTokens[chain];
+  if (!entry) {
+    throw new Error(`TEL token decimals not configured for chain ${chain}`);
+  }
+  return entry.decimals;
 }
 
 describe("DeveloperIncentivesCalculator", () => {
@@ -185,10 +194,12 @@ describe("DeveloperIncentivesCalculator", () => {
         {
           [ChainId.Polygon]: 1n,
           [ChainId.Mainnet]: 1n,
+          [ChainId.Base]: 1n,
         },
         {
           [ChainId.Polygon]: 1n,
           [ChainId.Mainnet]: 1n,
+          [ChainId.Base]: 1n,
         }
       );
       const calculatedReferralsPerDeveloper =

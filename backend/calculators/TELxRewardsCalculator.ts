@@ -489,10 +489,16 @@ async function processFees(
 
       const subperiodStart = prevChange.blockNumber;
       const subperiodEnd = currChange.blockNumber;
+      const effectiveSubperiodEnd =
+        subperiodEnd > subperiodStart ? subperiodEnd - 1n : subperiodEnd;
       const liquidityForSubperiod = prevChange.newLiquidityAmount;
 
       // skip if no liquidity or if the period is zero blocks
-      if (liquidityForSubperiod === 0n || startBlock === endBlock) {
+      if (
+        liquidityForSubperiod === 0n ||
+        startBlock === endBlock ||
+        effectiveSubperiodEnd < subperiodStart
+      ) {
         continue;
       }
 
@@ -513,7 +519,7 @@ async function processFees(
         position.tickLower,
         position.tickUpper,
         tickSpacing,
-        subperiodEnd
+        effectiveSubperiodEnd
       );
 
       // calculate subperiod's fees and add to period total for this position
@@ -551,7 +557,7 @@ async function processFees(
 }
 
 // calculates fees earned for the given `liquidity` between start and end checkpoints
-function calculateFees(
+export function calculateFees(
   liquidity: bigint,
   feeGrowthInside0End: bigint,
   feeGrowthInside1End: bigint,
@@ -559,15 +565,11 @@ function calculateFees(
   feeGrowthInside1Start: bigint
 ): { token0Fees: bigint; token1Fees: bigint } {
   const Q128 = 2n ** 128n;
-  // underflow protection: return 0 if current is less than last. this also ignores massive fee growth gained by JIT liquidity actions
+  const MAX_UINT256 = 2n ** 256n;
   const feeGrowthDelta0 =
-    feeGrowthInside0End >= feeGrowthInside0Start
-      ? feeGrowthInside0End - feeGrowthInside0Start
-      : 0n;
+    (feeGrowthInside0End - feeGrowthInside0Start + MAX_UINT256) % MAX_UINT256;
   const feeGrowthDelta1 =
-    feeGrowthInside1End >= feeGrowthInside1Start
-      ? feeGrowthInside1End - feeGrowthInside1Start
-      : 0n;
+    (feeGrowthInside1End - feeGrowthInside1Start + MAX_UINT256) % MAX_UINT256;
 
   return {
     token0Fees: (feeGrowthDelta0 * liquidity) / Q128,
@@ -661,6 +663,23 @@ async function getFeeGrowthInsideOffchain(
   tickSpacing: number,
   blockNumber: bigint
 ): Promise<{ feeGrowthInside0X128: bigint; feeGrowthInside1X128: bigint }> {
+  try {
+    const [feeGrowthInside0X128, feeGrowthInside1X128] =
+      await client.readContract({
+        address: stateView,
+        abi: STATE_VIEW_ABI,
+        functionName: "getFeeGrowthInside",
+        args: [poolId, tickLower, tickUpper],
+        blockNumber,
+      });
+    return { feeGrowthInside0X128, feeGrowthInside1X128 };
+  } catch (error) {
+    console.warn(
+      "getFeeGrowthInside call failed, falling back to manual computation",
+      error
+    );
+  }
+
   const [, currentTick] = await client.readContract({
     address: stateView,
     abi: STATE_VIEW_ABI,
@@ -677,7 +696,7 @@ async function getFeeGrowthInsideOffchain(
       blockNumber,
     });
 
-  // find nearest initialized ticks by searching DOWNWARD for both
+  // find nearest initialized ticks: lower searches downward, upper searches upward
   const safeTickLower = await findInitializedTickUnder(
     client,
     poolId,
@@ -686,7 +705,7 @@ async function getFeeGrowthInsideOffchain(
     tickSpacing,
     blockNumber
   );
-  const safeTickUpper = await findInitializedTickUnder(
+  const safeTickUpper = await findInitializedTickAbove(
     client,
     poolId,
     stateView,
@@ -748,12 +767,30 @@ async function getFeeGrowthInsideOffchain(
       feeGrowthGlobal1X128 - upperTickInfo.feeGrowthOutside1X128;
   }
 
-  const feeGrowthInside0X128 =
-    feeGrowthGlobal0X128 - feeGrowthBelow0X128 - feeGrowthAbove0X128;
-  const feeGrowthInside1X128 =
-    feeGrowthGlobal1X128 - feeGrowthBelow1X128 - feeGrowthAbove1X128;
+  const feeGrowthInside0X128 = calculateFeeGrowthInside(
+    feeGrowthGlobal0X128,
+    feeGrowthBelow0X128,
+    feeGrowthAbove0X128
+  );
+  const feeGrowthInside1X128 = calculateFeeGrowthInside(
+    feeGrowthGlobal1X128,
+    feeGrowthBelow1X128,
+    feeGrowthAbove1X128
+  );
 
   return { feeGrowthInside0X128, feeGrowthInside1X128 };
+}
+
+export function calculateFeeGrowthInside(
+  feeGrowthGlobal: bigint,
+  feeGrowthBelow: bigint,
+  feeGrowthAbove: bigint
+): bigint {
+  const MAX_UINT256 = 2n ** 256n;
+  return (
+    (feeGrowthGlobal - feeGrowthBelow - feeGrowthAbove + MAX_UINT256) %
+    MAX_UINT256
+  );
 }
 
 // Helper function to destructure TickInfo results, which come back as an array
@@ -770,7 +807,7 @@ function parseTickInfo(tickInfo: readonly [bigint, bigint, bigint, bigint]): {
 /**
  * Finds the highest safe initialized tick under `startTick` by searching downward (inclusive)
  */
-async function findInitializedTickUnder(
+export async function findInitializedTickUnder(
   client: PublicClient,
   poolId: `0x${string}`,
   stateView: Address,
@@ -813,6 +850,52 @@ async function findInitializedTickUnder(
         if (initialized) {
           // Calculate the actual tick index
           const tickIndex = (currentWord * 256 + i) * tickSpacing;
+          return tickIndex;
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Finds the lowest safe initialized tick above `startTick` by searching upward (inclusive)
+ */
+export async function findInitializedTickAbove(
+  client: PublicClient,
+  poolId: `0x${string}`,
+  stateView: Address,
+  startTick: number,
+  tickSpacing: number,
+  blockNumber: bigint,
+  searchLimit: number = 2560 // Safety limit: search up to 10 words
+): Promise<number | null> {
+  const startWord = tickToWord(startTick, tickSpacing);
+
+  let startCompressed = Math.floor(startTick / tickSpacing);
+  if (startTick < 0 && startTick % tickSpacing !== 0) {
+    startCompressed -= 1;
+  }
+  const startBitPos = startCompressed & 255;
+
+  for (let wordOffset = 0; wordOffset < searchLimit; wordOffset++) {
+    const currentWord = startWord + wordOffset;
+
+    const bitmap = await getTickBitmap(
+      client,
+      poolId,
+      stateView,
+      currentWord,
+      blockNumber
+    );
+
+    if (bitmap !== 0n) {
+      const startBit = wordOffset === 0 ? startBitPos : 0;
+
+      for (let bit = startBit; bit < 256; bit++) {
+        if ((bitmap & (1n << BigInt(bit))) !== 0n) {
+          const tickIndex = (currentWord * 256 + bit) * tickSpacing;
           return tickIndex;
         }
       }
