@@ -93,6 +93,23 @@ on-chain fee growth, while the clamped window collapses to a single tick and
 forces `getFeeGrowthInside` to return zero even though the checkpoint contains
 the wallet’s full allocation.
 
+
+
+### Post-fix comparison
+
+After applying the symmetric clamp fix, use the following helper (which replicates the new behaviour) to verify that the fee growth no longer collapses:
+
+```bash
+node poc/scripts/compareFeeGrowthClamped.js \
+  --checkpoint backend/checkpoints/base-ETH-TEL-8.json \
+  --tokenId 353422 \
+  --poolId 0xb6d004fca4f9a34197862176485c45ceab7117c86f07422d1fe3d9cfd6e9d1da \
+  --stateView 0xa3c0c9b65bad0b08107aa264b0f3db444b867a71 \
+  --tickSpacing 60 \
+  --rpc https://base-mainnet.<provider>.com/v2/<key>
+```
+
+Swap in the Polygon parameters to check the Polygon pool.
 ## Control Runs
 
 Run the helper below to discover positions whose clamped tick bounds match the originals **and** those that collapse. It prints two CSV sections: one for controls and one for positions where the clamped ticks differ.

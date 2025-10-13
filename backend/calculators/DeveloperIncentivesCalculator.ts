@@ -14,6 +14,15 @@ import {
 } from "../helpers";
 import { ChainId, config } from "../config";
 
+function getTelTokenDecimals(chain: ChainId): bigint {
+  const telTokens = config.telToken as Record<number, { decimals: bigint }>;
+  const entry = telTokens[chain];
+  if (!entry) {
+    throw new Error(`TEL token decimals not configured for chain ${chain}`);
+  }
+  return entry.decimals;
+}
+
 /**
  * This class calculates TAN developers' referrals incentives.
  *
@@ -112,9 +121,10 @@ export class DeveloperIncentivesCalculator implements ICalculator<bigint> {
 
       // process each event to identify claimable amount delta in referrals
       for (const event of claimableIncreasedEvents) {
+        const telTokenDecimals = getTelTokenDecimals(plugin.chain);
         const amount = scaleDecimals(
           event.newClaimable - event.oldClaimable,
-          config.telToken[plugin.chain].decimals,
+          telTokenDecimals,
           config.canonicalDecimals
         );
 
