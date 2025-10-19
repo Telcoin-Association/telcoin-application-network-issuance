@@ -145,7 +145,7 @@ const POLYGON_USDC_EMXN: PoolConfig = {
 };
 
 export const POOLS = [BASE_ETH_TEL, POLYGON_ETH_TEL, POLYGON_USDC_EMXN];
-export const PERIODS = Array.from({ length: 8 }, (_, i) => i); // [0, 1, 2, 3, 4, 5, 6, 7]
+export const PERIODS = Array.from({ length: 9 }, (_, i) => i); // [0, 1, 2, 3, 4, 5, 6, 7, 8]
 export const TELX_BASE_PATH = "backend/checkpoints";
 
 export type SupportedChainId = ChainId.Polygon | ChainId.Base;
@@ -155,14 +155,15 @@ const NETWORKS = {
     positionManager: getAddress("0x1Ec2eBf4F37E7363FDfe3551602425af0B3ceef9"),
     stateView: getAddress("0x5ea1bd7974c8a611cbab0bdcafcb1d9cc9b3ba5a"),
     periodStarts: [
-      74_970_501n, // programStart
-      75_417_061n,
-      75_697_435n,
-      75_981_195n,
-      76_265_454n,
-      76_539_088n,
-      76_822_629n,
-      77_126_356n,
+      74_970_501n, // programStart aug 9
+      75_417_061n, // aug 20
+      75_697_435n, // aug 27
+      75_981_195n, // sep 3
+      76_265_454n, // sep 10
+      76_539_088n, // sep 17
+      76_822_629n, // sep 24
+      77_126_356n, // oct 1
+      77_390_383n, // oct 8
     ],
   },
   [ChainId.Base]: {
@@ -170,14 +171,15 @@ const NETWORKS = {
     positionManager: getAddress("0x7C5f5A4bBd8fD63184577525326123B519429bDc"),
     stateView: getAddress("0xa3c0c9b65bad0b08107aa264b0f3db444b867a71"),
     periodStarts: [
-      33_954_128n, // programStart
-      34_429_327n,
-      34_731_727n,
-      35_034_127n,
-      35_336_526n,
-      35_638_926n,
-      35_941_326n,
-      36_265_326n,
+      33_954_128n, // programStart aug 9
+      34_429_327n, // aug 20
+      34_731_727n, // aug 27
+      35_034_127n, // sep 3
+      35_336_526n, // sep 10
+      35_638_926n, // sep 17
+      35_941_326n, // sep 24
+      36_265_326n, // oct 1
+      36_546_126n, // oct 8
     ],
   },
 };
@@ -1249,8 +1251,8 @@ function parseCLIArgs(args: string[]): [`0x${string}`, number] {
     throw new Error("Invalid poolId format");
   }
   const period = Number(periodStr);
-  if (isNaN(period) || period < 0 || period > 7) {
-    throw new Error("Invalid period, must be 0–7");
+  if (isNaN(period) || period < 0 || period > 8) {
+    throw new Error("Invalid period, must be 0–8");
   }
   return [poolId as `0x${string}`, period];
 }
