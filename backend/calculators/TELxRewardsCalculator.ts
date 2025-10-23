@@ -145,7 +145,7 @@ const POLYGON_USDC_EMXN: PoolConfig = {
 };
 
 export const POOLS = [BASE_ETH_TEL, POLYGON_ETH_TEL, POLYGON_USDC_EMXN];
-export const PERIODS = Array.from({ length: 9 }, (_, i) => i); // [0, 1, 2, 3, 4, 5, 6, 7, 8]
+export const PERIODS = Array.from({ length: 10 }, (_, i) => i);
 export const TELX_BASE_PATH = "backend/checkpoints";
 
 export type SupportedChainId = ChainId.Polygon | ChainId.Base;
@@ -164,6 +164,7 @@ const NETWORKS = {
       76_822_629n, // sep 24
       77_126_356n, // oct 1
       77_390_383n, // oct 8
+      77_690_848n, // oct 15
     ],
   },
   [ChainId.Base]: {
@@ -180,6 +181,7 @@ const NETWORKS = {
       35_941_326n, // sep 24
       36_265_326n, // oct 1
       36_546_126n, // oct 8
+      36_848_526n, // oct 15
     ],
   },
 };
@@ -1251,7 +1253,7 @@ function parseCLIArgs(args: string[]): [`0x${string}`, number] {
     throw new Error("Invalid poolId format");
   }
   const period = Number(periodStr);
-  if (isNaN(period) || period < 0 || period > 8) {
+  if (isNaN(period) || period < 0 || period > 9) {
     throw new Error("Invalid period, must be 0–8");
   }
   return [poolId as `0x${string}`, period];
