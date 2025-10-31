@@ -145,7 +145,7 @@ const POLYGON_USDC_EMXN: PoolConfig = {
 };
 
 export const POOLS = [BASE_ETH_TEL, POLYGON_ETH_TEL, POLYGON_USDC_EMXN];
-export const PERIODS = Array.from({ length: 11 }, (_, i) => i);
+export const PERIODS = Array.from({ length: 12 }, (_, i) => i);
 export const TELX_BASE_PATH = "backend/checkpoints";
 
 export type SupportedChainId = ChainId.Polygon | ChainId.Base;
@@ -166,6 +166,7 @@ const NETWORKS = {
       77_390_383n, // oct 8
       77_690_848n, // oct 15
       77_993_212n, // oct 22
+      78_295_585n, // oct 29
     ],
   },
   [ChainId.Base]: {
@@ -184,6 +185,7 @@ const NETWORKS = {
       36_546_126n, // oct 8
       36_848_526n, // oct 15
       37_150_926n, // oct 22
+      37_453_326n, // oct 29
     ],
   },
 };
