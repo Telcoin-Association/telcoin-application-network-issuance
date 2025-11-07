@@ -46,6 +46,7 @@ interface LiquidityChange {
   blockNumber: bigint;
   newLiquidityAmount: bigint;
   owner: Address;
+  isSubscribed: boolean;
 }
 
 export interface LPData {
@@ -103,6 +104,7 @@ const POSITION_REGISTRY_ABI = parseAbi([
   "function JIT_WEIGHT() external view returns (uint256)",
   "function ACTIVE_WEIGHT() external view returns (uint256)",
   "function PASSIVE_WEIGHT() external view returns (uint256)",
+  "function isTokenSubscribed(uint256 tokenId) external view returns (bool)",
 ]);
 
 // ---------------- Pool Definitions ----------------
@@ -314,16 +316,13 @@ async function updateFeesAndPositions(
     client,
     positionRegistry,
     positionManager,
-    stateView,
-    tickSpacing,
     initialPositions
   );
   // use final positions to credit fees to LPs
   const { lpData, finalPositions } = await processFees(
     poolId,
     client,
-    startBlock,
-    endBlock,
+    positionRegistry,
     stateView,
     tickSpacing,
     updatedPositions,
@@ -343,8 +342,6 @@ async function updatePositions(
   client: PublicClient,
   positionRegistry: Address,
   positionManager: Address,
-  stateView: Address,
-  tickSpacing: number,
   initialPositions: Map<bigint, PositionState>
 ): Promise<Map<bigint, PositionState>> {
   // use copy of initial positions fetched from checkpoint file
@@ -374,17 +371,32 @@ async function updatePositions(
     if (!log.args || !log.blockNumber || !log.transactionHash) continue;
     const { tokenId, newOwner, tickLower, tickUpper, newLiquidity } =
       log.args as any;
+    // Fetch subscription status AT THE BLOCK of the modification
+    const isSubscribedAtMod = await client.readContract({
+      address: positionRegistry,
+      abi: POSITION_REGISTRY_ABI,
+      functionName: "isTokenSubscribed",
+      args: [tokenId],
+      blockNumber: log.blockNumber,
+    });
 
     const currentPositionState = positions.get(tokenId);
-
     if (currentPositionState) {
       // --- Existing position ---
       if (currentPositionState.liquidityModifications.length === 0) {
         // First modification this period. Add synthetic start block
+        const isSubscribedAtStart = await client.readContract({
+          address: positionRegistry,
+          abi: POSITION_REGISTRY_ABI,
+          functionName: "isTokenSubscribed",
+          args: [tokenId],
+          blockNumber: startBlock,
+        });
         currentPositionState.liquidityModifications.push({
           blockNumber: startBlock,
           newLiquidityAmount: currentPositionState.liquidity,
           owner: currentPositionState.lastOwner,
+          isSubscribed: isSubscribedAtStart,
         });
       }
 
@@ -392,6 +404,7 @@ async function updatePositions(
         blockNumber: log.blockNumber,
         newLiquidityAmount: newLiquidity,
         owner: newOwner,
+        isSubscribed: isSubscribedAtMod,
       });
 
       positions.set(tokenId, {
@@ -406,11 +419,13 @@ async function updatePositions(
           blockNumber: startBlock,
           newLiquidityAmount: 0n,
           owner: zeroAddress,
+          isSubscribed: false,
         },
         {
           blockNumber: log.blockNumber,
           newLiquidityAmount: newLiquidity,
           owner: newOwner,
+          isSubscribed: isSubscribedAtMod,
         }, // The first "real" event
       ];
 
@@ -430,13 +445,22 @@ async function updatePositions(
 
   // loop over map again to append final subperiod chunk from last update to endBlock
   for (const [tokenId, position] of positions.entries()) {
-    const ownerAtEndBlock: Address = await client.readContract({
-      address: positionManager,
-      abi: POSITION_MANAGER_ABI,
-      functionName: "ownerOf",
-      args: [tokenId],
-      blockNumber: endBlock,
-    });
+    const [ownerAtEndBlock, isSubscribedAtEnd] = await Promise.all([
+      client.readContract({
+        address: positionManager,
+        abi: POSITION_MANAGER_ABI,
+        functionName: "ownerOf",
+        args: [tokenId],
+        blockNumber: endBlock,
+      }),
+      client.readContract({
+        address: positionRegistry,
+        abi: POSITION_REGISTRY_ABI,
+        functionName: "isTokenSubscribed",
+        args: [tokenId],
+        blockNumber: endBlock,
+      }),
+    ]);
 
     // construct new memory array which includes final chunk of time between last modification and period endBlock
     const timelinePoints: LiquidityChange[] = [];
@@ -447,16 +471,26 @@ async function updatePositions(
         positions.delete(tokenId);
         continue;
       }
+      // Get subscription status at start
+      const isSubscribedAtStart = await client.readContract({
+        address: positionRegistry,
+        abi: POSITION_REGISTRY_ABI,
+        functionName: "isTokenSubscribed",
+        args: [tokenId],
+        blockNumber: startBlock,
+      });
       // The timeline is just the start and end of the full period.
       timelinePoints.push({
         blockNumber: startBlock,
         newLiquidityAmount: position.liquidity,
         owner: position.lastOwner,
+        isSubscribed: isSubscribedAtStart,
       });
       timelinePoints.push({
         blockNumber: endBlock,
         newLiquidityAmount: position.liquidity,
         owner: ownerAtEndBlock,
+        isSubscribed: isSubscribedAtEnd,
       });
     } else {
       // Case 2: Position was created or modified during the period.
@@ -467,6 +501,7 @@ async function updatePositions(
         blockNumber: endBlock,
         newLiquidityAmount: lastChange.newLiquidityAmount, // Liquidity carries over til endBlock
         owner: ownerAtEndBlock,
+        isSubscribed: isSubscribedAtEnd,
       });
     }
 
@@ -526,8 +561,7 @@ function assignPositionDesignations(
 async function processFees(
   poolId: `0x${string}`,
   client: PublicClient,
-  startBlock: bigint,
-  endBlock: bigint,
+  positionRegistry: Address,
   stateView: Address,
   tickSpacing: number,
   positions: Map<bigint, PositionState>, // must be fully processed for the period
@@ -567,9 +601,17 @@ async function processFees(
       const prevChange = position.liquidityModifications[i - 1];
       const currChange = position.liquidityModifications[i];
 
-      // skip if no liquidity
+      // skip if no liquidity or if JIT
       const liquidityForSubperiod = prevChange.newLiquidityAmount;
-      if (liquidityForSubperiod === 0n) continue;
+      if (
+        liquidityForSubperiod === 0n ||
+        prevChange.blockNumber === currChange.blockNumber
+      )
+        continue;
+
+      // check the "isSubscribed" flag at BOTH start and end of sub-period
+      const isEligibleForRewards =
+        prevChange.isSubscribed && currChange.isSubscribed;
 
       // get fee growth values and calculate the subperiod delta
       const [feeGrowthStart, feeGrowthEnd] = await Promise.all([
@@ -613,23 +655,25 @@ async function processFees(
       totalWeightedFees0 += weightedFees0;
       totalWeightedFees1 += weightedFees1;
 
-      // aggregate fees for the owner of the position at that time
-      const lp = currChange.owner;
-      const currentFees = lpData.get(lp) ?? {
-        periodFeesCurrency0: 0n,
-        periodFeesCurrency1: 0n,
-        periodFeesCurrency0Weighted: 0n,
-        periodFeesCurrency1Weighted: 0n,
-      };
+      // if subscribed for the *entire subperiod*, aggregate fees for position owner at that time
+      if (isEligibleForRewards) {
+        const lp = currChange.owner;
+        const currentFees = lpData.get(lp) ?? {
+          periodFeesCurrency0: 0n,
+          periodFeesCurrency1: 0n,
+          periodFeesCurrency0Weighted: 0n,
+          periodFeesCurrency1Weighted: 0n,
+        };
 
-      lpData.set(lp, {
-        periodFeesCurrency0: currentFees.periodFeesCurrency0 + feesEarned0,
-        periodFeesCurrency1: currentFees.periodFeesCurrency1 + feesEarned1,
-        periodFeesCurrency0Weighted:
-          currentFees.periodFeesCurrency0Weighted + weightedFees0,
-        periodFeesCurrency1Weighted:
-          currentFees.periodFeesCurrency1Weighted + weightedFees1,
-      });
+        lpData.set(lp, {
+          periodFeesCurrency0: currentFees.periodFeesCurrency0 + feesEarned0,
+          periodFeesCurrency1: currentFees.periodFeesCurrency1 + feesEarned1,
+          periodFeesCurrency0Weighted:
+            currentFees.periodFeesCurrency0Weighted + weightedFees0,
+          periodFeesCurrency1Weighted:
+            currentFees.periodFeesCurrency1Weighted + weightedFees1,
+        });
+      }
     }
 
     updatePosition(positions, tokenId, {
