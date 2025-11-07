@@ -448,13 +448,7 @@ async function updatePositions(
   // loop over map again to append final subperiod chunk from last update to endBlock
   for (const [tokenId, position] of positions.entries()) {
     const [ownerAtEndBlock, isSubscribedAtEnd] = await Promise.all([
-      client.readContract({
-        address: positionManager,
-        abi: POSITION_MANAGER_ABI,
-        functionName: "ownerOf",
-        args: [tokenId],
-        blockNumber: endBlock,
-      }),
+      safeGetOwnerOf(client, positionManager, tokenId, endBlock),
       client.readContract({
         address: positionRegistry,
         abi: POSITION_REGISTRY_ABI,
@@ -1164,6 +1158,30 @@ async function getRegistryConfig(
     ]);
 
   return [minPassiveLifetime, jitWeight, activeWeight, passiveWeight];
+}
+
+async function safeGetOwnerOf(
+  client: PublicClient,
+  positionManager: Address,
+  tokenId: bigint,
+  blockNumber: bigint
+): Promise<Address> {
+  try {
+    const owner = await client.readContract({
+      address: positionManager,
+      abi: POSITION_MANAGER_ABI,
+      functionName: "ownerOf",
+      args: [tokenId],
+      blockNumber: blockNumber,
+    });
+    return owner;
+  } catch (error: any) {
+    // Fails if token is burned (NOT_MINTED) or other revert
+    console.warn(
+      `[safeGetOwnerOf] Failed to get owner for token ${tokenId} at block ${blockNumber}. Treating as burned. Error: ${error.message}`
+    );
+    return zeroAddress; // Treat as burned
+  }
 }
 
 /**
