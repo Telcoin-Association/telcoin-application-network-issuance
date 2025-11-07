@@ -113,7 +113,7 @@ const POSITION_REGISTRY_ABI = parseAbi([
 const BASE_ETH_TEL: PoolConfig = {
   network: ChainId.Base,
   name: "base-ETH-TEL",
-  poolId: "0xb6d004fca4f9a34197862176485c45ceab7117c86f07422d1fe3d9cfd6e9d1da",
+  poolId: "0x727b2741ac2b2df8bc9185e1de972661519fc07b156057eeed9b07c50e08829b",
   currency0: zeroAddress,
   currency1: getAddress("0x09bE1692ca16e06f536F0038fF11D1dA8524aDB1"),
   denominator: getAddress("0x09bE1692ca16e06f536F0038fF11D1dA8524aDB1"), // TEL
@@ -129,7 +129,7 @@ const BASE_ETH_TEL: PoolConfig = {
 const POLYGON_ETH_TEL: PoolConfig = {
   network: ChainId.Polygon,
   name: "polygon-ETH-TEL",
-  poolId: "0x9a005a0c12cc2ef01b34e9a7f3fb91a0e6304d377b5479bd3f08f8c29cdf5deb",
+  poolId: "0x25412ca33f9a2069f0520708da3f70a7843374dd46dc1c7e62f6d5002f5f9fa7",
   currency0: getAddress("0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619"),
   currency1: getAddress("0xdF7837DE1F2Fa4631D716CF2502f8b230F1dcc32"),
   denominator: getAddress("0xdF7837DE1F2Fa4631D716CF2502f8b230F1dcc32"), // TEL
@@ -145,7 +145,7 @@ const POLYGON_ETH_TEL: PoolConfig = {
 const POLYGON_USDC_EMXN: PoolConfig = {
   network: ChainId.Polygon,
   name: "polygon-USDC-EMXN",
-  poolId: "0xfd56605f7f4620ab44dfc0860d70b9bd1d1f648a5a74558491b39e816a10b99a",
+  poolId: "0x29f94ec9b66df7fe4068e2d7e9bf0147b49afcdc7cd3283dff03088b8026169f",
   currency0: getAddress("0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359"),
   currency1: getAddress("0x68727e573D21a49c767c3c86A92D9F24bd933c99"),
   denominator: getAddress("0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359"), // USDC
