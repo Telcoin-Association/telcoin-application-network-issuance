@@ -37,10 +37,13 @@ export interface PositionState {
   liquidityModifications: LiquidityChange[];
 }
 
+//todo rename to Checkpoint
 interface LiquidityChange {
   blockNumber: bigint;
   newLiquidityAmount: bigint;
   owner: Address;
+  feeGrowthInside0: bigint;
+  feeGrowthInside1: bigint;
 }
 
 export interface LPData {
@@ -78,9 +81,7 @@ const FIRST_PERIOD_REWARD_AMOUNT_ETH_TEL = 101_851_851n; // prorated
 const PERIOD_REWARD_AMOUNT_ETH_TEL = 64_814_814n;
 const FIRST_PERIOD_REWARD_AMOUNT_USDC_EMXN = 88_000_000n; // prorated
 const PERIOD_REWARD_AMOUNT_USDC_EMXN = 56_000_000n;
-const POOL_MANAGER_ABI = parseAbi([
-  "event ModifyLiquidity(bytes32 indexed id, address indexed sender, int24 tickLower, int24 tickUpper, int256 liquidityDelta, bytes32 salt)",
-]);
+
 const STATE_VIEW_ABI = parseAbi([
   "function getSlot0(bytes32 id) external view returns (uint160 sqrtPriceX96, int24 tick, uint24 protocolFee, uint24 lpFee)",
   "function getFeeGrowthInside(bytes32 poolId, int24 tickLower, int24 tickUpper) external view returns (uint256 feeGrowthInside0X128, uint256 feeGrowthInside1X128)",
@@ -92,6 +93,10 @@ const POSITION_MANAGER_ABI = parseAbi([
   "function positionInfo(uint256 tokenId) external view returns (uint256)",
   "function ownerOf(uint256 id) public view returns (address owner)",
   "function poolKeys(bytes25 poolId) external view returns (address token0, address token1, uint24 fee, int24 tickSpacing, address hooks)",
+]);
+const POSITION_REGISTRY_ABI = parseAbi([
+  "event PositionUpdated(uint256 indexed tokenId, address indexed newOwner, bytes32 indexed poolId, int24 tickLower, int24 tickUpper, uint128 newLiquidity)",
+  "event Checkpoint(uint256 indexed tokenId, bytes32 indexed poolId, uint256 checkpointIndex, uint256 feeGrowth0, uint256 feeGrowth1)",
 ]);
 
 // ---------------- Pool Definitions ----------------
@@ -152,6 +157,7 @@ export type SupportedChainId = ChainId.Polygon | ChainId.Base;
 const NETWORKS = {
   [ChainId.Polygon]: {
     poolManager: getAddress("0x67366782805870060151383f4bbff9dab53e5cd6"),
+    positionRegistry: getAddress("0x2c33fC9c09CfAC5431e754b8fe708B1dA3F5B954"),
     positionManager: getAddress("0x1Ec2eBf4F37E7363FDfe3551602425af0B3ceef9"),
     stateView: getAddress("0x5ea1bd7974c8a611cbab0bdcafcb1d9cc9b3ba5a"),
     periodStarts: [
@@ -170,6 +176,7 @@ const NETWORKS = {
   },
   [ChainId.Base]: {
     poolManager: getAddress("0x498581fF718922c3f8e6A244956aF099B2652b2b"),
+    positionRegistry: getAddress("0x3994e3ae3Cf62bD2a3a83dcE73636E954852BB04"),
     positionManager: getAddress("0x7C5f5A4bBd8fD63184577525326123B519429bDc"),
     stateView: getAddress("0xa3c0c9b65bad0b08107aa264b0f3db444b867a71"),
     periodStarts: [
@@ -209,7 +216,7 @@ async function main() {
     poolConfig.startBlock,
     poolConfig.endBlock,
     client,
-    poolConfig.poolManager,
+    poolConfig.positionRegistry,
     poolConfig.stateView,
     poolConfig.positionManager,
     poolConfig.tickSpacing,
@@ -273,7 +280,7 @@ async function updateFeesAndPositions(
   startBlock: bigint,
   endBlock: bigint,
   client: PublicClient,
-  poolManager: Address,
+  positionRegistry: Address,
   stateView: Address,
   positionManager: Address,
   tickSpacing: number,
@@ -288,8 +295,10 @@ async function updateFeesAndPositions(
     startBlock,
     endBlock,
     client,
-    poolManager,
+    positionRegistry,
     positionManager,
+    stateView,
+    tickSpacing,
     initialPositions
   );
   // use final positions to credit fees to LPs
@@ -311,101 +320,183 @@ async function updatePositions(
   startBlock: bigint,
   endBlock: bigint,
   client: PublicClient,
-  poolManager: Address,
+  positionRegistry: Address,
   positionManager: Address,
+  stateView: Address,
+  tickSpacing: number,
   initialPositions: Map<bigint, PositionState>
 ): Promise<Map<bigint, PositionState>> {
   // use copy of initial positions fetched from checkpoint file
   const positions = new Map<bigint, PositionState>(initialPositions);
 
-  // fetch all ModifyPosition events in the new range
-  const logs = await client.getLogs({
-    address: poolManager,
-    event: parseAbiItem(
-      "event ModifyLiquidity(bytes32 indexed id, address indexed sender, int24 tickLower, int24 tickUpper, int256 liquidityDelta, bytes32 salt)"
-    ),
+  // fetch all Checkpoint && PositionUpdated events in new range and map them
+  const checkpointLogs = await client.getLogs({
+    address: positionRegistry,
+    event: POSITION_REGISTRY_ABI.find((abi) =>
+      abi.name.includes("Checkpoint")
+    )!,
     args: { id: poolId },
     fromBlock: startBlock,
     toBlock: endBlock,
   });
+  const positionUpdatedLogs = await client.getLogs({
+    address: positionRegistry,
+    event: POSITION_REGISTRY_ABI.find((abi) =>
+      abi.name.includes("PositionUpdated")
+    )!,
+    args: { poolId: poolId },
+    fromBlock: startBlock,
+    toBlock: endBlock,
+  });
 
-  // sort logs by block number and then log index to ensure chronological processing
-  logs.sort((a: any, b: any) => {
+  // combine and sort all events chronologically
+  const combinedLogs = [
+    ...checkpointLogs.map((log) => ({ ...log, type: "checkpoint" as const })),
+    ...positionUpdatedLogs.map((log) => ({
+      ...log,
+      type: "positionUpdate" as const,
+    })),
+  ];
+  combinedLogs.sort((a, b) => {
     if (a.blockNumber === b.blockNumber) {
       return Number(a.logIndex) - Number(b.logIndex);
     }
     return Number(a.blockNumber) - Number(b.blockNumber);
   });
 
-  // process logs to update position list, adding new ones when detected and marking liquidity changes on existing ones
-  for (const log of logs) {
-    if (!log.args || !log.blockNumber) continue;
-    const { tickLower, tickUpper, liquidityDelta, salt } = log.args as any;
-    const tokenId = hexToBigInt(salt!);
-    if (!tokenId) throw new Error("Missing tokenId in event args");
-    // fees accrued are credited to the owner at the time of the event (since transfers do not settle fees)
-    const lp = await client.readContract({
-      address: positionManager,
-      abi: POSITION_MANAGER_ABI,
-      functionName: "ownerOf",
-      args: [tokenId],
-      blockNumber: log.blockNumber,
-    });
+  const tempEventData = new Map<
+    `0x${string}`,
+    Partial<LiquidityChange & { tickLower: number; tickUpper: number }>
+  >();
 
-    const currentPositionState = positions.get(tokenId);
-    let newLiquidity = 0n;
-    if (currentPositionState) {
-      // previously existing position, mark subperiod with liquidity change
-      const currentLiquidity = toBigInt(currentPositionState.liquidity);
-      // Check if this is the first modification we've seen for this existing position in this period
-      if (currentPositionState.liquidityModifications.length === 0) {
-        // Add the initial state at the start of the period
-        currentPositionState.liquidityModifications.push({
-          blockNumber: startBlock,
-          newLiquidityAmount: currentLiquidity, // use checkpoint liquidity (persisted as opposed to liquidityModifications wipe in initialize())
-          owner: lp,
+  for (const log of combinedLogs) {
+    if (!log.args || !log.blockNumber || !log.transactionHash) continue;
+    const { tokenId } = log.args as any;
+
+    // Use a key that groups events by TX *and* TokenID
+    const groupKey: `0x${string}` = `${
+      log.transactionHash
+    }-${tokenId.toString()}`;
+    let temp = tempEventData.get(groupKey) ?? {};
+
+    // A. Add data from the PositionUpdated event
+    if (log.type === "positionUpdate") {
+      //todo positionUpdated
+      const { newOwner, tickLower, tickUpper, newLiquidity } = log.args as any;
+      temp = {
+        ...temp,
+        blockNumber: log.blockNumber,
+        newLiquidityAmount: newLiquidity,
+        owner: newOwner,
+        tickLower,
+        tickUpper,
+      };
+      tempEventData.set(groupKey, temp);
+    }
+
+    // B. Add data from the Checkpoint event
+    else if (log.type === "checkpoint") {
+      const { feeGrowth0, feeGrowth1 } = log.args as any;
+      temp = {
+        ...temp,
+        feeGrowthInside0: feeGrowth0,
+        feeGrowthInside1: feeGrowth1,
+      };
+
+      // C. If Checkpoint is hit, PositionUpdated came first
+      // and we can now process the full LiquidityChange
+      if (
+        !temp.blockNumber ||
+        temp.newLiquidityAmount === undefined ||
+        !temp.owner ||
+        temp.tickLower === undefined ||
+        temp.tickUpper === undefined
+      ) {
+        //todo: should be impossible; sanity assert for now and delete later
+        console.warn(
+          `Got Checkpoint for ${groupKey} without a prior PositionUpdated event. Skipping.`
+        );
+        tempEventData.delete(groupKey);
+        continue;
+      }
+
+      const change: LiquidityChange = {
+        blockNumber: temp.blockNumber,
+        newLiquidityAmount: temp.newLiquidityAmount,
+        owner: temp.owner,
+        feeGrowthInside0: temp.feeGrowthInside0!,
+        feeGrowthInside1: temp.feeGrowthInside1!,
+      };
+
+      const currentPositionState = positions.get(tokenId);
+
+      if (currentPositionState) {
+        // --- Existing position ---
+        if (currentPositionState.liquidityModifications.length === 0) {
+          // First modification this period. Add synthetic start block.
+          // This call is now safe and solves the 'todo's.
+          const startFeeGrowth = await getFeeGrowthInsideOffchain(
+            client,
+            poolId,
+            stateView,
+            currentPositionState.tickLower,
+            currentPositionState.tickUpper,
+            tickSpacing,
+            startBlock
+          );
+          currentPositionState.liquidityModifications.push({
+            blockNumber: startBlock,
+            newLiquidityAmount: currentPositionState.liquidity,
+            owner: currentPositionState.lastOwner,
+            feeGrowthInside0: startFeeGrowth.feeGrowthInside0X128,
+            feeGrowthInside1: startFeeGrowth.feeGrowthInside1X128,
+          });
+        }
+
+        positions.set(tokenId, {
+          ...currentPositionState,
+          liquidity: change.newLiquidityAmount,
+          liquidityModifications: [
+            ...currentPositionState.liquidityModifications,
+            change,
+          ],
+        });
+      } else {
+        // --- New position ---
+        const startFeeGrowth = await getFeeGrowthInsideOffchain(
+          client,
+          poolId,
+          stateView,
+          temp.tickLower,
+          temp.tickUpper,
+          tickSpacing,
+          startBlock
+        );
+
+        const changes: LiquidityChange[] = [
+          {
+            // Synthetic 0-liquidity entry from period start
+            blockNumber: startBlock,
+            newLiquidityAmount: 0n,
+            owner: zeroAddress,
+            feeGrowthInside0: startFeeGrowth.feeGrowthInside0X128,
+            feeGrowthInside1: startFeeGrowth.feeGrowthInside1X128,
+          },
+          change, // The first "real" event
+        ];
+
+        positions.set(tokenId, {
+          lastOwner: change.owner,
+          tickLower: temp.tickLower,
+          tickUpper: temp.tickUpper,
+          liquidity: change.newLiquidityAmount,
+          feeGrowthInsidePeriod0: 0n,
+          feeGrowthInsidePeriod1: 0n,
+          liquidityModifications: changes,
         });
       }
 
-      // update the positions entry with new liquidity and append the liquidity modification event
-      newLiquidity = currentLiquidity + toBigInt(liquidityDelta!);
-      const change: LiquidityChange = {
-        blockNumber: log.blockNumber,
-        newLiquidityAmount: newLiquidity,
-        owner: lp,
-      };
-
-      positions.set(tokenId, {
-        ...currentPositionState,
-        liquidity: newLiquidity,
-        liquidityModifications: [
-          ...currentPositionState.liquidityModifications,
-          change,
-        ],
-      });
-    } else {
-      // this is a newly detected position; delta is the initial liquidity amount
-      newLiquidity = toBigInt(liquidityDelta!);
-      // new positions start period with a subperiod of 0 liquidity until creation time
-      const changes: LiquidityChange[] = [
-        { blockNumber: startBlock, newLiquidityAmount: 0n, owner: zeroAddress },
-        {
-          blockNumber: log.blockNumber,
-          newLiquidityAmount: newLiquidity,
-          owner: lp,
-        },
-      ];
-
-      // placeholders used for feeGrowth params until final processing step
-      positions.set(tokenId, {
-        lastOwner: lp,
-        tickLower: tickLower!,
-        tickUpper: tickUpper!,
-        liquidity: liquidityDelta!,
-        feeGrowthInsidePeriod0: 0n,
-        feeGrowthInsidePeriod1: 0n,
-        liquidityModifications: changes,
-      });
+      tempEventData.delete(groupKey); // Clean up this entry
     }
   }
 
@@ -419,8 +510,19 @@ async function updatePositions(
       blockNumber: endBlock,
     });
 
+    // get fee growth at end of period
+    const endFeeGrowth = await getFeeGrowthInsideOffchain(
+      client,
+      poolId,
+      stateView,
+      position.tickLower,
+      position.tickUpper,
+      tickSpacing,
+      endBlock
+    );
+
     // construct new memory array which includes final chunk of time between last modification and period endBlock
-    const timelinePoints = [];
+    const timelinePoints: LiquidityChange[] = [];
     if (position.liquidityModifications.length === 0) {
       // Case 1: Pre-existing position with NO modifications this period, but owner may have changed
       // first delete irrelevant positions; even if not burned they will be recognized as new if liquidity is re-added
@@ -428,20 +530,29 @@ async function updatePositions(
         positions.delete(tokenId);
         continue;
       }
+      const startFeeGrowth = await getFeeGrowthInsideOffchain(
+        client,
+        poolId,
+        stateView,
+        position.tickLower,
+        position.tickUpper,
+        tickSpacing,
+        startBlock //todo: this doesn't handle whether the tick boundaries are still initialized
+      );
       // The timeline is just the start and end of the full period.
       timelinePoints.push({
         blockNumber: startBlock,
         newLiquidityAmount: position.liquidity,
         owner: position.lastOwner,
+        feeGrowthInside0: startFeeGrowth.feeGrowthInside0X128,
+        feeGrowthInside1: startFeeGrowth.feeGrowthInside1X128,
       });
       timelinePoints.push({
         blockNumber: endBlock,
         newLiquidityAmount: position.liquidity,
         owner: ownerAtEndBlock,
-      });
-
-      updatePosition(positions, tokenId, {
-        liquidityModifications: timelinePoints,
+        feeGrowthInside0: endFeeGrowth.feeGrowthInside0X128,
+        feeGrowthInside1: endFeeGrowth.feeGrowthInside1X128,
       });
     } else {
       // Case 2: Position was created or modified during the period.
@@ -452,12 +563,14 @@ async function updatePositions(
         blockNumber: endBlock,
         newLiquidityAmount: lastChange.newLiquidityAmount, // Liquidity carries over til endBlock
         owner: ownerAtEndBlock,
-      });
-
-      updatePosition(positions, tokenId, {
-        liquidityModifications: timelinePoints,
+        feeGrowthInside0: endFeeGrowth.feeGrowthInside0X128,
+        feeGrowthInside1: endFeeGrowth.feeGrowthInside1X128,
       });
     }
+
+    updatePosition(positions, tokenId, {
+      liquidityModifications: timelinePoints,
+    });
   }
 
   return positions;
@@ -491,43 +604,27 @@ async function processFees(
       const prevChange = position.liquidityModifications[i - 1];
       const currChange = position.liquidityModifications[i];
 
-      const subperiodStart = prevChange.blockNumber;
-      const subperiodEnd = currChange.blockNumber;
-      const liquidityForSubperiod = prevChange.newLiquidityAmount;
-
       // skip if no liquidity or if the period is zero blocks
+      const liquidityForSubperiod = prevChange.newLiquidityAmount;
+      //todo: assign JIT | active | passive here
       if (liquidityForSubperiod === 0n || startBlock === endBlock) {
         continue;
       }
 
       // get fee growth values and calculate the subperiod delta
-      const feeGrowthStart = await getFeeGrowthInsideOffchain(
-        client,
-        poolId,
-        stateView,
-        position.tickLower,
-        position.tickUpper,
-        tickSpacing,
-        subperiodStart
-      );
-      const feeGrowthEnd = await getFeeGrowthInsideOffchain(
-        client,
-        poolId,
-        stateView,
-        position.tickLower,
-        position.tickUpper,
-        tickSpacing,
-        subperiodEnd
-      );
+      const feeGrowthStart0 = prevChange.feeGrowthInside0;
+      const feeGrowthStart1 = prevChange.feeGrowthInside1;
+      const feeGrowthEnd0 = currChange.feeGrowthInside0;
+      const feeGrowthEnd1 = currChange.feeGrowthInside1;
 
       // calculate subperiod's fees and add to period total for this position
       const { token0Fees: feesEarned0, token1Fees: feesEarned1 } =
         calculateFees(
           liquidityForSubperiod,
-          feeGrowthEnd.feeGrowthInside0X128,
-          feeGrowthEnd.feeGrowthInside1X128,
-          feeGrowthStart.feeGrowthInside0X128,
-          feeGrowthStart.feeGrowthInside1X128
+          feeGrowthEnd0,
+          feeGrowthEnd1,
+          feeGrowthStart0,
+          feeGrowthStart1
         );
       feesEarnedThisPeriod0 += feesEarned0;
       feesEarnedThisPeriod1 += feesEarned1;
@@ -543,12 +640,16 @@ async function processFees(
         periodFeesCurrency0: currentFees.periodFeesCurrency0 + feesEarned0,
         periodFeesCurrency1: currentFees.periodFeesCurrency1 + feesEarned1,
       });
-      updatePosition(positions, tokenId, {
-        lastOwner: lp,
-        feeGrowthInsidePeriod0: feesEarnedThisPeriod0,
-        feeGrowthInsidePeriod1: feesEarnedThisPeriod1,
-      });
     }
+
+    updatePosition(positions, tokenId, {
+      lastOwner:
+        position.liquidityModifications[
+          position.liquidityModifications.length - 1
+        ].owner,
+      feeGrowthInsidePeriod0: feesEarnedThisPeriod0,
+      feeGrowthInsidePeriod1: feesEarnedThisPeriod1,
+    });
   }
 
   return { lpData, finalPositions: positions };
@@ -1222,7 +1323,7 @@ function setPoolConfig(poolId_: `0x${string}`, period: number) {
   if (!(network in NETWORKS)) {
     throw new Error(`Network ${network} is not supported`);
   }
-  const { poolManager, positionManager, stateView } =
+  const { poolManager, positionRegistry, positionManager, stateView } =
     NETWORKS[network as SupportedChainId];
   const checkpointFile = `${TELX_BASE_PATH}/${pool.name}-${period - 1}.json`;
 
@@ -1233,6 +1334,7 @@ function setPoolConfig(poolId_: `0x${string}`, period: number) {
     name,
     poolId: pool.poolId,
     poolManager,
+    positionRegistry,
     positionManager,
     stateView,
     denominator,
