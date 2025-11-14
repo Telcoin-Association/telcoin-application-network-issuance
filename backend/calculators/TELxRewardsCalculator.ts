@@ -182,7 +182,7 @@ const NETWORKS = {
       77_690_848n, // oct 15
       77_993_212n, // oct 22
       78_295_585n, // oct 29
-      78_597_968n, // nov 5
+      78_331_507n, // period 13 start: PositionRegistry deployment
       78_900_357n, // nov 12
     ],
   },
@@ -204,7 +204,7 @@ const NETWORKS = {
       36_848_526n, // oct 15
       37_150_926n, // oct 22
       37_453_326n, // oct 29
-      37_755_726n, // nov 5
+      37_463_764n, // period 13 start: PositionRegistry deployment
       38_058_126n, // nov 12
     ],
   },
@@ -412,10 +412,10 @@ async function updatePositions(
     );
 
     if (!currentPositionState) {
-      // first event should be guaranteed to be a PositionUpdated, left in as sanity check
+      // skip subscription logs for positions that belong to a different supported pool
       if (log.type !== "positionUpdate") {
-        console.warn(
-          `Received '${log.type}' for unknown token ${tokenId} at block ${log.blockNumber}. This event will be processed if/when a PositionUpdate is found.`
+        console.log(
+          `[Info] Skipping '${log.type}' for token ${tokenId}: not part of this pool.`
         );
         continue;
       }
