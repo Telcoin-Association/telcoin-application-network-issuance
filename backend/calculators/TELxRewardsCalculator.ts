@@ -47,6 +47,7 @@ interface LiquidityChange {
   newLiquidityAmount: bigint;
   owner: Address;
   isSubscribed: boolean;
+  type: "positionUpdate" | "subscribe" | "unsubscribe" | "synthetic";
 }
 
 export interface LPData {
@@ -158,7 +159,7 @@ const POLYGON_USDC_EMXN: PoolConfig = {
 };
 
 export const POOLS = [BASE_ETH_TEL, POLYGON_ETH_TEL, POLYGON_USDC_EMXN];
-export const PERIODS = Array.from({ length: 13 }, (_, i) => i);
+export const PERIODS = Array.from({ length: 14 }, (_, i) => i);
 export const TELX_BASE_PATH = "backend/checkpoints";
 
 export type SupportedChainId = ChainId.Polygon | ChainId.Base;
@@ -181,7 +182,8 @@ const NETWORKS = {
       77_690_848n, // oct 15
       77_993_212n, // oct 22
       78_295_585n, // oct 29
-      78_597_968n, // nov 5
+      78_331_507n, // period 13 start: PositionRegistry deployment
+      78_900_357n, // nov 12
     ],
   },
   [ChainId.Base]: {
@@ -202,7 +204,8 @@ const NETWORKS = {
       36_848_526n, // oct 15
       37_150_926n, // oct 22
       37_453_326n, // oct 29
-      37_755_726n, // nov 5
+      37_463_764n, // period 13 start: PositionRegistry deployment
+      38_058_126n, // nov 12
     ],
   },
 };
@@ -351,7 +354,7 @@ async function updatePositions(
   // use copy of initial positions fetched from checkpoint file
   const positions = new Map<bigint, PositionState>(initialPositions);
 
-  // fetch all PositionUpdated events in new range and map them
+  // fetch all event streams in new range and map them
   const positionUpdatedLogs = await client.getLogs({
     address: positionRegistry,
     event: parseAbiItem(
@@ -361,9 +364,33 @@ async function updatePositions(
     fromBlock: startBlock,
     toBlock: endBlock,
   });
+  const subscribeLogs = await client.getLogs({
+    address: positionRegistry,
+    event: parseAbiItem(
+      "event Subscribed(uint256 indexed tokenId, address indexed owner)"
+    ),
+    fromBlock: startBlock,
+    toBlock: endBlock,
+  });
+  const unsubscribeLogs = await client.getLogs({
+    address: positionRegistry,
+    event: parseAbiItem(
+      "event Unsubscribed(uint256 indexed tokenId, address indexed owner)"
+    ),
+    fromBlock: startBlock,
+    toBlock: endBlock,
+  });
 
   // combine and sort all events chronologically
-  positionUpdatedLogs.sort((a, b) => {
+  const combinedLogs = [
+    ...positionUpdatedLogs.map((log) => ({
+      ...log,
+      type: "positionUpdate" as const,
+    })),
+    ...subscribeLogs.map((log) => ({ ...log, type: "subscribe" as const })),
+    ...unsubscribeLogs.map((log) => ({ ...log, type: "unsubscribe" as const })),
+  ];
+  combinedLogs.sort((a, b) => {
     if (a.blockNumber === b.blockNumber) {
       return Number(a.logIndex) - Number(b.logIndex);
     }
@@ -371,52 +398,30 @@ async function updatePositions(
   });
 
   // establish position timelines
-  for (const log of positionUpdatedLogs) {
+  for (const log of combinedLogs) {
     if (!log.args || !log.blockNumber || !log.transactionHash) continue;
-    const { tokenId, newOwner, tickLower, tickUpper, newLiquidity } =
-      log.args as any;
-    // Fetch subscription status AT THE BLOCK of the modification
-    const isSubscribedAtMod = await client.readContract({
-      address: positionRegistry,
-      abi: POSITION_REGISTRY_ABI,
-      functionName: "isTokenSubscribed",
-      args: [tokenId],
-      blockNumber: log.blockNumber,
-    });
+    const { tokenId } = log.args as any;
+    let currentPositionState = positions.get(tokenId);
 
-    const currentPositionState = positions.get(tokenId);
-    if (currentPositionState) {
-      // --- Existing position ---
-      if (currentPositionState.liquidityModifications.length === 0) {
-        // First modification this period. Add synthetic start block
-        const isSubscribedAtStart = await client.readContract({
-          address: positionRegistry,
-          abi: POSITION_REGISTRY_ABI,
-          functionName: "isTokenSubscribed",
-          args: [tokenId],
-          blockNumber: startBlock,
-        });
-        currentPositionState.liquidityModifications.push({
-          blockNumber: startBlock,
-          newLiquidityAmount: currentPositionState.liquidity,
-          owner: currentPositionState.lastOwner,
-          isSubscribed: isSubscribedAtStart,
-        });
+    // Fetch subscription status AT THE BLOCK of the modification
+    const isSubscribedAtMod = await isSubscribed(
+      client,
+      positionRegistry,
+      tokenId,
+      log.blockNumber
+    );
+
+    if (!currentPositionState) {
+      // skip subscription logs for positions that belong to a different supported pool
+      if (log.type !== "positionUpdate") {
+        console.log(
+          `[Info] Skipping '${log.type}' for token ${tokenId}: not part of this pool.`
+        );
+        continue;
       }
 
-      currentPositionState.liquidityModifications.push({
-        blockNumber: log.blockNumber,
-        newLiquidityAmount: newLiquidity,
-        owner: newOwner,
-        isSubscribed: isSubscribedAtMod,
-      });
-
-      positions.set(tokenId, {
-        ...currentPositionState,
-        liquidity: newLiquidity,
-      });
-    } else {
       // --- New position ---
+      const { newOwner, tickLower, tickUpper, newLiquidity } = log.args as any;
       const changes: LiquidityChange[] = [
         {
           // Synthetic 0-liquidity entry from period start
@@ -424,12 +429,14 @@ async function updatePositions(
           newLiquidityAmount: 0n,
           owner: zeroAddress,
           isSubscribed: false,
+          type: "synthetic",
         },
         {
           blockNumber: log.blockNumber,
           newLiquidityAmount: newLiquidity,
           owner: newOwner,
           isSubscribed: isSubscribedAtMod,
+          type: "positionUpdate",
         }, // The first "real" event
       ];
 
@@ -444,6 +451,62 @@ async function updatePositions(
         feeGrowthInsidePeriod1Weighted: 0n,
         liquidityModifications: changes,
       });
+    } else {
+      // --- Existing position ---
+      if (currentPositionState.liquidityModifications.length === 0) {
+        // First modification this period. Add synthetic start block
+        const isSubscribedAtStart = await isSubscribed(
+          client,
+          positionRegistry,
+          tokenId,
+          startBlock
+        );
+        currentPositionState.liquidityModifications.push({
+          blockNumber: startBlock,
+          newLiquidityAmount: currentPositionState.liquidity,
+          owner: currentPositionState.lastOwner,
+          isSubscribed: isSubscribedAtStart,
+          type: "synthetic",
+        });
+      }
+
+      // Get the *last* known state from the timeline
+      const lastState =
+        currentPositionState.liquidityModifications[
+          currentPositionState.liquidityModifications.length - 1
+        ];
+      const newState: LiquidityChange = {
+        blockNumber: log.blockNumber,
+        newLiquidityAmount: lastState.newLiquidityAmount, // initialize with last known liquidity, overwritten if PositionUpdated
+        owner: lastState.owner, // initialize with last known liquidity, overwritten if PositionUpdated
+        isSubscribed: lastState.isSubscribed,
+        type: log.type,
+      };
+
+      switch (log.type) {
+        case "positionUpdate": {
+          const { newOwner, newLiquidity } = log.args as any;
+          newState.owner = newOwner;
+          newState.newLiquidityAmount = newLiquidity;
+          // in case of implicit unsubscribe (transfer || liquidity drop) re-check the subscription status
+          newState.isSubscribed = isSubscribedAtMod;
+          break;
+        }
+        case "subscribe": {
+          newState.isSubscribed = true;
+          break;
+        }
+        case "unsubscribe": {
+          newState.isSubscribed = false;
+          break;
+        }
+      }
+      currentPositionState.liquidityModifications.push(newState);
+
+      updatePosition(positions, tokenId, {
+        lastOwner: newState.owner,
+        liquidity: newState.newLiquidityAmount,
+      });
     }
   }
 
@@ -451,56 +514,59 @@ async function updatePositions(
   for (const [tokenId, position] of positions.entries()) {
     const [ownerAtEndBlock, isSubscribedAtEnd] = await Promise.all([
       safeGetOwnerOf(client, positionManager, tokenId, endBlock),
-      client.readContract({
-        address: positionRegistry,
-        abi: POSITION_REGISTRY_ABI,
-        functionName: "isTokenSubscribed",
-        args: [tokenId],
-        blockNumber: endBlock,
-      }),
+      isSubscribed(client, positionRegistry, tokenId, endBlock),
     ]);
 
     // construct new memory array which includes final chunk of time between last modification and period endBlock
     const timelinePoints: LiquidityChange[] = [];
     if (position.liquidityModifications.length === 0) {
-      // Case 1: Pre-existing position with NO modifications this period, but owner may have changed
+      // Case 1: Pre-existing position with NO modifications this period, but owner/subscription may have changed
       // first delete irrelevant positions; even if not burned they will be recognized as new if liquidity is re-added
       if (position.liquidity === 0n) {
         positions.delete(tokenId);
         continue;
       }
       // Get subscription status at start
-      const isSubscribedAtStart = await client.readContract({
-        address: positionRegistry,
-        abi: POSITION_REGISTRY_ABI,
-        functionName: "isTokenSubscribed",
-        args: [tokenId],
-        blockNumber: startBlock,
-      });
+      const isSubscribedAtStart = await isSubscribed(
+        client,
+        positionRegistry,
+        tokenId,
+        startBlock
+      );
       // The timeline is just the start and end of the full period.
       timelinePoints.push({
         blockNumber: startBlock,
         newLiquidityAmount: position.liquidity,
         owner: position.lastOwner,
         isSubscribed: isSubscribedAtStart,
+        type: "synthetic",
       });
       timelinePoints.push({
         blockNumber: endBlock,
         newLiquidityAmount: position.liquidity,
         owner: ownerAtEndBlock,
         isSubscribed: isSubscribedAtEnd,
+        type: "synthetic",
       });
     } else {
       // Case 2: Position was created or modified during the period.
       // The timeline is its list of modifications prepended with pre-chunk from startBlock; append post-chunk until endBlock
       timelinePoints.push(...position.liquidityModifications);
       const lastChange = timelinePoints[timelinePoints.length - 1];
-      timelinePoints.push({
-        blockNumber: endBlock,
-        newLiquidityAmount: lastChange.newLiquidityAmount, // Liquidity carries over til endBlock
-        owner: ownerAtEndBlock,
-        isSubscribed: isSubscribedAtEnd,
-      });
+      // Only add an end block point if it's not the same block
+      if (lastChange.blockNumber < endBlock) {
+        timelinePoints.push({
+          blockNumber: endBlock,
+          newLiquidityAmount: lastChange.newLiquidityAmount, // Liquidity carries over til endBlock
+          owner: ownerAtEndBlock,
+          isSubscribed: isSubscribedAtEnd,
+          type: "synthetic",
+        });
+      } else {
+        // if last event was in the end block just update owner/subscription status.
+        lastChange.owner = ownerAtEndBlock;
+        lastChange.isSubscribed = isSubscribedAtEnd;
+      }
     }
 
     updatePosition(positions, tokenId, {
@@ -511,19 +577,26 @@ async function updatePositions(
   return positions;
 }
 
-//
+// Assigns position designations based on their liquidity modification timelines
 function assignPositionDesignations(
   positions: Map<bigint, PositionState>, // must be fully processed for the period
   minPassiveLifetime: bigint
 ): Map<bigint, PositionDesignation> {
+  console.log(`Using passive threshold: ${minPassiveLifetime} blocks`);
+
   // Determine the designation for each *entire position lifetime*
   const designations = new Map<bigint, PositionDesignation>();
   for (const [tokenId, position] of positions.entries()) {
     let designation: PositionDesignation = "PASSIVE"; // Default to PASSIVE
 
-    for (let i = 1; i < position.liquidityModifications.length; i++) {
-      const prevChange = position.liquidityModifications[i - 1];
-      const currChange = position.liquidityModifications[i];
+    // ignore timeline entries corresponding to un/subscriptions
+    const timelineSansSubscriptions = position.liquidityModifications.filter(
+      (change) =>
+        change.type === "positionUpdate" || change.type === "synthetic"
+    );
+    for (let i = 1; i < timelineSansSubscriptions.length; i++) {
+      const prevChange = timelineSansSubscriptions[i - 1];
+      const currChange = timelineSansSubscriptions[i];
 
       const blockDelta = currChange.blockNumber - prevChange.blockNumber;
 
@@ -537,7 +610,7 @@ function assignPositionDesignations(
         // position should not be designated ACTIVE if created within first minPassiveLifetime of period
         const isSyntheticStart = prevChange.owner === zeroAddress && i === 1;
         // position should not be designated ACTIVE if modified within last minPassiveLifetime of period
-        const isSyntheticEnd = i === position.liquidityModifications.length - 1;
+        const isSyntheticEnd = i === timelineSansSubscriptions.length - 1;
 
         // Ignore prepended/appended subperiod entries along synthetic period boundaries
         if (!isSyntheticStart && !isSyntheticEnd) {
@@ -1184,6 +1257,22 @@ async function safeGetOwnerOf(
     );
     return zeroAddress; // Treat as burned
   }
+}
+
+async function isSubscribed(
+  client: PublicClient,
+  positionRegistry: Address,
+  tokenId: bigint,
+  blockNumber: bigint
+): Promise<boolean> {
+  const isSubscribed = await client.readContract({
+    address: positionRegistry,
+    abi: POSITION_REGISTRY_ABI,
+    functionName: "isTokenSubscribed",
+    args: [tokenId],
+    blockNumber: blockNumber,
+  });
+  return isSubscribed;
 }
 
 /**

@@ -171,7 +171,8 @@ async function convertFile(
       decimals1
     ),
     reward_formatted: formatBigIntString(data.reward!, TEL_DECIMALS),
-    totalFeesCommonDenominator: data.totalFeesCommonDenominator!.toString(),
+    totalFeesCommonDenominator:
+      data.totalFeesCommonDenominatorWeighted!.toString(),
   }));
 
   // create and write XLSX file
