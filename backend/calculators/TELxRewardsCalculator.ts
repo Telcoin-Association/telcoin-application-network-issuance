@@ -159,7 +159,7 @@ const POLYGON_USDC_EMXN: PoolConfig = {
 };
 
 export const POOLS = [BASE_ETH_TEL, POLYGON_ETH_TEL, POLYGON_USDC_EMXN];
-export const PERIODS = Array.from({ length: 14 }, (_, i) => i);
+export const PERIODS = Array.from({ length: 15 }, (_, i) => i);
 export const TELX_BASE_PATH = "backend/checkpoints";
 
 export type SupportedChainId = ChainId.Polygon | ChainId.Base;
@@ -184,6 +184,7 @@ const NETWORKS = {
       78_295_585n, // oct 29
       78_331_507n, // period 13 start: PositionRegistry deployment
       78_900_357n, // nov 12
+      79_202_684n, // nov 19
     ],
   },
   [ChainId.Base]: {
@@ -206,6 +207,7 @@ const NETWORKS = {
       37_453_326n, // oct 29
       37_463_764n, // period 13 start: PositionRegistry deployment
       38_058_126n, // nov 12
+      38_360_526n, // nov 19
     ],
   },
 };
@@ -680,9 +682,8 @@ async function processFees(
       )
         continue;
 
-      // check the "isSubscribed" flag at BOTH start and end of sub-period
-      const isEligibleForRewards =
-        prevChange.isSubscribed && currChange.isSubscribed;
+      // check the "isSubscribed" flag at start of sub-period
+      const isEligibleForRewards = prevChange.isSubscribed;
 
       // get fee growth values and calculate the subperiod delta
       const [feeGrowthStart, feeGrowthEnd] = await Promise.all([
