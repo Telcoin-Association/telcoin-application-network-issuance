@@ -682,9 +682,8 @@ async function processFees(
       )
         continue;
 
-      // check the "isSubscribed" flag at BOTH start and end of sub-period
-      const isEligibleForRewards =
-        prevChange.isSubscribed && currChange.isSubscribed;
+      // check the "isSubscribed" flag at start of sub-period
+      const isEligibleForRewards = prevChange.isSubscribed;
 
       // get fee growth values and calculate the subperiod delta
       const [feeGrowthStart, feeGrowthEnd] = await Promise.all([
