@@ -481,9 +481,9 @@ async function updatePositions(
       const newState: LiquidityChange = {
         blockNumber: log.blockNumber,
         newLiquidityAmount: lastState.newLiquidityAmount, // initialize with last known liquidity, overwritten if PositionUpdated
-        owner: lastState.owner, // initialize with last known liquidity, overwritten if PositionUpdated
+        owner: lastState.owner, // initialize with last known owner, overwritten if PositionUpdated
         isSubscribed: lastState.isSubscribed,
-        type: log.type,
+        type: log.type, // overwritten if claim
       };
 
       switch (log.type) {
@@ -497,7 +497,7 @@ async function updatePositions(
           newState.type = type;
           newState.owner = newOwner;
           newState.newLiquidityAmount = newLiquidity;
-          // in case of implicit unsubscribe (transfer || liquidity drop) re-check the subscription status
+          // in case of implicit unsubscribe (transfer || liquidity drop) use re-checked subscription status
           newState.isSubscribed = isSubscribedAtMod;
           break;
         }
