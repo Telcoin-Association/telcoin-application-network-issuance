@@ -47,7 +47,7 @@ interface LiquidityChange {
   newLiquidityAmount: bigint;
   owner: Address;
   isSubscribed: boolean;
-  type: "positionUpdate" | "subscribe" | "unsubscribe" | "synthetic";
+  type: "positionUpdate" | "claim" | "subscribe" | "unsubscribe" | "synthetic";
 }
 
 export interface LPData {
@@ -333,7 +333,6 @@ async function updateFeesAndPositions(
   const { lpData, finalPositions } = await processFees(
     poolId,
     client,
-    positionRegistry,
     stateView,
     tickSpacing,
     updatedPositions,
@@ -482,17 +481,23 @@ async function updatePositions(
       const newState: LiquidityChange = {
         blockNumber: log.blockNumber,
         newLiquidityAmount: lastState.newLiquidityAmount, // initialize with last known liquidity, overwritten if PositionUpdated
-        owner: lastState.owner, // initialize with last known liquidity, overwritten if PositionUpdated
+        owner: lastState.owner, // initialize with last known owner, overwritten if PositionUpdated
         isSubscribed: lastState.isSubscribed,
-        type: log.type,
+        type: log.type, // overwritten if claim
       };
 
       switch (log.type) {
         case "positionUpdate": {
           const { newOwner, newLiquidity } = log.args as any;
+          // check if positionUpdate logs are claims and label if so
+          const type =
+            newLiquidity === lastState.newLiquidityAmount
+              ? "claim"
+              : "positionUpdate";
+          newState.type = type;
           newState.owner = newOwner;
           newState.newLiquidityAmount = newLiquidity;
-          // in case of implicit unsubscribe (transfer || liquidity drop) re-check the subscription status
+          // in case of implicit unsubscribe (transfer || liquidity drop) use re-checked subscription status
           newState.isSubscribed = isSubscribedAtMod;
           break;
         }
@@ -593,14 +598,14 @@ function assignPositionDesignations(
   for (const [tokenId, position] of positions.entries()) {
     let designation: PositionDesignation = "PASSIVE"; // Default to PASSIVE
 
-    // ignore timeline entries corresponding to un/subscriptions
-    const timelineSansSubscriptions = position.liquidityModifications.filter(
+    // ignore timeline entries corresponding to claims and un/subscriptions
+    const designatableTimeline = position.liquidityModifications.filter(
       (change) =>
         change.type === "positionUpdate" || change.type === "synthetic"
     );
-    for (let i = 1; i < timelineSansSubscriptions.length; i++) {
-      const prevChange = timelineSansSubscriptions[i - 1];
-      const currChange = timelineSansSubscriptions[i];
+    for (let i = 1; i < designatableTimeline.length; i++) {
+      const prevChange = designatableTimeline[i - 1];
+      const currChange = designatableTimeline[i];
 
       const blockDelta = currChange.blockNumber - prevChange.blockNumber;
 
@@ -614,7 +619,7 @@ function assignPositionDesignations(
         // position should not be designated ACTIVE if created within first minPassiveLifetime of period
         const isSyntheticStart = prevChange.owner === zeroAddress && i === 1;
         // position should not be designated ACTIVE if modified within last minPassiveLifetime of period
-        const isSyntheticEnd = i === timelineSansSubscriptions.length - 1;
+        const isSyntheticEnd = i === designatableTimeline.length - 1;
 
         // Ignore prepended/appended subperiod entries along synthetic period boundaries
         if (!isSyntheticStart && !isSyntheticEnd) {
@@ -636,7 +641,6 @@ function assignPositionDesignations(
 async function processFees(
   poolId: `0x${string}`,
   client: PublicClient,
-  positionRegistry: Address,
   stateView: Address,
   tickSpacing: number,
   positions: Map<bigint, PositionState>, // must be fully processed for the period
