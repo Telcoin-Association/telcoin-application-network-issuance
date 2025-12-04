@@ -158,11 +158,16 @@ const POLYGON_USDC_EMXN: PoolConfig = {
   },
 };
 
-export const POOLS = [BASE_ETH_TEL, POLYGON_ETH_TEL, POLYGON_USDC_EMXN];
-export const PERIODS = Array.from({ length: 16 }, (_, i) => i);
 export const TELX_BASE_PATH = "backend/checkpoints";
-
 export type SupportedChainId = ChainId.Polygon | ChainId.Base;
+export const POOLS = [BASE_ETH_TEL, POLYGON_ETH_TEL, POLYGON_USDC_EMXN];
+
+/**
+ * @dev For new periods, increment length here and add the new blocknumbers to `periodStarts`
+ * @notice While public-facing periods are 1-indexed, this utility uses `period 0` internally
+ * to refer to the initialization period from pool creation to first period start.
+ */
+export const PERIODS = Array.from({ length: 17 }, (_, i) => i);
 const NETWORKS = {
   [ChainId.Polygon]: {
     poolManager: getAddress("0x67366782805870060151383f4bbff9dab53e5cd6"),
@@ -186,6 +191,7 @@ const NETWORKS = {
       78_900_357n, // nov 12
       79_202_684n, // nov 19
       79_505_082n, // nov 26
+      79_807_479n, // dec 3
     ],
   },
   [ChainId.Base]: {
@@ -210,10 +216,15 @@ const NETWORKS = {
       38_058_126n, // nov 12
       38_360_526n, // nov 19
       38_662_926n, // nov 26
+      38_965_326n, // dec 3
     ],
   },
 };
 
+/**
+ * @dev Usage: `yarn ts-node backend/calculators/TELxRewardsCalculator.ts <poolId>:<period>`
+ * eg: `yarn ts-node backend/calculators/TELxRewardsCalculator.ts 0x29f94ec9b66df7fe4068e2d7e9bf0147b49afcdc7cd3283dff03088b8026169f:16`
+ */
 async function main() {
   const args = process.argv.slice(2);
   const [poolId, period] = parseCLIArgs(args);
