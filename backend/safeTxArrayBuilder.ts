@@ -162,12 +162,12 @@ function processTelxRewards(jsonData: TelxIncentivesJson): TelxOutput {
   }
 
   console.log(
-    `\nTotal TELx amount to transfer via CryptoBatcher:
+    `\nTotal TELx amount to distribute via PositionRegistry:
     - ${totalAmount / TEL_DECIMALS} ERC20 TEL (decimals applied)
     - ${totalAmount} native/wrapped TEL (no decimals)`
   );
   console.log(
-    "\nThis output is formatted for the CryptoBatcher::batchTEL(address[], uint256[]) function."
+    "\nThis output is formatted for the PositionRegistry::addRewards(address[], uint256[]) function."
   );
 
   return { wallets, amounts };
