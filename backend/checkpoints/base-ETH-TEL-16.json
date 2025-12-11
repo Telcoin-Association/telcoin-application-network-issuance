@@ -1,0 +1,2616 @@
+{
+  "blockRange": {
+    "network": "Base",
+    "startBlock": "38662926n",
+    "endBlock": "38965325n"
+  },
+  "poolId": "0x727b2741ac2b2df8bc9185e1de972661519fc07b156057eeed9b07c50e08829b",
+  "denominator": "0x09bE1692ca16e06f536F0038fF11D1dA8524aDB1",
+  "currency0": "0x0000000000000000000000000000000000000000",
+  "currency1": "0x09bE1692ca16e06f536F0038fF11D1dA8524aDB1",
+  "positions": [
+    [
+      "96439n",
+      {
+        "lastOwner": "0x55a09787C9CE8E0be3b4132acca7De895303B9AB",
+        "tickLower": -238920,
+        "tickUpper": -233040,
+        "liquidity": "70340928853837n",
+        "feeGrowthInsidePeriod0": "6638367196573572n",
+        "feeGrowthInsidePeriod1": "327924n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "70340928853837n",
+            "owner": "0x55a09787C9CE8E0be3b4132acca7De895303B9AB",
+            "isSubscribed": false,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "70340928853837n",
+            "owner": "0x55a09787C9CE8E0be3b4132acca7De895303B9AB",
+            "isSubscribed": false,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE",
+        "feeGrowthInsidePeriod0Weighted": "6638367196573572n",
+        "feeGrowthInsidePeriod1Weighted": "327924n"
+      }
+    ],
+    [
+      "98826n",
+      {
+        "lastOwner": "0xe3B1ebcD19c28459aD75B44C13095cA93E53cbB0",
+        "tickLower": -887220,
+        "tickUpper": 887220,
+        "liquidity": "2799647519312n",
+        "feeGrowthInsidePeriod0": "264214427602850n",
+        "feeGrowthInsidePeriod1": "13051n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "2799647519312n",
+            "owner": "0xe3B1ebcD19c28459aD75B44C13095cA93E53cbB0",
+            "isSubscribed": false,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "2799647519312n",
+            "owner": "0xe3B1ebcD19c28459aD75B44C13095cA93E53cbB0",
+            "isSubscribed": false,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE",
+        "feeGrowthInsidePeriod0Weighted": "264214427602850n",
+        "feeGrowthInsidePeriod1Weighted": "13051n"
+      }
+    ],
+    [
+      "98935n",
+      {
+        "lastOwner": "0xf6786b4edFa78d8d5cbfB93A97fF260e873152Be",
+        "tickLower": -246960,
+        "tickUpper": -233580,
+        "liquidity": "72822838586832n",
+        "feeGrowthInsidePeriod0": "6872595382422613n",
+        "feeGrowthInsidePeriod1": "339495n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "72822838586832n",
+            "owner": "0xf6786b4edFa78d8d5cbfB93A97fF260e873152Be",
+            "isSubscribed": false,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "72822838586832n",
+            "owner": "0xf6786b4edFa78d8d5cbfB93A97fF260e873152Be",
+            "isSubscribed": false,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE",
+        "feeGrowthInsidePeriod0Weighted": "6872595382422613n",
+        "feeGrowthInsidePeriod1Weighted": "339495n"
+      }
+    ],
+    [
+      "127754n",
+      {
+        "lastOwner": "0x67E8a7A42cA0bfddf9F5fDe9a3a689beD701769b",
+        "tickLower": -887220,
+        "tickUpper": 887220,
+        "liquidity": "555542429181n",
+        "feeGrowthInsidePeriod0": "52428858962654n",
+        "feeGrowthInsidePeriod1": "2589n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "555542429181n",
+            "owner": "0x67E8a7A42cA0bfddf9F5fDe9a3a689beD701769b",
+            "isSubscribed": false,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "555542429181n",
+            "owner": "0x67E8a7A42cA0bfddf9F5fDe9a3a689beD701769b",
+            "isSubscribed": false,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE",
+        "feeGrowthInsidePeriod0Weighted": "52428858962654n",
+        "feeGrowthInsidePeriod1Weighted": "2589n"
+      }
+    ],
+    [
+      "131715n",
+      {
+        "lastOwner": "0x54180459a99C2fD2a59983497e84046e9A5996fA",
+        "tickLower": -887220,
+        "tickUpper": 887220,
+        "liquidity": "132321488837n",
+        "feeGrowthInsidePeriod0": "12487731470287n",
+        "feeGrowthInsidePeriod1": "616n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "132321488837n",
+            "owner": "0x54180459a99C2fD2a59983497e84046e9A5996fA",
+            "isSubscribed": false,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "132321488837n",
+            "owner": "0x54180459a99C2fD2a59983497e84046e9A5996fA",
+            "isSubscribed": false,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE",
+        "feeGrowthInsidePeriod0Weighted": "12487731470287n",
+        "feeGrowthInsidePeriod1Weighted": "616n"
+      }
+    ],
+    [
+      "137236n",
+      {
+        "lastOwner": "0xc38eDb1B53c7c034867BdE801e24826687F24466",
+        "tickLower": -232740,
+        "tickUpper": -232560,
+        "liquidity": "193608237918218n",
+        "feeGrowthInsidePeriod0": "0n",
+        "feeGrowthInsidePeriod1": "0n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "193608237918218n",
+            "owner": "0xc38eDb1B53c7c034867BdE801e24826687F24466",
+            "isSubscribed": false,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "193608237918218n",
+            "owner": "0xc38eDb1B53c7c034867BdE801e24826687F24466",
+            "isSubscribed": false,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE",
+        "feeGrowthInsidePeriod0Weighted": "0n",
+        "feeGrowthInsidePeriod1Weighted": "0n"
+      }
+    ],
+    [
+      "139335n",
+      {
+        "lastOwner": "0xc38eDb1B53c7c034867BdE801e24826687F24466",
+        "tickLower": -233220,
+        "tickUpper": -232680,
+        "liquidity": "82678018534207n",
+        "feeGrowthInsidePeriod0": "0n",
+        "feeGrowthInsidePeriod1": "0n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "82678018534207n",
+            "owner": "0xc38eDb1B53c7c034867BdE801e24826687F24466",
+            "isSubscribed": false,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "82678018534207n",
+            "owner": "0xc38eDb1B53c7c034867BdE801e24826687F24466",
+            "isSubscribed": false,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE",
+        "feeGrowthInsidePeriod0Weighted": "0n",
+        "feeGrowthInsidePeriod1Weighted": "0n"
+      }
+    ],
+    [
+      "152591n",
+      {
+        "lastOwner": "0xD12eabdDA283287cBe21EB1DaAdff5110B44be03",
+        "tickLower": -887220,
+        "tickUpper": 887220,
+        "liquidity": "190323510700816n",
+        "feeGrowthInsidePeriod0": "17961624487477855n",
+        "feeGrowthInsidePeriod1": "887274n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "190323510700816n",
+            "owner": "0xD12eabdDA283287cBe21EB1DaAdff5110B44be03",
+            "isSubscribed": false,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "190323510700816n",
+            "owner": "0xD12eabdDA283287cBe21EB1DaAdff5110B44be03",
+            "isSubscribed": false,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE",
+        "feeGrowthInsidePeriod0Weighted": "17961624487477855n",
+        "feeGrowthInsidePeriod1Weighted": "887274n"
+      }
+    ],
+    [
+      "169804n",
+      {
+        "lastOwner": "0x065963DF68Ab6f33aa9470f333B83661Aa060f20",
+        "tickLower": -887220,
+        "tickUpper": 887220,
+        "liquidity": "1935228148n",
+        "feeGrowthInsidePeriod0": "182635561754n",
+        "feeGrowthInsidePeriod1": "9n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "1935228148n",
+            "owner": "0x065963DF68Ab6f33aa9470f333B83661Aa060f20",
+            "isSubscribed": false,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "1935228148n",
+            "owner": "0x065963DF68Ab6f33aa9470f333B83661Aa060f20",
+            "isSubscribed": false,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE",
+        "feeGrowthInsidePeriod0Weighted": "182635561754n",
+        "feeGrowthInsidePeriod1Weighted": "9n"
+      }
+    ],
+    [
+      "188661n",
+      {
+        "lastOwner": "0x4dedbaF8f1bE09A82DBe5741174eA076AF52a90D",
+        "tickLower": -887220,
+        "tickUpper": 887220,
+        "liquidity": "3954172914015n",
+        "feeGrowthInsidePeriod0": "373171810348436n",
+        "feeGrowthInsidePeriod1": "18434n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "3954172914015n",
+            "owner": "0x4dedbaF8f1bE09A82DBe5741174eA076AF52a90D",
+            "isSubscribed": false,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "3954172914015n",
+            "owner": "0x4dedbaF8f1bE09A82DBe5741174eA076AF52a90D",
+            "isSubscribed": false,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE",
+        "feeGrowthInsidePeriod0Weighted": "373171810348436n",
+        "feeGrowthInsidePeriod1Weighted": "18434n"
+      }
+    ],
+    [
+      "216238n",
+      {
+        "lastOwner": "0xdcE6F2ccaf54de860a5f80DB7503154957d216D5",
+        "tickLower": -234360,
+        "tickUpper": -228180,
+        "liquidity": "23063374227770n",
+        "feeGrowthInsidePeriod0": "0n",
+        "feeGrowthInsidePeriod1": "0n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "23063374227770n",
+            "owner": "0xdcE6F2ccaf54de860a5f80DB7503154957d216D5",
+            "isSubscribed": false,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "23063374227770n",
+            "owner": "0xdcE6F2ccaf54de860a5f80DB7503154957d216D5",
+            "isSubscribed": false,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE",
+        "feeGrowthInsidePeriod0Weighted": "0n",
+        "feeGrowthInsidePeriod1Weighted": "0n"
+      }
+    ],
+    [
+      "227084n",
+      {
+        "lastOwner": "0xabF76381Ab5538598AA4cd77d01De16c3F48a54A",
+        "tickLower": -887220,
+        "tickUpper": 887220,
+        "liquidity": "6992043339226n",
+        "feeGrowthInsidePeriod0": "659868328389392n",
+        "feeGrowthInsidePeriod1": "32596n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "6992043339226n",
+            "owner": "0xabF76381Ab5538598AA4cd77d01De16c3F48a54A",
+            "isSubscribed": false,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "6992043339226n",
+            "owner": "0xabF76381Ab5538598AA4cd77d01De16c3F48a54A",
+            "isSubscribed": false,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE",
+        "feeGrowthInsidePeriod0Weighted": "659868328389392n",
+        "feeGrowthInsidePeriod1Weighted": "32596n"
+      }
+    ],
+    [
+      "235971n",
+      {
+        "lastOwner": "0xCDA0c8a5f22565ae0efB889E5dBb6CE60498d0b4",
+        "tickLower": -238740,
+        "tickUpper": -231840,
+        "liquidity": "14878824778138n",
+        "feeGrowthInsidePeriod0": "1404176827633255n",
+        "feeGrowthInsidePeriod1": "69364n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "14878824778138n",
+            "owner": "0xCDA0c8a5f22565ae0efB889E5dBb6CE60498d0b4",
+            "isSubscribed": false,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "14878824778138n",
+            "owner": "0xCDA0c8a5f22565ae0efB889E5dBb6CE60498d0b4",
+            "isSubscribed": false,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE",
+        "feeGrowthInsidePeriod0Weighted": "1404176827633255n",
+        "feeGrowthInsidePeriod1Weighted": "69364n"
+      }
+    ],
+    [
+      "323328n",
+      {
+        "lastOwner": "0xB12Ab623e0F271485F536E6bdB1D922085f72Ec7",
+        "tickLower": -887220,
+        "tickUpper": 887220,
+        "liquidity": "152036287345n",
+        "feeGrowthInsidePeriod0": "14348299333622n",
+        "feeGrowthInsidePeriod1": "708n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "152036287345n",
+            "owner": "0xB12Ab623e0F271485F536E6bdB1D922085f72Ec7",
+            "isSubscribed": false,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "152036287345n",
+            "owner": "0xB12Ab623e0F271485F536E6bdB1D922085f72Ec7",
+            "isSubscribed": false,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE",
+        "feeGrowthInsidePeriod0Weighted": "14348299333622n",
+        "feeGrowthInsidePeriod1Weighted": "708n"
+      }
+    ],
+    [
+      "380398n",
+      {
+        "lastOwner": "0x82c19D247F9391f5749ccbb68f879192A72C78dA",
+        "tickLower": -230940,
+        "tickUpper": -229440,
+        "liquidity": "632075719414n",
+        "feeGrowthInsidePeriod0": "32429399705861n",
+        "feeGrowthInsidePeriod1": "1675n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "632075719414n",
+            "owner": "0x82c19D247F9391f5749ccbb68f879192A72C78dA",
+            "isSubscribed": false,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "632075719414n",
+            "owner": "0x82c19D247F9391f5749ccbb68f879192A72C78dA",
+            "isSubscribed": false,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE",
+        "feeGrowthInsidePeriod0Weighted": "32429399705861n",
+        "feeGrowthInsidePeriod1Weighted": "1675n"
+      }
+    ],
+    [
+      "397056n",
+      {
+        "lastOwner": "0x07C7d97B79881D8245Ee3Aa4dCE27fDfB2CC3130",
+        "tickLower": -230400,
+        "tickUpper": -229620,
+        "liquidity": "552820604842n",
+        "feeGrowthInsidePeriod0": "13084300709543n",
+        "feeGrowthInsidePeriod1": "866n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "552820604842n",
+            "owner": "0x07C7d97B79881D8245Ee3Aa4dCE27fDfB2CC3130",
+            "isSubscribed": false,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "552820604842n",
+            "owner": "0x07C7d97B79881D8245Ee3Aa4dCE27fDfB2CC3130",
+            "isSubscribed": false,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE",
+        "feeGrowthInsidePeriod0Weighted": "13084300709543n",
+        "feeGrowthInsidePeriod1Weighted": "866n"
+      }
+    ],
+    [
+      "473512n",
+      {
+        "lastOwner": "0x329e6cBdD16cAD2f51D97d2E8F09612f12D45A6d",
+        "tickLower": -230280,
+        "tickUpper": -228180,
+        "liquidity": "2134767548n",
+        "feeGrowthInsidePeriod0": "0n",
+        "feeGrowthInsidePeriod1": "0n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "2134767548n",
+            "owner": "0x329e6cBdD16cAD2f51D97d2E8F09612f12D45A6d",
+            "isSubscribed": false,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "2134767548n",
+            "owner": "0x329e6cBdD16cAD2f51D97d2E8F09612f12D45A6d",
+            "isSubscribed": false,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE",
+        "feeGrowthInsidePeriod0Weighted": "0n",
+        "feeGrowthInsidePeriod1Weighted": "0n"
+      }
+    ],
+    [
+      "499487n",
+      {
+        "lastOwner": "0x2fe6f7c52EccC8Fea03289EC10213033a7c364b7",
+        "tickLower": -228360,
+        "tickUpper": -227760,
+        "liquidity": "810223718752750n",
+        "feeGrowthInsidePeriod0": "0n",
+        "feeGrowthInsidePeriod1": "0n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "810223718752750n",
+            "owner": "0x2fe6f7c52EccC8Fea03289EC10213033a7c364b7",
+            "isSubscribed": false,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "810223718752750n",
+            "owner": "0x2fe6f7c52EccC8Fea03289EC10213033a7c364b7",
+            "isSubscribed": false,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE",
+        "feeGrowthInsidePeriod0Weighted": "0n",
+        "feeGrowthInsidePeriod1Weighted": "0n"
+      }
+    ],
+    [
+      "467685n",
+      {
+        "lastOwner": "0xc1612C97537c2CC62a11FC4516367AB6F62d4B23",
+        "tickLower": -887220,
+        "tickUpper": 887220,
+        "liquidity": "1059244542n",
+        "feeGrowthInsidePeriod0": "99965330787n",
+        "feeGrowthInsidePeriod1": "4n",
+        "feeGrowthInsidePeriod0Weighted": "99965330787n",
+        "feeGrowthInsidePeriod1Weighted": "4n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "1059244542n",
+            "owner": "0xc1612C97537c2CC62a11FC4516367AB6F62d4B23",
+            "isSubscribed": true,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "1059244542n",
+            "owner": "0xc1612C97537c2CC62a11FC4516367AB6F62d4B23",
+            "isSubscribed": true,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "467710n",
+      {
+        "lastOwner": "0x329e6cBdD16cAD2f51D97d2E8F09612f12D45A6d",
+        "tickLower": -887220,
+        "tickUpper": 887220,
+        "liquidity": "2973154045n",
+        "feeGrowthInsidePeriod0": "280588962987n",
+        "feeGrowthInsidePeriod1": "13n",
+        "feeGrowthInsidePeriod0Weighted": "280588962987n",
+        "feeGrowthInsidePeriod1Weighted": "13n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "2973154045n",
+            "owner": "0x329e6cBdD16cAD2f51D97d2E8F09612f12D45A6d",
+            "isSubscribed": false,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "2973154045n",
+            "owner": "0x329e6cBdD16cAD2f51D97d2E8F09612f12D45A6d",
+            "isSubscribed": false,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "473240n",
+      {
+        "lastOwner": "0xc1612C97537c2CC62a11FC4516367AB6F62d4B23",
+        "tickLower": -887220,
+        "tickUpper": 887220,
+        "liquidity": "1059244542n",
+        "feeGrowthInsidePeriod0": "99965330787n",
+        "feeGrowthInsidePeriod1": "4n",
+        "feeGrowthInsidePeriod0Weighted": "99965330787n",
+        "feeGrowthInsidePeriod1Weighted": "4n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "1059244542n",
+            "owner": "0xc1612C97537c2CC62a11FC4516367AB6F62d4B23",
+            "isSubscribed": true,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "1059244542n",
+            "owner": "0xc1612C97537c2CC62a11FC4516367AB6F62d4B23",
+            "isSubscribed": true,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "473521n",
+      {
+        "lastOwner": "0x329e6cBdD16cAD2f51D97d2E8F09612f12D45A6d",
+        "tickLower": -887220,
+        "tickUpper": 887220,
+        "liquidity": "8874241n",
+        "feeGrowthInsidePeriod0": "837499181n",
+        "feeGrowthInsidePeriod1": "0n",
+        "feeGrowthInsidePeriod0Weighted": "837499181n",
+        "feeGrowthInsidePeriod1Weighted": "0n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "8874241n",
+            "owner": "0x329e6cBdD16cAD2f51D97d2E8F09612f12D45A6d",
+            "isSubscribed": false,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "8874241n",
+            "owner": "0x329e6cBdD16cAD2f51D97d2E8F09612f12D45A6d",
+            "isSubscribed": false,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "504866n",
+      {
+        "lastOwner": "0xa4fF2Ff7c9dCc78b76Ac381E2d06938B88bd8804",
+        "tickLower": -887220,
+        "tickUpper": 887220,
+        "liquidity": "4858050187327n",
+        "feeGrowthInsidePeriod0": "458474483182780n",
+        "feeGrowthInsidePeriod1": "22647n",
+        "feeGrowthInsidePeriod0Weighted": "458474483182780n",
+        "feeGrowthInsidePeriod1Weighted": "22647n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "4858050187327n",
+            "owner": "0xa4fF2Ff7c9dCc78b76Ac381E2d06938B88bd8804",
+            "isSubscribed": true,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "4858050187327n",
+            "owner": "0xa4fF2Ff7c9dCc78b76Ac381E2d06938B88bd8804",
+            "isSubscribed": true,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "505377n",
+      {
+        "lastOwner": "0xCD7a60306d8315B0b611De60B38Ae0B623062b2e",
+        "tickLower": -229500,
+        "tickUpper": -226200,
+        "liquidity": "0n",
+        "feeGrowthInsidePeriod0": "0n",
+        "feeGrowthInsidePeriod1": "0n",
+        "feeGrowthInsidePeriod0Weighted": "0n",
+        "feeGrowthInsidePeriod1Weighted": "0n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "25808586590156n",
+            "owner": "0xCD7a60306d8315B0b611De60B38Ae0B623062b2e",
+            "isSubscribed": true,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38675719n",
+            "newLiquidityAmount": "25808586590156n",
+            "owner": "0xCD7a60306d8315B0b611De60B38Ae0B623062b2e",
+            "isSubscribed": false,
+            "type": "unsubscribe"
+          },
+          {
+            "blockNumber": "38675719n",
+            "newLiquidityAmount": "0n",
+            "owner": "0xCD7a60306d8315B0b611De60B38Ae0B623062b2e",
+            "isSubscribed": false,
+            "type": "positionUpdate"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "0n",
+            "owner": "0xCD7a60306d8315B0b611De60B38Ae0B623062b2e",
+            "isSubscribed": false,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "ACTIVE"
+      }
+    ],
+    [
+      "505745n",
+      {
+        "lastOwner": "0x93E7fB017883f56fBc43f5723eCcCf6bF90FE6cF",
+        "tickLower": -233820,
+        "tickUpper": -226920,
+        "liquidity": "0n",
+        "feeGrowthInsidePeriod0": "0n",
+        "feeGrowthInsidePeriod1": "0n",
+        "feeGrowthInsidePeriod0Weighted": "0n",
+        "feeGrowthInsidePeriod1Weighted": "0n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "2667175614449n",
+            "owner": "0x93E7fB017883f56fBc43f5723eCcCf6bF90FE6cF",
+            "isSubscribed": true,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38742656n",
+            "newLiquidityAmount": "2667175614449n",
+            "owner": "0x93E7fB017883f56fBc43f5723eCcCf6bF90FE6cF",
+            "isSubscribed": false,
+            "type": "unsubscribe"
+          },
+          {
+            "blockNumber": "38742656n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x93E7fB017883f56fBc43f5723eCcCf6bF90FE6cF",
+            "isSubscribed": false,
+            "type": "positionUpdate"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x93E7fB017883f56fBc43f5723eCcCf6bF90FE6cF",
+            "isSubscribed": false,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "506486n",
+      {
+        "lastOwner": "0x4651B2E464e94c730725F3D5B2737418E2e5fd32",
+        "tickLower": -887220,
+        "tickUpper": 887220,
+        "liquidity": "24868702919482n",
+        "feeGrowthInsidePeriod0": "2346963345125310n",
+        "feeGrowthInsidePeriod1": "115936n",
+        "feeGrowthInsidePeriod0Weighted": "2346963345125310n",
+        "feeGrowthInsidePeriod1Weighted": "115936n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "24868702919482n",
+            "owner": "0x4651B2E464e94c730725F3D5B2737418E2e5fd32",
+            "isSubscribed": true,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "24868702919482n",
+            "owner": "0x4651B2E464e94c730725F3D5B2737418E2e5fd32",
+            "isSubscribed": true,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "510443n",
+      {
+        "lastOwner": "0xBa44825f3215A71b34a702A70373afF8d4A52390",
+        "tickLower": -236340,
+        "tickUpper": -227940,
+        "liquidity": "18556086886349n",
+        "feeGrowthInsidePeriod0": "1343725360978960n",
+        "feeGrowthInsidePeriod1": "65657n",
+        "feeGrowthInsidePeriod0Weighted": "1343725360978960n",
+        "feeGrowthInsidePeriod1Weighted": "65657n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "18556086886349n",
+            "owner": "0xBa44825f3215A71b34a702A70373afF8d4A52390",
+            "isSubscribed": true,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "18556086886349n",
+            "owner": "0xBa44825f3215A71b34a702A70373afF8d4A52390",
+            "isSubscribed": true,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "535036n",
+      {
+        "lastOwner": "0x87029960cb6d1011289d35bC8944d37B88C46B72",
+        "tickLower": -243420,
+        "tickUpper": -223980,
+        "liquidity": "645825640325n",
+        "feeGrowthInsidePeriod0": "60949262617048n",
+        "feeGrowthInsidePeriod1": "3010n",
+        "feeGrowthInsidePeriod0Weighted": "60949262617048n",
+        "feeGrowthInsidePeriod1Weighted": "3010n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "645825640325n",
+            "owner": "0x87029960cb6d1011289d35bC8944d37B88C46B72",
+            "isSubscribed": true,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "645825640325n",
+            "owner": "0x87029960cb6d1011289d35bC8944d37B88C46B72",
+            "isSubscribed": true,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "535083n",
+      {
+        "lastOwner": "0x87029960cb6d1011289d35bC8944d37B88C46B72",
+        "tickLower": -243420,
+        "tickUpper": -222660,
+        "liquidity": "537839520148n",
+        "feeGrowthInsidePeriod0": "50758161510637n",
+        "feeGrowthInsidePeriod1": "2507n",
+        "feeGrowthInsidePeriod0Weighted": "50758161510637n",
+        "feeGrowthInsidePeriod1Weighted": "2507n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "537839520148n",
+            "owner": "0x87029960cb6d1011289d35bC8944d37B88C46B72",
+            "isSubscribed": true,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "537839520148n",
+            "owner": "0x87029960cb6d1011289d35bC8944d37B88C46B72",
+            "isSubscribed": true,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "586835n",
+      {
+        "lastOwner": "0xdcE6F2ccaf54de860a5f80DB7503154957d216D5",
+        "tickLower": -238020,
+        "tickUpper": -228420,
+        "liquidity": "11007862263618n",
+        "feeGrowthInsidePeriod0": "1038857930168144n",
+        "feeGrowthInsidePeriod1": "51317n",
+        "feeGrowthInsidePeriod0Weighted": "1038857930168144n",
+        "feeGrowthInsidePeriod1Weighted": "51317n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "11007862263618n",
+            "owner": "0xdcE6F2ccaf54de860a5f80DB7503154957d216D5",
+            "isSubscribed": true,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "11007862263618n",
+            "owner": "0xdcE6F2ccaf54de860a5f80DB7503154957d216D5",
+            "isSubscribed": true,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "596119n",
+      {
+        "lastOwner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+        "tickLower": -237180,
+        "tickUpper": -233880,
+        "liquidity": "62931445477964n",
+        "feeGrowthInsidePeriod0": "1808798689037769n",
+        "feeGrowthInsidePeriod1": "102796n",
+        "feeGrowthInsidePeriod0Weighted": "1808798689037769n",
+        "feeGrowthInsidePeriod1Weighted": "102796n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "1872597372909n",
+            "owner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+            "isSubscribed": true,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38877018n",
+            "newLiquidityAmount": "62931445477964n",
+            "owner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+            "isSubscribed": true,
+            "type": "positionUpdate"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "62931445477964n",
+            "owner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+            "isSubscribed": true,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "614356n",
+      {
+        "lastOwner": "0x248784Af80094fe92F915674b2f4409366443562",
+        "tickLower": -289140,
+        "tickUpper": -230160,
+        "liquidity": "4690201560669n",
+        "feeGrowthInsidePeriod0": "442633907356554n",
+        "feeGrowthInsidePeriod1": "21865n",
+        "feeGrowthInsidePeriod0Weighted": "442633907356554n",
+        "feeGrowthInsidePeriod1Weighted": "21865n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "4690201560669n",
+            "owner": "0x248784Af80094fe92F915674b2f4409366443562",
+            "isSubscribed": true,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "4690201560669n",
+            "owner": "0x248784Af80094fe92F915674b2f4409366443562",
+            "isSubscribed": true,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "615214n",
+      {
+        "lastOwner": "0xdcE6F2ccaf54de860a5f80DB7503154957d216D5",
+        "tickLower": -887220,
+        "tickUpper": 887220,
+        "liquidity": "1782299610957n",
+        "feeGrowthInsidePeriod0": "168203057091097n",
+        "feeGrowthInsidePeriod1": "8308n",
+        "feeGrowthInsidePeriod0Weighted": "168203057091097n",
+        "feeGrowthInsidePeriod1Weighted": "8308n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "1782299610957n",
+            "owner": "0xdcE6F2ccaf54de860a5f80DB7503154957d216D5",
+            "isSubscribed": true,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "1782299610957n",
+            "owner": "0xdcE6F2ccaf54de860a5f80DB7503154957d216D5",
+            "isSubscribed": true,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "629834n",
+      {
+        "lastOwner": "0x5196E6ff6b95536874ba6405c11f465e026099e0",
+        "tickLower": -887220,
+        "tickUpper": 887220,
+        "liquidity": "1507057120407n",
+        "feeGrowthInsidePeriod0": "142227273857313n",
+        "feeGrowthInsidePeriod1": "7025n",
+        "feeGrowthInsidePeriod0Weighted": "142227273857313n",
+        "feeGrowthInsidePeriod1Weighted": "7025n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "1507057120407n",
+            "owner": "0x5196E6ff6b95536874ba6405c11f465e026099e0",
+            "isSubscribed": true,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "1507057120407n",
+            "owner": "0x5196E6ff6b95536874ba6405c11f465e026099e0",
+            "isSubscribed": true,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "637910n",
+      {
+        "lastOwner": "0xCDA0c8a5f22565ae0efB889E5dBb6CE60498d0b4",
+        "tickLower": -241380,
+        "tickUpper": -234420,
+        "liquidity": "31759446116948n",
+        "feeGrowthInsidePeriod0": "2997271556111857n",
+        "feeGrowthInsidePeriod1": "148059n",
+        "feeGrowthInsidePeriod0Weighted": "2997271556111857n",
+        "feeGrowthInsidePeriod1Weighted": "148059n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "31759446116948n",
+            "owner": "0xCDA0c8a5f22565ae0efB889E5dBb6CE60498d0b4",
+            "isSubscribed": true,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38782674n",
+            "newLiquidityAmount": "31759446116948n",
+            "owner": "0xCDA0c8a5f22565ae0efB889E5dBb6CE60498d0b4",
+            "isSubscribed": true,
+            "type": "claim"
+          },
+          {
+            "blockNumber": "38955952n",
+            "newLiquidityAmount": "31759446116948n",
+            "owner": "0xCDA0c8a5f22565ae0efB889E5dBb6CE60498d0b4",
+            "isSubscribed": true,
+            "type": "claim"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "31759446116948n",
+            "owner": "0xCDA0c8a5f22565ae0efB889E5dBb6CE60498d0b4",
+            "isSubscribed": true,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "639470n",
+      {
+        "lastOwner": "0xe3B1ebcD19c28459aD75B44C13095cA93E53cbB0",
+        "tickLower": -887220,
+        "tickUpper": 887220,
+        "liquidity": "2845132999791n",
+        "feeGrowthInsidePeriod0": "268507082341027n",
+        "feeGrowthInsidePeriod1": "13263n",
+        "feeGrowthInsidePeriod0Weighted": "268507082341027n",
+        "feeGrowthInsidePeriod1Weighted": "13263n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "2845132999791n",
+            "owner": "0xe3B1ebcD19c28459aD75B44C13095cA93E53cbB0",
+            "isSubscribed": true,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "2845132999791n",
+            "owner": "0xe3B1ebcD19c28459aD75B44C13095cA93E53cbB0",
+            "isSubscribed": true,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "639620n",
+      {
+        "lastOwner": "0xf6786b4edFa78d8d5cbfB93A97fF260e873152Be",
+        "tickLower": -246960,
+        "tickUpper": -233580,
+        "liquidity": "73488024796555n",
+        "feeGrowthInsidePeriod0": "6935371782822640n",
+        "feeGrowthInsidePeriod1": "342596n",
+        "feeGrowthInsidePeriod0Weighted": "6935371782822640n",
+        "feeGrowthInsidePeriod1Weighted": "342596n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "73488024796555n",
+            "owner": "0xf6786b4edFa78d8d5cbfB93A97fF260e873152Be",
+            "isSubscribed": true,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "73488024796555n",
+            "owner": "0xf6786b4edFa78d8d5cbfB93A97fF260e873152Be",
+            "isSubscribed": true,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "653508n",
+      {
+        "lastOwner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+        "tickLower": -239400,
+        "tickUpper": -235380,
+        "liquidity": "0n",
+        "feeGrowthInsidePeriod0": "2820620369867434n",
+        "feeGrowthInsidePeriod1": "221762n",
+        "feeGrowthInsidePeriod0Weighted": "2820620369867434n",
+        "feeGrowthInsidePeriod1Weighted": "221762n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "187411627840128n",
+            "owner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+            "isSubscribed": true,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38738890n",
+            "newLiquidityAmount": "46852906960032n",
+            "owner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+            "isSubscribed": true,
+            "type": "positionUpdate"
+          },
+          {
+            "blockNumber": "38794193n",
+            "newLiquidityAmount": "46852906960032n",
+            "owner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+            "isSubscribed": false,
+            "type": "unsubscribe"
+          },
+          {
+            "blockNumber": "38794193n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+            "isSubscribed": false,
+            "type": "positionUpdate"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+            "isSubscribed": false,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "685612n",
+      {
+        "lastOwner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+        "tickLower": -240720,
+        "tickUpper": -236520,
+        "liquidity": "0n",
+        "feeGrowthInsidePeriod0": "0n",
+        "feeGrowthInsidePeriod1": "0n",
+        "feeGrowthInsidePeriod0Weighted": "0n",
+        "feeGrowthInsidePeriod1Weighted": "0n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "6812414786848n",
+            "owner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+            "isSubscribed": true,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38738851n",
+            "newLiquidityAmount": "1703103696712n",
+            "owner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+            "isSubscribed": true,
+            "type": "positionUpdate"
+          },
+          {
+            "blockNumber": "38794173n",
+            "newLiquidityAmount": "1703103696712n",
+            "owner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+            "isSubscribed": false,
+            "type": "unsubscribe"
+          },
+          {
+            "blockNumber": "38794173n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+            "isSubscribed": false,
+            "type": "positionUpdate"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+            "isSubscribed": false,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "702133n",
+      {
+        "lastOwner": "0xf51435DD16E9a346f016A0a9123A7A87D80b28AA",
+        "tickLower": -887220,
+        "tickUpper": 887220,
+        "liquidity": "0n",
+        "feeGrowthInsidePeriod0": "26609882175202n",
+        "feeGrowthInsidePeriod1": "2388n",
+        "feeGrowthInsidePeriod0Weighted": "26609882175202n",
+        "feeGrowthInsidePeriod1Weighted": "2388n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "1558602158365n",
+            "owner": "0xf51435DD16E9a346f016A0a9123A7A87D80b28AA",
+            "isSubscribed": true,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38742701n",
+            "newLiquidityAmount": "1558602158365n",
+            "owner": "0xf51435DD16E9a346f016A0a9123A7A87D80b28AA",
+            "isSubscribed": false,
+            "type": "unsubscribe"
+          },
+          {
+            "blockNumber": "38742701n",
+            "newLiquidityAmount": "0n",
+            "owner": "0xf51435DD16E9a346f016A0a9123A7A87D80b28AA",
+            "isSubscribed": false,
+            "type": "positionUpdate"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "0n",
+            "owner": "0xf51435DD16E9a346f016A0a9123A7A87D80b28AA",
+            "isSubscribed": false,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "705559n",
+      {
+        "lastOwner": "0x87029960cb6d1011289d35bC8944d37B88C46B72",
+        "tickLower": -238080,
+        "tickUpper": -236820,
+        "liquidity": "0n",
+        "feeGrowthInsidePeriod0": "0n",
+        "feeGrowthInsidePeriod1": "0n",
+        "feeGrowthInsidePeriod0Weighted": "0n",
+        "feeGrowthInsidePeriod1Weighted": "0n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "7118775252987n",
+            "owner": "0x87029960cb6d1011289d35bC8944d37B88C46B72",
+            "isSubscribed": true,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38734257n",
+            "newLiquidityAmount": "7118775252987n",
+            "owner": "0x87029960cb6d1011289d35bC8944d37B88C46B72",
+            "isSubscribed": true,
+            "type": "claim"
+          },
+          {
+            "blockNumber": "38734321n",
+            "newLiquidityAmount": "7118775252987n",
+            "owner": "0x87029960cb6d1011289d35bC8944d37B88C46B72",
+            "isSubscribed": false,
+            "type": "unsubscribe"
+          },
+          {
+            "blockNumber": "38734321n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x87029960cb6d1011289d35bC8944d37B88C46B72",
+            "isSubscribed": false,
+            "type": "positionUpdate"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x87029960cb6d1011289d35bC8944d37B88C46B72",
+            "isSubscribed": false,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "705583n",
+      {
+        "lastOwner": "0x87029960cb6d1011289d35bC8944d37B88C46B72",
+        "tickLower": -239700,
+        "tickUpper": -235560,
+        "liquidity": "0n",
+        "feeGrowthInsidePeriod0": "267813297114827n",
+        "feeGrowthInsidePeriod1": "16830n",
+        "feeGrowthInsidePeriod0Weighted": "267813297114827n",
+        "feeGrowthInsidePeriod1Weighted": "16830n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "2364958110206n",
+            "owner": "0x87029960cb6d1011289d35bC8944d37B88C46B72",
+            "isSubscribed": true,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38827203n",
+            "newLiquidityAmount": "2364958110206n",
+            "owner": "0x87029960cb6d1011289d35bC8944d37B88C46B72",
+            "isSubscribed": true,
+            "type": "claim"
+          },
+          {
+            "blockNumber": "38827418n",
+            "newLiquidityAmount": "2364958110206n",
+            "owner": "0x87029960cb6d1011289d35bC8944d37B88C46B72",
+            "isSubscribed": false,
+            "type": "unsubscribe"
+          },
+          {
+            "blockNumber": "38827475n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x87029960cb6d1011289d35bC8944d37B88C46B72",
+            "isSubscribed": false,
+            "type": "positionUpdate"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x87029960cb6d1011289d35bC8944d37B88C46B72",
+            "isSubscribed": false,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "705595n",
+      {
+        "lastOwner": "0x87029960cb6d1011289d35bC8944d37B88C46B72",
+        "tickLower": -244380,
+        "tickUpper": -233340,
+        "liquidity": "1137590132472n",
+        "feeGrowthInsidePeriod0": "107359131327933n",
+        "feeGrowthInsidePeriod1": "5303n",
+        "feeGrowthInsidePeriod0Weighted": "107359131327933n",
+        "feeGrowthInsidePeriod1Weighted": "5303n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "1137590132472n",
+            "owner": "0x87029960cb6d1011289d35bC8944d37B88C46B72",
+            "isSubscribed": true,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "1137590132472n",
+            "owner": "0x87029960cb6d1011289d35bC8944d37B88C46B72",
+            "isSubscribed": true,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "718028n",
+      {
+        "lastOwner": "0xB70D29deCca758BB72Cd2967a989782F3acAd3e6",
+        "tickLower": -240420,
+        "tickUpper": -234900,
+        "liquidity": "26897112380354n",
+        "feeGrowthInsidePeriod0": "2531726760362317n",
+        "feeGrowthInsidePeriod1": "124972n",
+        "feeGrowthInsidePeriod0Weighted": "2531726760362317n",
+        "feeGrowthInsidePeriod1Weighted": "124972n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "26897112380354n",
+            "owner": "0xB70D29deCca758BB72Cd2967a989782F3acAd3e6",
+            "isSubscribed": true,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "26897112380354n",
+            "owner": "0xB70D29deCca758BB72Cd2967a989782F3acAd3e6",
+            "isSubscribed": true,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "719847n",
+      {
+        "lastOwner": "0xc38eDb1B53c7c034867BdE801e24826687F24466",
+        "tickLower": -237420,
+        "tickUpper": -235080,
+        "liquidity": "25307608599576n",
+        "feeGrowthInsidePeriod0": "2185306655452670n",
+        "feeGrowthInsidePeriod1": "105303n",
+        "feeGrowthInsidePeriod0Weighted": "2185306655452670n",
+        "feeGrowthInsidePeriod1Weighted": "105303n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "25307608599576n",
+            "owner": "0xc38eDb1B53c7c034867BdE801e24826687F24466",
+            "isSubscribed": true,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38718463n",
+            "newLiquidityAmount": "25307608599576n",
+            "owner": "0xc38eDb1B53c7c034867BdE801e24826687F24466",
+            "isSubscribed": true,
+            "type": "claim"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "25307608599576n",
+            "owner": "0xc38eDb1B53c7c034867BdE801e24826687F24466",
+            "isSubscribed": true,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "722327n",
+      {
+        "lastOwner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+        "tickLower": -238260,
+        "tickUpper": -237060,
+        "liquidity": "0n",
+        "feeGrowthInsidePeriod0": "0n",
+        "feeGrowthInsidePeriod1": "0n",
+        "feeGrowthInsidePeriod0Weighted": "0n",
+        "feeGrowthInsidePeriod1Weighted": "0n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "1198054202350n",
+            "owner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+            "isSubscribed": true,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38770512n",
+            "newLiquidityAmount": "1198054202350n",
+            "owner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+            "isSubscribed": false,
+            "type": "unsubscribe"
+          },
+          {
+            "blockNumber": "38770512n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+            "isSubscribed": false,
+            "type": "positionUpdate"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+            "isSubscribed": false,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "723333n",
+      {
+        "lastOwner": "0x0380ad3322Df94334C2f30CEE24D3086FC6F3445",
+        "tickLower": -239640,
+        "tickUpper": -233880,
+        "liquidity": "154582879952592n",
+        "feeGrowthInsidePeriod0": "14588631912459892n",
+        "feeGrowthInsidePeriod1": "720654n",
+        "feeGrowthInsidePeriod0Weighted": "14588631912459892n",
+        "feeGrowthInsidePeriod1Weighted": "720654n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "154582879952592n",
+            "owner": "0x0380ad3322Df94334C2f30CEE24D3086FC6F3445",
+            "isSubscribed": true,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "154582879952592n",
+            "owner": "0x0380ad3322Df94334C2f30CEE24D3086FC6F3445",
+            "isSubscribed": true,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "725006n",
+      {
+        "lastOwner": "0xBa44825f3215A71b34a702A70373afF8d4A52390",
+        "tickLower": -245280,
+        "tickUpper": -234360,
+        "liquidity": "9489152216413n",
+        "feeGrowthInsidePeriod0": "895530920946792n",
+        "feeGrowthInsidePeriod1": "44237n",
+        "feeGrowthInsidePeriod0Weighted": "895530920946792n",
+        "feeGrowthInsidePeriod1Weighted": "44237n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "9489152216413n",
+            "owner": "0xBa44825f3215A71b34a702A70373afF8d4A52390",
+            "isSubscribed": true,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "9489152216413n",
+            "owner": "0xBa44825f3215A71b34a702A70373afF8d4A52390",
+            "isSubscribed": true,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "729148n",
+      {
+        "lastOwner": "0x3663b2EE275616bfA14e77c69dc02b79e6C580F0",
+        "tickLower": -238080,
+        "tickUpper": -235560,
+        "liquidity": "0n",
+        "feeGrowthInsidePeriod0": "155831550992544n",
+        "feeGrowthInsidePeriod1": "13069n",
+        "feeGrowthInsidePeriod0Weighted": "155831550992544n",
+        "feeGrowthInsidePeriod1Weighted": "13069n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "20238571594868n",
+            "owner": "0x3663b2EE275616bfA14e77c69dc02b79e6C580F0",
+            "isSubscribed": true,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38734165n",
+            "newLiquidityAmount": "20238571594868n",
+            "owner": "0x3663b2EE275616bfA14e77c69dc02b79e6C580F0",
+            "isSubscribed": false,
+            "type": "unsubscribe"
+          },
+          {
+            "blockNumber": "38734165n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x3663b2EE275616bfA14e77c69dc02b79e6C580F0",
+            "isSubscribed": false,
+            "type": "positionUpdate"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x3663b2EE275616bfA14e77c69dc02b79e6C580F0",
+            "isSubscribed": false,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "733714n",
+      {
+        "lastOwner": "0xdcE6F2ccaf54de860a5f80DB7503154957d216D5",
+        "tickLower": -249240,
+        "tickUpper": -234600,
+        "liquidity": "8955286477830n",
+        "feeGrowthInsidePeriod0": "845147781796781n",
+        "feeGrowthInsidePeriod1": "41748n",
+        "feeGrowthInsidePeriod0Weighted": "845147781796781n",
+        "feeGrowthInsidePeriod1Weighted": "41748n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "8955286477830n",
+            "owner": "0xdcE6F2ccaf54de860a5f80DB7503154957d216D5",
+            "isSubscribed": true,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "8955286477830n",
+            "owner": "0xdcE6F2ccaf54de860a5f80DB7503154957d216D5",
+            "isSubscribed": true,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "733859n",
+      {
+        "lastOwner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+        "tickLower": -236760,
+        "tickUpper": -236160,
+        "liquidity": "0n",
+        "feeGrowthInsidePeriod0": "11918017648000593n",
+        "feeGrowthInsidePeriod1": "675447n",
+        "feeGrowthInsidePeriod0Weighted": "11918017648000593n",
+        "feeGrowthInsidePeriod1Weighted": "675447n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "16193315429854n",
+            "owner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+            "isSubscribed": true,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38770527n",
+            "newLiquidityAmount": "16193315429854n",
+            "owner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+            "isSubscribed": false,
+            "type": "unsubscribe"
+          },
+          {
+            "blockNumber": "38770527n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+            "isSubscribed": false,
+            "type": "positionUpdate"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+            "isSubscribed": false,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "738620n",
+      {
+        "lastOwner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+        "tickLower": -239580,
+        "tickUpper": -236700,
+        "liquidity": "0n",
+        "feeGrowthInsidePeriod0": "0n",
+        "feeGrowthInsidePeriod1": "0n",
+        "feeGrowthInsidePeriod0Weighted": "0n",
+        "feeGrowthInsidePeriod1Weighted": "0n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "3475971120953n",
+            "owner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+            "isSubscribed": true,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38770545n",
+            "newLiquidityAmount": "3475971120953n",
+            "owner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+            "isSubscribed": false,
+            "type": "unsubscribe"
+          },
+          {
+            "blockNumber": "38770545n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+            "isSubscribed": false,
+            "type": "positionUpdate"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+            "isSubscribed": false,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "742289n",
+      {
+        "lastOwner": "0x8F1c51E98Af7C7dbB24654ACB05781E0e96e008F",
+        "tickLower": -238980,
+        "tickUpper": -234600,
+        "liquidity": "183887517976250n",
+        "feeGrowthInsidePeriod0": "17354232977636930n",
+        "feeGrowthInsidePeriod1": "857270n",
+        "feeGrowthInsidePeriod0Weighted": "17354232977636930n",
+        "feeGrowthInsidePeriod1Weighted": "857270n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "183887517976250n",
+            "owner": "0x8F1c51E98Af7C7dbB24654ACB05781E0e96e008F",
+            "isSubscribed": true,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "183887517976250n",
+            "owner": "0x8F1c51E98Af7C7dbB24654ACB05781E0e96e008F",
+            "isSubscribed": true,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "747705n",
+      {
+        "lastOwner": "0xd0c500840B393f95F2Fc74E2Cbd86AA89720c8a2",
+        "tickLower": -247800,
+        "tickUpper": -233100,
+        "liquidity": "51863034510295n",
+        "feeGrowthInsidePeriod0": "4894531144496326n",
+        "feeGrowthInsidePeriod1": "241781n",
+        "feeGrowthInsidePeriod0Weighted": "4894531144496326n",
+        "feeGrowthInsidePeriod1Weighted": "241781n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "51863034510295n",
+            "owner": "0xd0c500840B393f95F2Fc74E2Cbd86AA89720c8a2",
+            "isSubscribed": true,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "51863034510295n",
+            "owner": "0xd0c500840B393f95F2Fc74E2Cbd86AA89720c8a2",
+            "isSubscribed": true,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "757614n",
+      {
+        "lastOwner": "0xCD7a60306d8315B0b611De60B38Ae0B623062b2e",
+        "tickLower": -242580,
+        "tickUpper": -228660,
+        "liquidity": "5537186644312n",
+        "feeGrowthInsidePeriod0": "453094845267339n",
+        "feeGrowthInsidePeriod1": "21075n",
+        "feeGrowthInsidePeriod0Weighted": "0n",
+        "feeGrowthInsidePeriod1Weighted": "0n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x0000000000000000000000000000000000000000",
+            "isSubscribed": false,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38722535n",
+            "newLiquidityAmount": "2937276670261n",
+            "owner": "0xCD7a60306d8315B0b611De60B38Ae0B623062b2e",
+            "isSubscribed": false,
+            "type": "positionUpdate"
+          },
+          {
+            "blockNumber": "38722637n",
+            "newLiquidityAmount": "2937276670261n",
+            "owner": "0xCD7a60306d8315B0b611De60B38Ae0B623062b2e",
+            "isSubscribed": true,
+            "type": "subscribe"
+          },
+          {
+            "blockNumber": "38722917n",
+            "newLiquidityAmount": "5537186644312n",
+            "owner": "0xCD7a60306d8315B0b611De60B38Ae0B623062b2e",
+            "isSubscribed": true,
+            "type": "positionUpdate"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "5537186644312n",
+            "owner": "0xCD7a60306d8315B0b611De60B38Ae0B623062b2e",
+            "isSubscribed": true,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "ACTIVE"
+      }
+    ],
+    [
+      "759999n",
+      {
+        "lastOwner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+        "tickLower": -236220,
+        "tickUpper": -234540,
+        "liquidity": "4014173180085n",
+        "feeGrowthInsidePeriod0": "16825377983726846n",
+        "feeGrowthInsidePeriod1": "515939n",
+        "feeGrowthInsidePeriod0Weighted": "16825377983726846n",
+        "feeGrowthInsidePeriod1Weighted": "515939n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x0000000000000000000000000000000000000000",
+            "isSubscribed": false,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38739356n",
+            "newLiquidityAmount": "299663946282003n",
+            "owner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+            "isSubscribed": false,
+            "type": "positionUpdate"
+          },
+          {
+            "blockNumber": "38739367n",
+            "newLiquidityAmount": "299663946282003n",
+            "owner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+            "isSubscribed": true,
+            "type": "subscribe"
+          },
+          {
+            "blockNumber": "38794331n",
+            "newLiquidityAmount": "401417318008471n",
+            "owner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+            "isSubscribed": true,
+            "type": "positionUpdate"
+          },
+          {
+            "blockNumber": "38876761n",
+            "newLiquidityAmount": "4014173180085n",
+            "owner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+            "isSubscribed": true,
+            "type": "positionUpdate"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "4014173180085n",
+            "owner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+            "isSubscribed": true,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "760508n",
+      {
+        "lastOwner": "0xf51435DD16E9a346f016A0a9123A7A87D80b28AA",
+        "tickLower": -238980,
+        "tickUpper": -233340,
+        "liquidity": "0n",
+        "feeGrowthInsidePeriod0": "73757109013200n",
+        "feeGrowthInsidePeriod1": "7927n",
+        "feeGrowthInsidePeriod0Weighted": "0n",
+        "feeGrowthInsidePeriod1Weighted": "0n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x0000000000000000000000000000000000000000",
+            "isSubscribed": false,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38742778n",
+            "newLiquidityAmount": "9484048461408n",
+            "owner": "0xf51435DD16E9a346f016A0a9123A7A87D80b28AA",
+            "isSubscribed": false,
+            "type": "positionUpdate"
+          },
+          {
+            "blockNumber": "38742807n",
+            "newLiquidityAmount": "9484048461408n",
+            "owner": "0xf51435DD16E9a346f016A0a9123A7A87D80b28AA",
+            "isSubscribed": true,
+            "type": "subscribe"
+          },
+          {
+            "blockNumber": "38750571n",
+            "newLiquidityAmount": "12017810795975n",
+            "owner": "0xf51435DD16E9a346f016A0a9123A7A87D80b28AA",
+            "isSubscribed": true,
+            "type": "positionUpdate"
+          },
+          {
+            "blockNumber": "38780437n",
+            "newLiquidityAmount": "12017810795975n",
+            "owner": "0xf51435DD16E9a346f016A0a9123A7A87D80b28AA",
+            "isSubscribed": false,
+            "type": "unsubscribe"
+          },
+          {
+            "blockNumber": "38780437n",
+            "newLiquidityAmount": "0n",
+            "owner": "0xf51435DD16E9a346f016A0a9123A7A87D80b28AA",
+            "isSubscribed": false,
+            "type": "positionUpdate"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "0n",
+            "owner": "0xf51435DD16E9a346f016A0a9123A7A87D80b28AA",
+            "isSubscribed": false,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "ACTIVE"
+      }
+    ],
+    [
+      "760549n",
+      {
+        "lastOwner": "0x93E7fB017883f56fBc43f5723eCcCf6bF90FE6cF",
+        "tickLower": -237240,
+        "tickUpper": -230100,
+        "liquidity": "2262822747402n",
+        "feeGrowthInsidePeriod0": "174919051684903n",
+        "feeGrowthInsidePeriod1": "7081n",
+        "feeGrowthInsidePeriod0Weighted": "174919051684903n",
+        "feeGrowthInsidePeriod1Weighted": "7081n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x0000000000000000000000000000000000000000",
+            "isSubscribed": false,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38742973n",
+            "newLiquidityAmount": "2262822747402n",
+            "owner": "0x93E7fB017883f56fBc43f5723eCcCf6bF90FE6cF",
+            "isSubscribed": false,
+            "type": "positionUpdate"
+          },
+          {
+            "blockNumber": "38743016n",
+            "newLiquidityAmount": "2262822747402n",
+            "owner": "0x93E7fB017883f56fBc43f5723eCcCf6bF90FE6cF",
+            "isSubscribed": true,
+            "type": "subscribe"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "2262822747402n",
+            "owner": "0x93E7fB017883f56fBc43f5723eCcCf6bF90FE6cF",
+            "isSubscribed": true,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "763406n",
+      {
+        "lastOwner": "0x5196E6ff6b95536874ba6405c11f465e026099e0",
+        "tickLower": -887220,
+        "tickUpper": 887220,
+        "liquidity": "1218383449308n",
+        "feeGrowthInsidePeriod0": "91477026863724n",
+        "feeGrowthInsidePeriod1": "3215n",
+        "feeGrowthInsidePeriod0Weighted": "91477026863724n",
+        "feeGrowthInsidePeriod1Weighted": "3215n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x0000000000000000000000000000000000000000",
+            "isSubscribed": false,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38765809n",
+            "newLiquidityAmount": "1218383449308n",
+            "owner": "0x5196E6ff6b95536874ba6405c11f465e026099e0",
+            "isSubscribed": false,
+            "type": "positionUpdate"
+          },
+          {
+            "blockNumber": "38765853n",
+            "newLiquidityAmount": "1218383449308n",
+            "owner": "0x5196E6ff6b95536874ba6405c11f465e026099e0",
+            "isSubscribed": true,
+            "type": "subscribe"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "1218383449308n",
+            "owner": "0x5196E6ff6b95536874ba6405c11f465e026099e0",
+            "isSubscribed": true,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "764022n",
+      {
+        "lastOwner": "0xdcE6F2ccaf54de860a5f80DB7503154957d216D5",
+        "tickLower": -249240,
+        "tickUpper": -233820,
+        "liquidity": "19721900965007n",
+        "feeGrowthInsidePeriod0": "1406890893855209n",
+        "feeGrowthInsidePeriod1": "48631n",
+        "feeGrowthInsidePeriod0Weighted": "1406890893855209n",
+        "feeGrowthInsidePeriod1Weighted": "48631n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x0000000000000000000000000000000000000000",
+            "isSubscribed": false,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38772781n",
+            "newLiquidityAmount": "19721900965007n",
+            "owner": "0xdcE6F2ccaf54de860a5f80DB7503154957d216D5",
+            "isSubscribed": false,
+            "type": "positionUpdate"
+          },
+          {
+            "blockNumber": "38772809n",
+            "newLiquidityAmount": "19721900965007n",
+            "owner": "0xdcE6F2ccaf54de860a5f80DB7503154957d216D5",
+            "isSubscribed": true,
+            "type": "subscribe"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "19721900965007n",
+            "owner": "0xdcE6F2ccaf54de860a5f80DB7503154957d216D5",
+            "isSubscribed": true,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "764902n",
+      {
+        "lastOwner": "0xf51435DD16E9a346f016A0a9123A7A87D80b28AA",
+        "tickLower": -239400,
+        "tickUpper": -233820,
+        "liquidity": "10974126767603n",
+        "feeGrowthInsidePeriod0": "778549777243201n",
+        "feeGrowthInsidePeriod1": "27060n",
+        "feeGrowthInsidePeriod0Weighted": "778549777243201n",
+        "feeGrowthInsidePeriod1Weighted": "27060n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x0000000000000000000000000000000000000000",
+            "isSubscribed": false,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38780462n",
+            "newLiquidityAmount": "10974126767603n",
+            "owner": "0xf51435DD16E9a346f016A0a9123A7A87D80b28AA",
+            "isSubscribed": false,
+            "type": "positionUpdate"
+          },
+          {
+            "blockNumber": "38780483n",
+            "newLiquidityAmount": "10974126767603n",
+            "owner": "0xf51435DD16E9a346f016A0a9123A7A87D80b28AA",
+            "isSubscribed": true,
+            "type": "subscribe"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "10974126767603n",
+            "owner": "0xf51435DD16E9a346f016A0a9123A7A87D80b28AA",
+            "isSubscribed": true,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "765036n",
+      {
+        "lastOwner": "0x87029960cb6d1011289d35bC8944d37B88C46B72",
+        "tickLower": -235680,
+        "tickUpper": -234420,
+        "liquidity": "6382534195487n",
+        "feeGrowthInsidePeriod0": "119840386135071n",
+        "feeGrowthInsidePeriod1": "2549n",
+        "feeGrowthInsidePeriod0Weighted": "119840386135071n",
+        "feeGrowthInsidePeriod1Weighted": "2549n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x0000000000000000000000000000000000000000",
+            "isSubscribed": false,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38781929n",
+            "newLiquidityAmount": "6382534195487n",
+            "owner": "0x87029960cb6d1011289d35bC8944d37B88C46B72",
+            "isSubscribed": false,
+            "type": "positionUpdate"
+          },
+          {
+            "blockNumber": "38827357n",
+            "newLiquidityAmount": "6382534195487n",
+            "owner": "0x87029960cb6d1011289d35bC8944d37B88C46B72",
+            "isSubscribed": true,
+            "type": "subscribe"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "6382534195487n",
+            "owner": "0x87029960cb6d1011289d35bC8944d37B88C46B72",
+            "isSubscribed": true,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "767154n",
+      {
+        "lastOwner": "0x8F1c51E98Af7C7dbB24654ACB05781E0e96e008F",
+        "tickLower": -236640,
+        "tickUpper": -233460,
+        "liquidity": "0n",
+        "feeGrowthInsidePeriod0": "94976392189474474n",
+        "feeGrowthInsidePeriod1": "5296386n",
+        "feeGrowthInsidePeriod0Weighted": "94976392189474474n",
+        "feeGrowthInsidePeriod1Weighted": "5296386n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x0000000000000000000000000000000000000000",
+            "isSubscribed": false,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38807860n",
+            "newLiquidityAmount": "118510216596973n",
+            "owner": "0x8F1c51E98Af7C7dbB24654ACB05781E0e96e008F",
+            "isSubscribed": false,
+            "type": "positionUpdate"
+          },
+          {
+            "blockNumber": "38807994n",
+            "newLiquidityAmount": "118510216596973n",
+            "owner": "0x8F1c51E98Af7C7dbB24654ACB05781E0e96e008F",
+            "isSubscribed": true,
+            "type": "subscribe"
+          },
+          {
+            "blockNumber": "38871667n",
+            "newLiquidityAmount": "118510216596973n",
+            "owner": "0x8F1c51E98Af7C7dbB24654ACB05781E0e96e008F",
+            "isSubscribed": false,
+            "type": "unsubscribe"
+          },
+          {
+            "blockNumber": "38871667n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x8F1c51E98Af7C7dbB24654ACB05781E0e96e008F",
+            "isSubscribed": false,
+            "type": "positionUpdate"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x8F1c51E98Af7C7dbB24654ACB05781E0e96e008F",
+            "isSubscribed": false,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "772987n",
+      {
+        "lastOwner": "0x8F1c51E98Af7C7dbB24654ACB05781E0e96e008F",
+        "tickLower": -237900,
+        "tickUpper": -234360,
+        "liquidity": "179370264940803n",
+        "feeGrowthInsidePeriod0": "6893818320813750n",
+        "feeGrowthInsidePeriod1": "291241n",
+        "feeGrowthInsidePeriod0Weighted": "6893818320813750n",
+        "feeGrowthInsidePeriod1Weighted": "291241n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x0000000000000000000000000000000000000000",
+            "isSubscribed": false,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38871871n",
+            "newLiquidityAmount": "179370264940803n",
+            "owner": "0x8F1c51E98Af7C7dbB24654ACB05781E0e96e008F",
+            "isSubscribed": false,
+            "type": "positionUpdate"
+          },
+          {
+            "blockNumber": "38871993n",
+            "newLiquidityAmount": "179370264940803n",
+            "owner": "0x8F1c51E98Af7C7dbB24654ACB05781E0e96e008F",
+            "isSubscribed": true,
+            "type": "subscribe"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "179370264940803n",
+            "owner": "0x8F1c51E98Af7C7dbB24654ACB05781E0e96e008F",
+            "isSubscribed": true,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ],
+    [
+      "773236n",
+      {
+        "lastOwner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+        "tickLower": -238080,
+        "tickUpper": -236100,
+        "liquidity": "222481047539061n",
+        "feeGrowthInsidePeriod0": "5946812169019915n",
+        "feeGrowthInsidePeriod1": "342752n",
+        "feeGrowthInsidePeriod0Weighted": "5946812169019915n",
+        "feeGrowthInsidePeriod1Weighted": "342752n",
+        "liquidityModifications": [
+          {
+            "blockNumber": "38662926n",
+            "newLiquidityAmount": "0n",
+            "owner": "0x0000000000000000000000000000000000000000",
+            "isSubscribed": false,
+            "type": "synthetic"
+          },
+          {
+            "blockNumber": "38876933n",
+            "newLiquidityAmount": "222481047539061n",
+            "owner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+            "isSubscribed": false,
+            "type": "positionUpdate"
+          },
+          {
+            "blockNumber": "38876948n",
+            "newLiquidityAmount": "222481047539061n",
+            "owner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+            "isSubscribed": true,
+            "type": "subscribe"
+          },
+          {
+            "blockNumber": "38965325n",
+            "newLiquidityAmount": "222481047539061n",
+            "owner": "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+            "isSubscribed": true,
+            "type": "synthetic"
+          }
+        ],
+        "designation": "PASSIVE"
+      }
+    ]
+  ],
+  "lpData": [
+    [
+      "0xc1612C97537c2CC62a11FC4516367AB6F62d4B23",
+      {
+        "periodFeesCurrency0": "199930661574n",
+        "periodFeesCurrency1": "8n",
+        "periodFeesCurrency0Weighted": "199930661574n",
+        "periodFeesCurrency1Weighted": "8n",
+        "totalFeesCommonDenominatorWeighted": "17n",
+        "reward": "53n"
+      }
+    ],
+    [
+      "0xa4fF2Ff7c9dCc78b76Ac381E2d06938B88bd8804",
+      {
+        "periodFeesCurrency0": "458474483182780n",
+        "periodFeesCurrency1": "22647n",
+        "periodFeesCurrency0Weighted": "458474483182780n",
+        "periodFeesCurrency1Weighted": "22647n",
+        "totalFeesCommonDenominatorWeighted": "45294n",
+        "reward": "142866n"
+      }
+    ],
+    [
+      "0xCD7a60306d8315B0b611De60B38Ae0B623062b2e",
+      {
+        "periodFeesCurrency0": "453094845267339n",
+        "periodFeesCurrency1": "21075n",
+        "periodFeesCurrency0Weighted": "0n",
+        "periodFeesCurrency1Weighted": "0n",
+        "totalFeesCommonDenominatorWeighted": "0n",
+        "reward": "0n"
+      }
+    ],
+    [
+      "0x93E7fB017883f56fBc43f5723eCcCf6bF90FE6cF",
+      {
+        "periodFeesCurrency0": "174919051684903n",
+        "periodFeesCurrency1": "7081n",
+        "periodFeesCurrency0Weighted": "174919051684903n",
+        "periodFeesCurrency1Weighted": "7081n",
+        "totalFeesCommonDenominatorWeighted": "15721n",
+        "reward": "49587n"
+      }
+    ],
+    [
+      "0x4651B2E464e94c730725F3D5B2737418E2e5fd32",
+      {
+        "periodFeesCurrency0": "2346963345125310n",
+        "periodFeesCurrency1": "115936n",
+        "periodFeesCurrency0Weighted": "2346963345125310n",
+        "periodFeesCurrency1Weighted": "115936n",
+        "totalFeesCommonDenominatorWeighted": "231872n",
+        "reward": "731370n"
+      }
+    ],
+    [
+      "0xBa44825f3215A71b34a702A70373afF8d4A52390",
+      {
+        "periodFeesCurrency0": "2239256281925752n",
+        "periodFeesCurrency1": "109894n",
+        "periodFeesCurrency0Weighted": "2239256281925752n",
+        "periodFeesCurrency1Weighted": "109894n",
+        "totalFeesCommonDenominatorWeighted": "220509n",
+        "reward": "695529n"
+      }
+    ],
+    [
+      "0x87029960cb6d1011289d35bC8944d37B88C46B72",
+      {
+        "periodFeesCurrency0": "300749307939311n",
+        "periodFeesCurrency1": "12680n",
+        "periodFeesCurrency0Weighted": "300749307939311n",
+        "periodFeesCurrency1Weighted": "12680n",
+        "totalFeesCommonDenominatorWeighted": "27536n",
+        "reward": "86854n"
+      }
+    ],
+    [
+      "0xdcE6F2ccaf54de860a5f80DB7503154957d216D5",
+      {
+        "periodFeesCurrency0": "3459099662911231n",
+        "periodFeesCurrency1": "150004n",
+        "periodFeesCurrency0Weighted": "3459099662911231n",
+        "periodFeesCurrency1Weighted": "150004n",
+        "totalFeesCommonDenominatorWeighted": "320877n",
+        "reward": "1012110n"
+      }
+    ],
+    [
+      "0x92119de4787cb947A4A93FEEC7c19C3AFe1b5729",
+      {
+        "periodFeesCurrency0": "39319626859652557n",
+        "periodFeesCurrency1": "1858696n",
+        "periodFeesCurrency0Weighted": "39319626859652557n",
+        "periodFeesCurrency1Weighted": "1858696n",
+        "totalFeesCommonDenominatorWeighted": "3801021n",
+        "reward": "11989180n"
+      }
+    ],
+    [
+      "0x248784Af80094fe92F915674b2f4409366443562",
+      {
+        "periodFeesCurrency0": "442633907356554n",
+        "periodFeesCurrency1": "21865n",
+        "periodFeesCurrency0Weighted": "442633907356554n",
+        "periodFeesCurrency1Weighted": "21865n",
+        "totalFeesCommonDenominatorWeighted": "43730n",
+        "reward": "137933n"
+      }
+    ],
+    [
+      "0x5196E6ff6b95536874ba6405c11f465e026099e0",
+      {
+        "periodFeesCurrency0": "233704300721037n",
+        "periodFeesCurrency1": "10240n",
+        "periodFeesCurrency0Weighted": "233704300721037n",
+        "periodFeesCurrency1Weighted": "10240n",
+        "totalFeesCommonDenominatorWeighted": "21784n",
+        "reward": "68711n"
+      }
+    ],
+    [
+      "0xCDA0c8a5f22565ae0efB889E5dBb6CE60498d0b4",
+      {
+        "periodFeesCurrency0": "2997271556111857n",
+        "periodFeesCurrency1": "148059n",
+        "periodFeesCurrency0Weighted": "2997271556111857n",
+        "periodFeesCurrency1Weighted": "148059n",
+        "totalFeesCommonDenominatorWeighted": "296119n",
+        "reward": "934018n"
+      }
+    ],
+    [
+      "0xe3B1ebcD19c28459aD75B44C13095cA93E53cbB0",
+      {
+        "periodFeesCurrency0": "268507082341027n",
+        "periodFeesCurrency1": "13263n",
+        "periodFeesCurrency0Weighted": "268507082341027n",
+        "periodFeesCurrency1Weighted": "13263n",
+        "totalFeesCommonDenominatorWeighted": "26526n",
+        "reward": "83668n"
+      }
+    ],
+    [
+      "0xf6786b4edFa78d8d5cbfB93A97fF260e873152Be",
+      {
+        "periodFeesCurrency0": "6935371782822640n",
+        "periodFeesCurrency1": "342596n",
+        "periodFeesCurrency0Weighted": "6935371782822640n",
+        "periodFeesCurrency1Weighted": "342596n",
+        "totalFeesCommonDenominatorWeighted": "685192n",
+        "reward": "2161232n"
+      }
+    ],
+    [
+      "0xf51435DD16E9a346f016A0a9123A7A87D80b28AA",
+      {
+        "periodFeesCurrency0": "878916768431603n",
+        "periodFeesCurrency1": "37375n",
+        "periodFeesCurrency0Weighted": "805159659418403n",
+        "periodFeesCurrency1Weighted": "29448n",
+        "totalFeesCommonDenominatorWeighted": "69221n",
+        "reward": "218336n"
+      }
+    ],
+    [
+      "0xB70D29deCca758BB72Cd2967a989782F3acAd3e6",
+      {
+        "periodFeesCurrency0": "2531726760362317n",
+        "periodFeesCurrency1": "124972n",
+        "periodFeesCurrency0Weighted": "2531726760362317n",
+        "periodFeesCurrency1Weighted": "124972n",
+        "totalFeesCommonDenominatorWeighted": "250035n",
+        "reward": "788660n"
+      }
+    ],
+    [
+      "0xc38eDb1B53c7c034867BdE801e24826687F24466",
+      {
+        "periodFeesCurrency0": "2185306655452670n",
+        "periodFeesCurrency1": "105303n",
+        "periodFeesCurrency0Weighted": "2185306655452670n",
+        "periodFeesCurrency1Weighted": "105303n",
+        "totalFeesCommonDenominatorWeighted": "213253n",
+        "reward": "672642n"
+      }
+    ],
+    [
+      "0x0380ad3322Df94334C2f30CEE24D3086FC6F3445",
+      {
+        "periodFeesCurrency0": "14588631912459892n",
+        "periodFeesCurrency1": "720654n",
+        "periodFeesCurrency0Weighted": "14588631912459892n",
+        "periodFeesCurrency1Weighted": "720654n",
+        "totalFeesCommonDenominatorWeighted": "1441308n",
+        "reward": "4546173n"
+      }
+    ],
+    [
+      "0x3663b2EE275616bfA14e77c69dc02b79e6C580F0",
+      {
+        "periodFeesCurrency0": "155831550992544n",
+        "periodFeesCurrency1": "13069n",
+        "periodFeesCurrency0Weighted": "155831550992544n",
+        "periodFeesCurrency1Weighted": "13069n",
+        "totalFeesCommonDenominatorWeighted": "20766n",
+        "reward": "65500n"
+      }
+    ],
+    [
+      "0x8F1c51E98Af7C7dbB24654ACB05781E0e96e008F",
+      {
+        "periodFeesCurrency0": "119224443487925154n",
+        "periodFeesCurrency1": "6444897n",
+        "periodFeesCurrency0Weighted": "119224443487925154n",
+        "periodFeesCurrency1Weighted": "6444897n",
+        "totalFeesCommonDenominatorWeighted": "12334390n",
+        "reward": "38905133n"
+      }
+    ],
+    [
+      "0xd0c500840B393f95F2Fc74E2Cbd86AA89720c8a2",
+      {
+        "periodFeesCurrency0": "4894531144496326n",
+        "periodFeesCurrency1": "241781n",
+        "periodFeesCurrency0Weighted": "4894531144496326n",
+        "periodFeesCurrency1Weighted": "241781n",
+        "totalFeesCommonDenominatorWeighted": "483562n",
+        "reward": "1525251n"
+      }
+    ]
+  ]
+}
