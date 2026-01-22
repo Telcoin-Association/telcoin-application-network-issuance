@@ -167,7 +167,7 @@ export const POOLS = [BASE_ETH_TEL, POLYGON_ETH_TEL, POLYGON_USDC_EMXN];
  * @notice While public-facing periods are 1-indexed, this utility uses `period 0` internally
  * to refer to the initialization period from pool creation to first period start.
  */
-export const PERIODS = Array.from({ length: 23 }, (_, i) => i);
+export const PERIODS = Array.from({ length: 24 }, (_, i) => i);
 const NETWORKS = {
   [ChainId.Polygon]: {
     poolManager: getAddress("0x67366782805870060151383f4bbff9dab53e5cd6"),
@@ -198,6 +198,7 @@ const NETWORKS = {
       81_009_978n, // dec 31
       81_312_370n, // jan 7
       81_614_414n, // jan 14
+      81_916_814n, // jan 21
     ],
   },
   [ChainId.Base]: {
@@ -229,6 +230,7 @@ const NETWORKS = {
       40_174_926n, // dec 31
       40_477_326n, // jan 7
       40_779_726n, // jan 14
+      41_082_126n, // jan 21
     ],
   },
 };
@@ -251,7 +253,7 @@ async function main() {
     poolConfig.startBlock,
     poolConfig.endBlock,
     client,
-    poolConfig.positionManager
+    poolConfig.positionManager,
   );
   // fetches current registry config parameters to accomodate most recent TELx council wishes
   const [minPassiveLifetime, jitWeight, activeWeight, passiveWeight] =
@@ -269,12 +271,12 @@ async function main() {
     minPassiveLifetime,
     jitWeight,
     activeWeight,
-    passiveWeight
+    passiveWeight,
   );
   const denominatorIsCurrency0 = denominatorIsCurrencyZero(
     poolConfig.denominator,
     poolConfig.currency0,
-    poolConfig.currency1
+    poolConfig.currency1,
   );
   const vwapPriceScaled = await getVolumeWeightedAveragePriceScaled(
     client,
@@ -282,17 +284,17 @@ async function main() {
     poolConfig.stateView,
     poolConfig.startBlock,
     poolConfig.endBlock,
-    denominatorIsCurrency0
+    denominatorIsCurrency0,
   );
   const lpData = await populateTotalFeesCommonDenominator(
     lpFees,
     vwapPriceScaled,
-    denominatorIsCurrency0
+    denominatorIsCurrency0,
   );
 
   const lpRewards = calculateRewardDistribution(
     lpData,
-    poolConfig.rewardAmount
+    poolConfig.rewardAmount,
   );
 
   // write to the checkpoint file
@@ -316,9 +318,9 @@ async function main() {
       newCheckpoint,
       (key, value) =>
         typeof value === "bigint" ? value.toString() + "n" : value,
-      2
+      2,
     ),
-    "utf-8"
+    "utf-8",
   );
 
   console.log("Analysis complete. New checkpoint saved.");
@@ -337,7 +339,7 @@ async function updateFeesAndPositions(
   minPassiveLifetime: bigint,
   jitWeight: bigint,
   activeWeight: bigint,
-  passiveWeight: bigint
+  passiveWeight: bigint,
 ): Promise<{
   lpData: Map<Address, LPData>;
   finalPositions: Map<bigint, PositionState>;
@@ -350,7 +352,7 @@ async function updateFeesAndPositions(
     client,
     positionRegistry,
     positionManager,
-    initialPositions
+    initialPositions,
   );
   // use final positions to credit fees to LPs
   const { lpData, finalPositions } = await processFees(
@@ -362,7 +364,7 @@ async function updateFeesAndPositions(
     minPassiveLifetime,
     jitWeight,
     activeWeight,
-    passiveWeight
+    passiveWeight,
   );
 
   return { lpData, finalPositions };
@@ -375,7 +377,7 @@ async function updatePositions(
   client: PublicClient,
   positionRegistry: Address,
   positionManager: Address,
-  initialPositions: Map<bigint, PositionState>
+  initialPositions: Map<bigint, PositionState>,
 ): Promise<Map<bigint, PositionState>> {
   // use copy of initial positions fetched from checkpoint file
   const positions = new Map<bigint, PositionState>(initialPositions);
@@ -384,7 +386,7 @@ async function updatePositions(
   const positionUpdatedLogs = await client.getLogs({
     address: positionRegistry,
     event: parseAbiItem(
-      "event PositionUpdated(uint256 indexed tokenId, address indexed newOwner, bytes32 indexed poolId, int24 tickLower, int24 tickUpper, uint128 newLiquidity)"
+      "event PositionUpdated(uint256 indexed tokenId, address indexed newOwner, bytes32 indexed poolId, int24 tickLower, int24 tickUpper, uint128 newLiquidity)",
     ),
     args: { poolId: poolId },
     fromBlock: startBlock,
@@ -393,7 +395,7 @@ async function updatePositions(
   const subscribeLogs = await client.getLogs({
     address: positionRegistry,
     event: parseAbiItem(
-      "event Subscribed(uint256 indexed tokenId, address indexed owner)"
+      "event Subscribed(uint256 indexed tokenId, address indexed owner)",
     ),
     fromBlock: startBlock,
     toBlock: endBlock,
@@ -401,7 +403,7 @@ async function updatePositions(
   const unsubscribeLogs = await client.getLogs({
     address: positionRegistry,
     event: parseAbiItem(
-      "event Unsubscribed(uint256 indexed tokenId, address indexed owner)"
+      "event Unsubscribed(uint256 indexed tokenId, address indexed owner)",
     ),
     fromBlock: startBlock,
     toBlock: endBlock,
@@ -434,14 +436,14 @@ async function updatePositions(
       client,
       positionRegistry,
       tokenId,
-      log.blockNumber
+      log.blockNumber,
     );
 
     if (!currentPositionState) {
       // skip subscription logs for positions that belong to a different supported pool
       if (log.type !== "positionUpdate") {
         console.log(
-          `[Info] Skipping '${log.type}' for token ${tokenId}: not part of this pool.`
+          `[Info] Skipping '${log.type}' for token ${tokenId}: not part of this pool.`,
         );
         continue;
       }
@@ -485,7 +487,7 @@ async function updatePositions(
           client,
           positionRegistry,
           tokenId,
-          startBlock
+          startBlock,
         );
         currentPositionState.liquidityModifications.push({
           blockNumber: startBlock,
@@ -563,7 +565,7 @@ async function updatePositions(
         client,
         positionRegistry,
         tokenId,
-        startBlock
+        startBlock,
       );
       // The timeline is just the start and end of the full period.
       timelinePoints.push({
@@ -612,7 +614,7 @@ async function updatePositions(
 // Assigns position designations based on their liquidity modification timelines
 function assignPositionDesignations(
   positions: Map<bigint, PositionState>, // must be fully processed for the period
-  minPassiveLifetime: bigint
+  minPassiveLifetime: bigint,
 ): Map<bigint, PositionDesignation> {
   console.log(`Using passive threshold: ${minPassiveLifetime} blocks`);
 
@@ -624,7 +626,7 @@ function assignPositionDesignations(
     // ignore timeline entries corresponding to claims and un/subscriptions
     const designatableTimeline = position.liquidityModifications.filter(
       (change) =>
-        change.type === "positionUpdate" || change.type === "synthetic"
+        change.type === "positionUpdate" || change.type === "synthetic",
     );
     for (let i = 1; i < designatableTimeline.length; i++) {
       const prevChange = designatableTimeline[i - 1];
@@ -670,7 +672,7 @@ async function processFees(
   minPassiveLifetime: bigint,
   jitWeight: bigint,
   activeWeight: bigint,
-  passiveWeight: bigint
+  passiveWeight: bigint,
 ): Promise<{
   lpData: Map<Address, LPData>;
   finalPositions: Map<bigint, PositionState>;
@@ -678,7 +680,7 @@ async function processFees(
   // assign designations to positions based on their liquidity modification timelines
   const designations = assignPositionDesignations(
     positions,
-    minPassiveLifetime
+    minPassiveLifetime,
   );
   const weights = {
     JIT: jitWeight,
@@ -723,7 +725,7 @@ async function processFees(
           position.tickLower,
           position.tickUpper,
           tickSpacing,
-          prevChange.blockNumber // Fee growth at the start of the sub-period
+          prevChange.blockNumber, // Fee growth at the start of the sub-period
         ),
         getFeeGrowthInsideOffchain(
           // The new, safe function
@@ -733,7 +735,7 @@ async function processFees(
           position.tickLower,
           position.tickUpper,
           tickSpacing,
-          currChange.blockNumber // Fee growth at the end of the sub-period
+          currChange.blockNumber, // Fee growth at the end of the sub-period
         ),
       ]);
 
@@ -744,7 +746,7 @@ async function processFees(
           feeGrowthEnd.feeGrowthInside0X128,
           feeGrowthEnd.feeGrowthInside1X128,
           feeGrowthStart.feeGrowthInside0X128,
-          feeGrowthStart.feeGrowthInside1X128
+          feeGrowthStart.feeGrowthInside1X128,
         );
       feesEarnedThisPeriod0 += feesEarned0;
       feesEarnedThisPeriod1 += feesEarned1;
@@ -799,7 +801,7 @@ function calculateFees(
   feeGrowthInside0End: bigint,
   feeGrowthInside1End: bigint,
   feeGrowthInside0Start: bigint,
-  feeGrowthInside1Start: bigint
+  feeGrowthInside1Start: bigint,
 ): { token0Fees: bigint; token1Fees: bigint } {
   const Q128 = 2n ** 128n;
   // underflow protection: return 0 if current is less than last. this also ignores massive fee growth gained by JIT liquidity actions
@@ -835,7 +837,7 @@ function updatePosition(
     feeGrowthInsidePeriod0Weighted?: bigint;
     feeGrowthInsidePeriod1Weighted?: bigint;
     liquidityModifications?: LiquidityChange[];
-  }
+  },
 ) {
   const existing = positions.get(key);
 
@@ -860,7 +862,7 @@ function updatePosition(
       updates.liquidityModifications === undefined
     ) {
       throw new Error(
-        `Cannot create new position ${key}: due to missing required fields.`
+        `Cannot create new position ${key}: due to missing required fields.`,
       );
     }
 
@@ -886,7 +888,7 @@ function updatePosition(
 function modifyLPData(
   lpData: Map<Address, LPData>,
   key: Address,
-  updates: Partial<LPData>
+  updates: Partial<LPData>,
 ) {
   const existing = lpData.get(key);
   if (existing) {
@@ -911,7 +913,7 @@ async function getFeeGrowthInsideOffchain(
   tickLower: number,
   tickUpper: number,
   tickSpacing: number,
-  blockNumber: bigint
+  blockNumber: bigint,
 ): Promise<{ feeGrowthInside0X128: bigint; feeGrowthInside1X128: bigint }> {
   const [, currentTick] = await client.readContract({
     address: stateView,
@@ -936,7 +938,7 @@ async function getFeeGrowthInsideOffchain(
     stateView,
     tickLower,
     tickSpacing,
-    blockNumber
+    blockNumber,
   );
   const safeTickUpper = await findInitializedTickUnder(
     client,
@@ -944,7 +946,7 @@ async function getFeeGrowthInsideOffchain(
     stateView,
     tickUpper,
     tickSpacing,
-    blockNumber
+    blockNumber,
   );
 
   if (
@@ -1029,7 +1031,7 @@ async function findInitializedTickUnder(
   startTick: number,
   tickSpacing: number,
   blockNumber: bigint,
-  searchLimit: number = 2560 // Safety limit: search up to 10 words
+  searchLimit: number = 2560, // Safety limit: search up to 10 words
 ): Promise<number | null> {
   // Start from the word containing our tick
   const startWord = tickToWord(startTick, tickSpacing);
@@ -1050,7 +1052,7 @@ async function findInitializedTickUnder(
       poolId,
       stateView,
       currentWord,
-      blockNumber
+      blockNumber,
     );
 
     if (bitmap !== 0n) {
@@ -1091,7 +1093,7 @@ async function getTickBitmap(
   poolId: `0x${string}`,
   stateView: Address,
   wordPosition: number,
-  blockNumber: bigint
+  blockNumber: bigint,
 ): Promise<bigint> {
   if (wordPosition < -32768 || wordPosition > 32767) {
     throw new Error("Word position out of int16 range");
@@ -1111,7 +1113,7 @@ async function getTickBitmap(
 async function populateTotalFeesCommonDenominator(
   lpData: Map<Address, LPData>,
   vwapPriceScaled: bigint,
-  denominatorIsCurrency0: boolean
+  denominatorIsCurrency0: boolean,
 ): Promise<Map<Address, LPData>> {
   // convert both amounts into denominator and sum;
   for (const [lpAddress, fees] of lpData) {
@@ -1144,7 +1146,7 @@ async function getFeeGrowthGlobalsPeriodDelta(
   poolId: `0x${string}`,
   stateView: Address,
   startBlock: bigint,
-  endBlock: bigint
+  endBlock: bigint,
 ): Promise<{ feeGrowthDelta0: bigint; feeGrowthDelta1: bigint }> {
   // Fetch fee growth at start and end of period
   const [startGrowth, endGrowth] = await Promise.all([
@@ -1185,7 +1187,7 @@ async function getVolumeWeightedAveragePriceScaled(
   stateView: Address,
   startBlock: bigint,
   endBlock: bigint,
-  denominatorIsCurrency0: boolean
+  denominatorIsCurrency0: boolean,
 ): Promise<bigint> {
   // fetch fee growth at start and end of period
   const { feeGrowthDelta0, feeGrowthDelta1 } =
@@ -1194,7 +1196,7 @@ async function getVolumeWeightedAveragePriceScaled(
       poolId,
       stateView,
       startBlock,
-      endBlock
+      endBlock,
     );
 
   // Calculate VWAP based on fee ratio, representing average exchange rate for period
@@ -1213,7 +1215,7 @@ async function getVolumeWeightedAveragePriceScaled(
 // allocates each LP the amount proportional to their share of the total reward amount
 function calculateRewardDistribution(
   lpData: Map<Address, LPData>,
-  rewardAmount: bigint
+  rewardAmount: bigint,
 ): Map<Address, LPData> {
   const totalFees = Array.from(lpData.values())
     .map((data) => data.totalFeesCommonDenominatorWeighted!)
@@ -1236,7 +1238,7 @@ function calculateRewardDistribution(
 // fetch registry config constants needed for fee processing
 async function getRegistryConfig(
   client: PublicClient,
-  positionRegistry: Address
+  positionRegistry: Address,
 ): Promise<[bigint, bigint, bigint, bigint]> {
   const [minPassiveLifetime, jitWeight, activeWeight, passiveWeight] =
     await Promise.all([
@@ -1269,7 +1271,7 @@ async function safeGetOwnerOf(
   client: PublicClient,
   positionManager: Address,
   tokenId: bigint,
-  blockNumber: bigint
+  blockNumber: bigint,
 ): Promise<Address> {
   try {
     const owner = await client.readContract({
@@ -1283,7 +1285,7 @@ async function safeGetOwnerOf(
   } catch (error: any) {
     // Fails if token is burned (NOT_MINTED) or other revert
     console.warn(
-      `[safeGetOwnerOf] Failed to get owner for token ${tokenId} at block ${blockNumber}. Treating as burned. Error: ${error.message}`
+      `[safeGetOwnerOf] Failed to get owner for token ${tokenId} at block ${blockNumber}. Treating as burned. Error: ${error.message}`,
     );
     return zeroAddress; // Treat as burned
   }
@@ -1293,7 +1295,7 @@ async function isSubscribed(
   client: PublicClient,
   positionRegistry: Address,
   tokenId: bigint,
-  blockNumber: bigint
+  blockNumber: bigint,
 ): Promise<boolean> {
   const isSubscribed = await client.readContract({
     address: positionRegistry,
@@ -1322,12 +1324,12 @@ async function getPoolCreationBlock(
   poolManagerAddress: Address,
   poolId: `0x${string}`,
   fromBlock: bigint,
-  toBlock: bigint
+  toBlock: bigint,
 ) {
   const events = await client.getLogs({
     address: poolManagerAddress,
     event: parseAbiItem(
-      "event Initialize(bytes32 indexed id, address indexed currency0, address indexed currency1, uint24 fee, int24 tickSpacing, address hooks, uint160 sqrtPriceX96, int24 tick)"
+      "event Initialize(bytes32 indexed id, address indexed currency0, address indexed currency1, uint24 fee, int24 tickSpacing, address hooks, uint160 sqrtPriceX96, int24 tick)",
     ),
     args: { id: poolId },
     fromBlock: fromBlock,
@@ -1366,7 +1368,7 @@ async function inspectSwaps(
   tickUpper: number,
   tickSpacing: number,
   startBlock: bigint,
-  endBlock: bigint
+  endBlock: bigint,
 ) {
   const position = {
     tickLower: tickLower,
@@ -1377,7 +1379,7 @@ async function inspectSwaps(
 
   // The specific `Swap` event signature from the Uniswap v4 `IPoolManager` interface
   const swapEventAbi = parseAbiItem(
-    "event Swap(bytes32 indexed id, address indexed sender, int128 amount0, int128 amount1, uint160 sqrtPriceX96, uint128 liquidity, int24 tick, uint24 fee)"
+    "event Swap(bytes32 indexed id, address indexed sender, int128 amount0, int128 amount1, uint160 sqrtPriceX96, uint128 liquidity, int24 tick, uint24 fee)",
   );
 
   const swapLogs = await client.getLogs({
@@ -1423,7 +1425,7 @@ async function inspectSwaps(
     tickLower,
     tickUpper,
     tickSpacing,
-    endBlock
+    endBlock,
   );
   console.log(growthSafe);
   const lowerSafe = await findInitializedTickUnder(
@@ -1432,7 +1434,7 @@ async function inspectSwaps(
     stateView,
     tickLower,
     tickSpacing,
-    endBlock
+    endBlock,
   );
   const upperSafe = await findInitializedTickUnder(
     client,
@@ -1440,7 +1442,7 @@ async function inspectSwaps(
     stateView,
     tickUpper,
     tickSpacing,
-    endBlock
+    endBlock,
   );
   console.log(lowerSafe);
   console.log(upperSafe);
@@ -1470,14 +1472,14 @@ async function initialize(
   startBlock: bigint,
   endBlock: bigint,
   client: PublicClient,
-  positionManager: Address
+  positionManager: Address,
 ): Promise<Map<bigint, PositionState>> {
   let initialPositions = new Map<bigint, PositionState>();
 
   if (existsSync(checkpointFile)) {
     if (period === 0)
       throw new Error(
-        "Checkpoint file found but period is 0; delete checkpoint file"
+        "Checkpoint file found but period is 0; delete checkpoint file",
       );
 
     console.log("Checkpoint file found, loading previous state...");
@@ -1485,13 +1487,13 @@ async function initialize(
     const checkpoint: CheckpointData = JSON.parse(fileContent, (key, value) =>
       typeof value === "string" && /^\d+n$/.test(value)
         ? BigInt(value.slice(0, -1))
-        : value
+        : value,
     );
 
     const expectedStartBlock = BigInt(checkpoint.blockRange.endBlock) + 1n;
     if (startBlock !== expectedStartBlock) {
       throw new Error(
-        `Provided startBlock (${startBlock}) does not correspond to lastProcessedBlock + 1 (${expectedStartBlock})`
+        `Provided startBlock (${startBlock}) does not correspond to lastProcessedBlock + 1 (${expectedStartBlock})`,
       );
     }
 
@@ -1499,7 +1501,7 @@ async function initialize(
   } else {
     if (period !== 0) {
       throw new Error(
-        `No checkpoint file found. Period must be 0 for first runs`
+        `No checkpoint file found. Period must be 0 for first runs`,
       );
     }
   }
@@ -1607,7 +1609,7 @@ function buildPeriodConfig(pool: PoolConfig, period: number) {
 function denominatorIsCurrencyZero(
   denominator: Address,
   currency0: Address,
-  currency1: Address
+  currency1: Address,
 ): boolean {
   const denominatorIsCurrency0 = getAddress(currency0) === denominator;
   const denominatorIsCurrency1 = getAddress(currency1) === denominator;
