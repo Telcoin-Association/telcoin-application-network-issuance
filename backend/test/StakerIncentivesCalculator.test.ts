@@ -10,7 +10,10 @@ import { ChainId, config } from "../config";
 import { executors } from "../data/executors";
 import { amirXs } from "../data/amirXs";
 import { stakingModules } from "../data/stakingModules";
-import {StakeChangedEvent, StakerIncentivesCalculator} from "../calculators/StakerIncentivesCalculator";
+import {
+  StakeChangedEvent,
+  StakerIncentivesCalculator,
+} from "../calculators/StakerIncentivesCalculator";
 import {
   mockToken,
   mockTelTransfers,
@@ -66,7 +69,7 @@ const nonstakerSignal = "0x00000000";
 function generateTestTokenTransfer(
   iterator: number,
   referrer: Address,
-  referee: Address
+  referee: Address,
 ): TokenTransferWithCalldata {
   const testDefiSwap = {
     ...mockDefiSwap,
@@ -90,7 +93,7 @@ function generateTestTokenTransfer(
 }
 
 function createTestTransfers(
-  relationships: Map<Address, Address[]>
+  relationships: Map<Address, Address[]>,
 ): TokenTransferWithCalldata[] {
   const transfers: TokenTransferWithCalldata[] = [];
 
@@ -143,7 +146,7 @@ describe("StakerIncentivesCalculator", () => {
     const mockTokenTransferHistory = new TokenTransferHistory(
       mockToken,
       arbitraryStartBlock,
-      arbitraryEndBlock
+      arbitraryEndBlock,
     ) as jest.Mocked<TokenTransferHistory>;
     // sanity check mock TokenTransferHistory pulled the 123 expected transfers from `mockTransers.ts`
     expect((await mockTokenTransferHistory.fetchTransfers()).length).toBe(123);
@@ -161,7 +164,7 @@ describe("StakerIncentivesCalculator", () => {
       executorRegistry,
       1000n,
       { [ChainId.Polygon]: arbitraryStartBlock },
-      { [ChainId.Polygon]: arbitraryEndBlock }
+      { [ChainId.Polygon]: arbitraryEndBlock },
     );
 
     jest
@@ -171,14 +174,14 @@ describe("StakerIncentivesCalculator", () => {
           client: PublicClient,
           userAddress: Address,
           endBlock: bigint,
-          stakingModuleContract: Address
+          stakingModuleContract: Address,
         ): Promise<bigint> => {
           if (userAddress.toString().startsWith(stakerSignal))
             return Promise.resolve(getRandomBigInt(1, 2 ** 32));
           else if (userAddress.toString().startsWith(nonstakerSignal))
             return Promise.resolve(0n);
           else throw new Error("Invalid test data for fetchStake");
-        }
+        },
       );
 
     jest
@@ -188,16 +191,16 @@ describe("StakerIncentivesCalculator", () => {
           client: PublicClient,
           address: Address,
           endBlock: bigint,
-          tanIssuanceHistory: any
+          tanIssuanceHistory: any,
         ): Promise<bigint> => {
           if (address.toString().startsWith(stakerSignal))
             return Promise.resolve(getRandomBigInt(1, 2 ** 32));
           else if (address.toString().startsWith(nonstakerSignal)) return 0n;
           else
             throw new Error(
-              "Invalid test data for fetchCumulativeRewardsAtBlock"
+              "Invalid test data for fetchCumulativeRewardsAtBlock",
             );
-        }
+        },
       );
   });
 
@@ -215,7 +218,7 @@ describe("StakerIncentivesCalculator", () => {
     expect(transfers.length).toBe(15);
 
     const executorAddrs = executorRegistry.executors.map(
-      (executor) => executor.address
+      (executor) => executor.address,
     );
 
     const executorInitiated = transfers.every((transfer) => {
@@ -249,7 +252,7 @@ describe("StakerIncentivesCalculator", () => {
       impossibleExecutorRegistry,
       1000n,
       { [ChainId.Polygon]: arbitraryStartBlock },
-      { [ChainId.Polygon]: arbitraryEndBlock }
+      { [ChainId.Polygon]: arbitraryEndBlock },
     );
 
     const result = await impossibleCalculator.fetchUserFeeTransfers();
@@ -273,7 +276,7 @@ describe("StakerIncentivesCalculator", () => {
     }
 
     const testTransfers: TokenTransferWithCalldata[] = createTestTransfers(
-      referralRelationships
+      referralRelationships,
     );
 
     // half of the users are stakers and half not
@@ -287,7 +290,7 @@ describe("StakerIncentivesCalculator", () => {
         (duplicateSwap) =>
           duplicateSwap.txHash === swap.txHash &&
           duplicateSwap.userFee === swap.userFee &&
-          BigInt(duplicateSwap.userAddress) !== BigInt(swap.userAddress)
+          BigInt(duplicateSwap.userAddress) !== BigInt(swap.userAddress),
       );
       expect(complementarySwap).toBeDefined();
     });
@@ -311,7 +314,7 @@ describe("StakerIncentivesCalculator", () => {
     }
 
     const testTransfers: TokenTransferWithCalldata[] = createTestTransfers(
-      referralRelationships
+      referralRelationships,
     );
 
     const [userFeeSwaps, addressToOnchainRewardDatas] =
@@ -326,7 +329,7 @@ describe("StakerIncentivesCalculator", () => {
     for (const [address, onchainData] of addressToOnchainRewardDatas) {
       // ensure all onchain reward datas are populated with nonzero stake amounts
       const nonzeroStakeAmount = onchainData.every(
-        (data) => data.userStake > 0n
+        (data) => data.userStake > 0n,
       );
       expect(nonzeroStakeAmount).toBe(true);
 
@@ -348,12 +351,11 @@ describe("StakerIncentivesCalculator", () => {
 
     const referralRelationships = generateRandomReferralRelationships(users);
     const testTransfers: TokenTransferWithCalldata[] = createTestTransfers(
-      referralRelationships
+      referralRelationships,
     );
 
-    const [_, addressToOnchainRewardDatas] = await calculator.fetchOnchainData(
-      testTransfers
-    );
+    const [_, addressToOnchainRewardDatas] =
+      await calculator.fetchOnchainData(testTransfers);
 
     // todo: populate a map of address to <stakeAmount, prevRewards> in setup and read it for jest spyOn
     for (const [address, onchainDatas] of addressToOnchainRewardDatas) {
@@ -381,22 +383,24 @@ describe("StakerIncentivesCalculator", () => {
     }
   });
 
-
   it("should return the correct average staked amount from a given set of events", async () => {
     const startBlock = 10n;
     const endBlock = 30n;
     const accounts = [
-        getAddress("0x1111111111111111111111111111111111111111"),
-        getAddress("0x2222222222222222222222222222222222222222"),
-        getAddress("0x3333333333333333333333333333333333333333"),
-        getAddress("0x4444444444444444444444444444444444444444"),
-    ]
-    const accountsMap = new Map<Address, {
-      initialStakeAmount: bigint,
-      events: StakeChangedEvent[],
-      expectedAverageStakedAmount: bigint
-    }>([
-        //Even increasing stake
+      getAddress("0x1111111111111111111111111111111111111111"),
+      getAddress("0x2222222222222222222222222222222222222222"),
+      getAddress("0x3333333333333333333333333333333333333333"),
+      getAddress("0x4444444444444444444444444444444444444444"),
+    ];
+    const accountsMap = new Map<
+      Address,
+      {
+        initialStakeAmount: bigint;
+        events: StakeChangedEvent[];
+        expectedAverageStakedAmount: bigint;
+      }
+    >([
+      //Even increasing stake
       [
         accounts[0],
         {
@@ -406,25 +410,25 @@ describe("StakerIncentivesCalculator", () => {
               account: accounts[0],
               blockNumber: startBlock + 5n,
               oldStake: 500n,
-              newStake: 1000n
+              newStake: 1000n,
             },
             {
               account: accounts[0],
-              blockNumber:startBlock + 10n,
+              blockNumber: startBlock + 10n,
               oldStake: 1000n,
-              newStake: 1500n
+              newStake: 1500n,
             },
             {
               account: accounts[0],
               blockNumber: startBlock + 15n,
               oldStake: 1500n,
-              newStake: 2000n
-            }
+              newStake: 2000n,
+            },
           ],
-          expectedAverageStakedAmount: 1250n
-        }
+          expectedAverageStakedAmount: 1250n,
+        },
       ],
-        //Uneven increasing stake
+      //Uneven increasing stake
       [
         accounts[1],
         {
@@ -434,25 +438,25 @@ describe("StakerIncentivesCalculator", () => {
               account: accounts[1],
               blockNumber: startBlock + 3n,
               oldStake: 800n,
-              newStake: 1200n
+              newStake: 1200n,
             },
             {
               account: accounts[1],
               blockNumber: startBlock + 8n,
               oldStake: 1200n,
-              newStake: 1600n
+              newStake: 1600n,
             },
             {
               account: accounts[1],
               blockNumber: startBlock + 12n,
               oldStake: 1600n,
-              newStake: 2000n
-            }
+              newStake: 2000n,
+            },
           ],
-          expectedAverageStakedAmount: 1540n
-        }
+          expectedAverageStakedAmount: 1540n,
+        },
       ],
-        //Even decreasing stake
+      //Even decreasing stake
       [
         accounts[2],
         {
@@ -462,25 +466,25 @@ describe("StakerIncentivesCalculator", () => {
               account: accounts[2],
               blockNumber: startBlock + 5n,
               oldStake: 2000n,
-              newStake: 1500n
+              newStake: 1500n,
             },
             {
               account: accounts[2],
-              blockNumber:startBlock + 10n,
+              blockNumber: startBlock + 10n,
               oldStake: 1500n,
-              newStake: 1000n
+              newStake: 1000n,
             },
             {
               account: accounts[2],
               blockNumber: startBlock + 15n,
               oldStake: 1000n,
-              newStake: 500n
-            }
+              newStake: 500n,
+            },
           ],
-          expectedAverageStakedAmount: 1250n
-        }
+          expectedAverageStakedAmount: 1250n,
+        },
       ],
-        //Uneven decreasing stake
+      //Uneven decreasing stake
       [
         accounts[3],
         {
@@ -490,33 +494,398 @@ describe("StakerIncentivesCalculator", () => {
               account: accounts[3],
               blockNumber: startBlock + 3n,
               oldStake: 2000n,
-              newStake: 1600n
+              newStake: 1600n,
             },
             {
               account: accounts[3],
               blockNumber: startBlock + 8n,
               oldStake: 1600n,
-              newStake: 1200n
+              newStake: 1200n,
             },
             {
               account: accounts[3],
               blockNumber: startBlock + 12n,
               oldStake: 1200n,
-              newStake: 800n
-            }
+              newStake: 800n,
+            },
           ],
-          expectedAverageStakedAmount: 1260n
-        }
-      ]
+          expectedAverageStakedAmount: 1260n,
+        },
+      ],
     ]);
 
-    const allEvents = [...accountsMap.values()].flatMap((entry) => entry.events);
+    const allEvents = [...accountsMap.values()].flatMap(
+      (entry) => entry.events,
+    );
 
-    const result = await calculator.CalculateAvgStakedAmountsPerAccount(allEvents, startBlock, endBlock);
+    const result = await calculator.CalculateAvgStakedAmountsPerAccount(
+      allEvents,
+      startBlock,
+      endBlock,
+    );
 
-    for (const [account, {expectedAverageStakedAmount}] of accountsMap.entries()) {
+    for (const [
+      account,
+      { expectedAverageStakedAmount },
+    ] of accountsMap.entries()) {
       expect(result.get(account)).toEqual(expectedAverageStakedAmount);
     }
   });
-  
+
+  describe("calculateRewardsPerStaker - fee rebate cap", () => {
+    const stakerA = getAddress("0x1111111111111111111111111111111111111111");
+    const stakerB = getAddress("0x1111111111111111111111111111111111111112");
+
+    function makeRewardData(
+      entries: Array<{
+        address: Address;
+        userStake: bigint;
+        prevCumulativeRewards: bigint;
+      }>,
+    ): Map<
+      Address,
+      { chain: ChainId; userStake: bigint; prevCumulativeRewards: bigint }[]
+    > {
+      const map = new Map<
+        Address,
+        { chain: ChainId; userStake: bigint; prevCumulativeRewards: bigint }[]
+      >();
+
+      for (const entry of entries) {
+        map.set(entry.address, [
+          {
+            chain: ChainId.Polygon,
+            userStake: entry.userStake,
+            prevCumulativeRewards: entry.prevCumulativeRewards,
+          },
+        ]);
+      }
+
+      return map;
+    }
+
+    beforeEach(() => {
+      jest.spyOn(calculator, "fetchUserFeeTransfers").mockResolvedValue([]);
+    });
+
+    it("should not apply the fee rebate cap when uncapped reward is below both stake cap and own fees", async () => {
+      /**
+       * Setup:
+       * - stakerA own fees = 400
+       * - stakerA referee fees = 0
+       * - stakerB own fees = 600
+       * - totalFees = 1000
+       * - total incentive = 1000
+       *
+       * raw issuance for A = 400 / 1000 * 1000 = 400
+       * existing stake cap for A = 1000
+       * rebate cap for A = own fees = 400
+       *
+       * final reward = min(400, 1000, 400) = 400
+       */
+      const eligibleSwaps = [
+        {
+          txHash: "0xaaa1" as `0x${string}`,
+          userAddress: stakerA,
+          userFee: 400n,
+          isRefereeSwap: false,
+        },
+        {
+          txHash: "0xbbb1" as `0x${string}`,
+          userAddress: stakerB,
+          userFee: 600n,
+          isRefereeSwap: false,
+        },
+      ];
+
+      const addressToRewardDatas = makeRewardData([
+        { address: stakerA, userStake: 1000n, prevCumulativeRewards: 0n },
+        { address: stakerB, userStake: 1000n, prevCumulativeRewards: 0n },
+      ]);
+
+      jest
+        .spyOn(calculator, "fetchOnchainData")
+        .mockResolvedValue([eligibleSwaps as any, addressToRewardDatas as any]);
+
+      const result = await calculator.calculateRewardsPerStaker();
+      const rewardA = result.get(stakerA);
+
+      expect(rewardA).toBeDefined();
+      expect(rewardA!.reward).toBe(400n);
+      expect(rewardA!.metadata).toEqual({
+        uncappedAmount: 400n,
+        stakeCapAmount: 1000n,
+        fees: 400n,
+        refereeFees: 0n,
+      });
+    });
+
+    it("should apply the existing stake cap before the rebate cap when stake cap is lower", async () => {
+      /**
+       * Setup:
+       * - stakerA own fees = 400
+       * - stakerB own fees = 600
+       * - totalFees = 1000
+       * - raw issuance for A = 400
+       * - existing stake cap for A = 250
+       * - rebate cap for A = 400
+       *
+       * final reward = min(400, 250, 400) = 250
+       */
+      const eligibleSwaps = [
+        {
+          txHash: "0xaaa2" as `0x${string}`,
+          userAddress: stakerA,
+          userFee: 400n,
+          isRefereeSwap: false,
+        },
+        {
+          txHash: "0xbbb2" as `0x${string}`,
+          userAddress: stakerB,
+          userFee: 600n,
+          isRefereeSwap: false,
+        },
+      ];
+
+      const addressToRewardDatas = makeRewardData([
+        { address: stakerA, userStake: 300n, prevCumulativeRewards: 50n }, // cap = 250
+        { address: stakerB, userStake: 1000n, prevCumulativeRewards: 0n },
+      ]);
+
+      jest
+        .spyOn(calculator, "fetchOnchainData")
+        .mockResolvedValue([eligibleSwaps as any, addressToRewardDatas as any]);
+
+      const result = await calculator.calculateRewardsPerStaker();
+      const rewardA = result.get(stakerA);
+
+      expect(rewardA).toBeDefined();
+      expect(rewardA!.reward).toBe(250n);
+      expect(rewardA!.metadata).toEqual({
+        uncappedAmount: 400n,
+        stakeCapAmount: 250n,
+        fees: 400n,
+        refereeFees: 0n,
+      });
+    });
+
+    it("should apply the new fee rebate cap when own fees are lower than both uncapped reward and stake cap", async () => {
+      /**
+       * Setup:
+       * - stakerA own fees = 100
+       * - stakerA referee fees = 900
+       * - stakerB own fees = 1000
+       * - totalFees = 2000
+       * - stakerA total eligible fees = 1000
+       * - raw issuance for A = 1000 / 2000 * 1000 = 500
+       * - existing stake cap for A = 10_000
+       * - rebate cap for A = own fees = 100
+       *
+       * final reward = min(500, 10000, 100) = 100
+       */
+      const eligibleSwaps = [
+        {
+          txHash: "0xaaa3" as `0x${string}`,
+          userAddress: stakerA,
+          userFee: 100n,
+          isRefereeSwap: false,
+        },
+        {
+          txHash: "0xaaa4" as `0x${string}`,
+          userAddress: stakerA,
+          userFee: 900n,
+          isRefereeSwap: true,
+        },
+        {
+          txHash: "0xbbb3" as `0x${string}`,
+          userAddress: stakerB,
+          userFee: 1000n,
+          isRefereeSwap: false,
+        },
+      ];
+
+      const addressToRewardDatas = makeRewardData([
+        { address: stakerA, userStake: 10_000n, prevCumulativeRewards: 0n },
+        { address: stakerB, userStake: 10_000n, prevCumulativeRewards: 0n },
+      ]);
+
+      jest
+        .spyOn(calculator, "fetchOnchainData")
+        .mockResolvedValue([eligibleSwaps as any, addressToRewardDatas as any]);
+
+      const result = await calculator.calculateRewardsPerStaker();
+      const rewardA = result.get(stakerA);
+
+      expect(rewardA).toBeDefined();
+      expect(rewardA!.reward).toBe(100n);
+      expect(rewardA!.metadata).toEqual({
+        uncappedAmount: 500n,
+        stakeCapAmount: 10_000n,
+        fees: 100n,
+        refereeFees: 900n,
+      });
+    });
+
+    it("should return zero when own fees are zero even if referee fees generate a positive uncapped reward", async () => {
+      /**
+       * Setup:
+       * - stakerA own fees = 0
+       * - stakerA referee fees = 500
+       * - stakerB own fees = 500
+       * - totalFees = 1000
+       * - raw issuance for A = 500
+       * - existing stake cap for A = large
+       * - rebate cap for A = 0
+       *
+       * final reward = min(500, large, 0) = 0
+       */
+      const eligibleSwaps = [
+        {
+          txHash: "0xaaa5" as `0x${string}`,
+          userAddress: stakerA,
+          userFee: 500n,
+          isRefereeSwap: true,
+        },
+        {
+          txHash: "0xbbb4" as `0x${string}`,
+          userAddress: stakerB,
+          userFee: 500n,
+          isRefereeSwap: false,
+        },
+      ];
+
+      const addressToRewardDatas = makeRewardData([
+        { address: stakerA, userStake: 10_000n, prevCumulativeRewards: 0n },
+        { address: stakerB, userStake: 10_000n, prevCumulativeRewards: 0n },
+      ]);
+
+      jest
+        .spyOn(calculator, "fetchOnchainData")
+        .mockResolvedValue([eligibleSwaps as any, addressToRewardDatas as any]);
+
+      const result = await calculator.calculateRewardsPerStaker();
+      const rewardA = result.get(stakerA);
+
+      expect(rewardA).toBeDefined();
+      expect(rewardA!.reward).toBe(0n);
+      expect(rewardA!.metadata).toEqual({
+        uncappedAmount: 500n,
+        stakeCapAmount: 10_000n,
+        fees: 0n,
+        refereeFees: 500n,
+      });
+    });
+
+    it("should apply the stake cap when it is lower than the rebate cap and both caps bind", async () => {
+      /**
+       * Setup:
+       * - stakerA own fees = 300
+       * - stakerA referee fees = 700
+       * - stakerB own fees = 1000
+       * - totalFees = 2000
+       * - raw issuance for A = 500
+       * - existing stake cap for A = 200
+       * - rebate cap for A = 300
+       *
+       * final reward = min(500, 200, 300) = 200
+       */
+      const eligibleSwaps = [
+        {
+          txHash: "0xaaa6" as `0x${string}`,
+          userAddress: stakerA,
+          userFee: 300n,
+          isRefereeSwap: false,
+        },
+        {
+          txHash: "0xaaa7" as `0x${string}`,
+          userAddress: stakerA,
+          userFee: 700n,
+          isRefereeSwap: true,
+        },
+        {
+          txHash: "0xbbb5" as `0x${string}`,
+          userAddress: stakerB,
+          userFee: 1000n,
+          isRefereeSwap: false,
+        },
+      ];
+
+      const addressToRewardDatas = makeRewardData([
+        { address: stakerA, userStake: 350n, prevCumulativeRewards: 150n }, // cap = 200
+        { address: stakerB, userStake: 10_000n, prevCumulativeRewards: 0n },
+      ]);
+
+      jest
+        .spyOn(calculator, "fetchOnchainData")
+        .mockResolvedValue([eligibleSwaps as any, addressToRewardDatas as any]);
+
+      const result = await calculator.calculateRewardsPerStaker();
+      const rewardA = result.get(stakerA);
+
+      expect(rewardA).toBeDefined();
+      expect(rewardA!.reward).toBe(200n);
+      expect(rewardA!.metadata).toEqual({
+        uncappedAmount: 500n,
+        stakeCapAmount: 200n,
+        fees: 300n,
+        refereeFees: 700n,
+      });
+    });
+
+    it("should apply the rebate cap when it is lower than the stake cap and both caps bind", async () => {
+      /**
+       * Setup:
+       * - stakerA own fees = 150
+       * - stakerA referee fees = 850
+       * - stakerB own fees = 1000
+       * - totalFees = 2000
+       * - raw issuance for A = 500
+       * - existing stake cap for A = 300
+       * - rebate cap for A = 150
+       *
+       * final reward = min(500, 300, 150) = 150
+       */
+      const eligibleSwaps = [
+        {
+          txHash: "0xaaa8" as `0x${string}`,
+          userAddress: stakerA,
+          userFee: 150n,
+          isRefereeSwap: false,
+        },
+        {
+          txHash: "0xaaa9" as `0x${string}`,
+          userAddress: stakerA,
+          userFee: 850n,
+          isRefereeSwap: true,
+        },
+        {
+          txHash: "0xbbb6" as `0x${string}`,
+          userAddress: stakerB,
+          userFee: 1000n,
+          isRefereeSwap: false,
+        },
+      ];
+
+      const addressToRewardDatas = makeRewardData([
+        { address: stakerA, userStake: 350n, prevCumulativeRewards: 50n }, // cap = 300
+        { address: stakerB, userStake: 10_000n, prevCumulativeRewards: 0n },
+      ]);
+
+      jest
+        .spyOn(calculator, "fetchOnchainData")
+        .mockResolvedValue([eligibleSwaps as any, addressToRewardDatas as any]);
+
+      const result = await calculator.calculateRewardsPerStaker();
+      const rewardA = result.get(stakerA);
+
+      expect(rewardA).toBeDefined();
+      expect(rewardA!.reward).toBe(150n);
+      expect(rewardA!.metadata).toEqual({
+        uncappedAmount: 500n,
+        stakeCapAmount: 300n,
+        fees: 150n,
+        refereeFees: 850n,
+      });
+    });
+  });
 });
