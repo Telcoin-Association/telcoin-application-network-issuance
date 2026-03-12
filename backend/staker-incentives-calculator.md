@@ -16,11 +16,11 @@
 
 `Stakers'` own user fees are eligible for rewards if they are also `Referees`, and if they are `Referrers` they are additionally eligible for their `Referees` fees. As a result, the set of `eligible users` for TAN rewards issuance comprises both `Stakers` and `Referrers`.
 
-### **Rewards Caps:** Rewards for any given period are capped by the time weighted average stake held by the `Staker/Referrer` during the period, less cumulative rewards already earned.
+### **Rewards Caps:** Rewards for any given period are subject to two caps applied sequentially:
 
-To incentivize staking TEL, `Stakers'` are only eligible to receive issuance rewards up to their time weighted average stake for the period. This includes their cumulative rewards for all previous periods. Thus `rewardsCap = timeWeightedStake - cumulativePrevRewards`.
+1. **Stake-based cap:** `Stakers` are only eligible to receive issuance rewards up to their time weighted average stake for the period, less cumulative rewards for all previous periods. Thus `stakeBasedCap = timeWeightedStake - cumulativePrevRewards`. Historical rewards checkpoints are persisted by the `TANIssuanceHistory` contract in a mapping called `prevCumulativeRewards` for immutable derivation of future rewards caps.
 
-Historical rewards checkpoints are persisted by the `TANIssuanceHistory` contract in a mapping called `prevCumulativeRewards` for immutable derivation of future rewards caps.
+2. **Fee-based rebate cap:** A wallet's reward is additionally capped at the total TEL fees that wallet personally paid during the period. Only the wallet's own fees count toward this cap; fees paid by referred users do not. Thus `finalRebate = min(stakeCapResult, walletOwnFees)`. This ensures no wallet can receive more TEL than it spent in fees.
 
 ### **Multichain Support:** The `StakerIncentivesCalculator` class works across multiple chains.
 
@@ -91,7 +91,8 @@ For each validated user fee transfer, the `fetchUserFeeTransfers()` function als
 
 ### 8. **Apply Rewards Caps:**
 
-- Apply rewards caps where applicable to values derived in step 5. If any rewards caps were applied, it will result in a remainder out of the period's total issuance amount.
+- Apply the stake-based rewards cap where applicable using values derived in step 5. If any stake caps were applied, it will result in a remainder out of the period's total issuance amount.
+- Apply the fee-based rebate cap: each wallet's reward is capped at its own TEL fees paid during the period (`walletOwnFees`). Referee fees are not included in the cap. The final reward is `min(stakeCapResult, walletOwnFees)`.
 
 ### 9. **Distribute Issuance:**
 
