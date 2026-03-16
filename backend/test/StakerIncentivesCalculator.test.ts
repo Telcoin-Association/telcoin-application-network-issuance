@@ -571,29 +571,29 @@ describe("StakerIncentivesCalculator", () => {
     it("should not apply the fee rebate cap when uncapped reward is below both stake cap and own fees", async () => {
       /**
        * Setup:
-       * - stakerA own fees = 400
+       * - stakerA own fees = 500
        * - stakerA referee fees = 0
-       * - stakerB own fees = 600
-       * - totalFees = 1000
+       * - stakerB own fees = 1500
+       * - totalFees = 2000
        * - total incentive = 1000
        *
-       * raw issuance for A = 400 / 1000 * 1000 = 400
+       * raw issuance for A = 500 / 2000 * 1000 = 250
        * existing stake cap for A = 1000
-       * rebate cap for A = own fees = 400
+       * rebate cap for A = own fees = 500
        *
-       * final reward = min(400, 1000, 400) = 400
+       * final reward = min(250, 1000, 500) = 250
        */
       const eligibleSwaps = [
         {
           txHash: "0xaaa1" as `0x${string}`,
           userAddress: stakerA,
-          userFee: 400n,
+          userFee: 500n,
           isRefereeSwap: false,
         },
         {
           txHash: "0xbbb1" as `0x${string}`,
           userAddress: stakerB,
-          userFee: 600n,
+          userFee: 1500n,
           isRefereeSwap: false,
         },
       ];
@@ -611,11 +611,11 @@ describe("StakerIncentivesCalculator", () => {
       const rewardA = result.get(stakerA);
 
       expect(rewardA).toBeDefined();
-      expect(rewardA!.reward).toBe(400n);
+      expect(rewardA!.reward).toBe(250n);
       expect(rewardA!.metadata).toEqual({
-        uncappedAmount: 400n,
+        uncappedAmount: 250n,
         stakeCapAmount: 1000n,
-        fees: 400n,
+        fees: 500n,
         refereeFees: 0n,
       });
     });
