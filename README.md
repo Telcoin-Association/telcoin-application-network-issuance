@@ -40,6 +40,7 @@ TANIP-1 Staker Incentives Issuance has been paused for the time being.
     - Personal fees paid
     - Referred users' fees paid
 - **TAN Maximum Weekly TEL Issuance Rule:** Throughout the entire period, total staked TEL must exceed (Lifetime TEL issuance + Current week TEL issuance)
+- **Fee-Based Rebate Cap:** A wallet's reward for any period is additionally capped at the total TEL fees that wallet personally paid during the period. This means no wallet can receive more TEL than it spent in fees: `finalRebate = min(rawIssuance, walletOwnFees)` (TANIP: Trading Fee Rebate Program)
 
 ## Viewing the official rewards
 

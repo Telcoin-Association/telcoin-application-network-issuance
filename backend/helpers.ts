@@ -62,7 +62,7 @@ export function jsonParse(s: string) {
 
 export function jsonStringify(obj: any) {
   return JSON.stringify(obj, (key, value) =>
-    typeof value === "bigint" ? value.toString() + "n" : value
+    typeof value === "bigint" ? value.toString() + "n" : value,
   );
 }
 
@@ -83,7 +83,7 @@ export function getSupportedChain(chainId: string): ChainId {
 export function scaleDecimals(
   currentValue: bigint,
   currentDecimals: bigint,
-  desiredDecimals: bigint
+  desiredDecimals: bigint,
 ) {
   if (currentDecimals === desiredDecimals) {
     return currentValue;
@@ -127,13 +127,13 @@ export function observableToPromise<T>(obs: Observable<Update<T>>): Promise<T> {
 }
 
 export function observableToProgressBar<T>(
-  obs: Observable<Update<T>>
+  obs: Observable<Update<T>>,
 ): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     let data: T;
     const bar = new cliProgress.SingleBar(
       {},
-      cliProgress.Presets.shades_classic
+      cliProgress.Presets.shades_classic,
     );
     bar.start(100, 0);
     obs.subscribe({
@@ -159,10 +159,10 @@ export interface NetworkConfig {
 }
 
 export function parseAndSanitizeCLIArgs(
-  networkArgs: string[]
+  networkArgs: string[],
 ): NetworkConfig[] {
   const validNetworks: string[] = config.chains.map((chain) =>
-    chain.name.toLowerCase()
+    chain.name.toLowerCase(),
   );
 
   const networkConfigs: NetworkConfig[] = [];
@@ -177,7 +177,7 @@ export function parseAndSanitizeCLIArgs(
     }
     if (!blockRange) {
       console.error(
-        `Invalid blockRange specified for ${network}: ${blockRange}`
+        `Invalid blockRange specified for ${network}: ${blockRange}`,
       );
     }
 
@@ -189,7 +189,7 @@ export function parseAndSanitizeCLIArgs(
       startBlock = BigInt(startBlockStr);
     } else {
       console.error(
-        `Invalid start block specified for ${network}: ${blockRange}`
+        `Invalid start block specified for ${network}: ${blockRange}`,
       );
       process.exit(1);
     }
@@ -198,7 +198,7 @@ export function parseAndSanitizeCLIArgs(
       endBlock = BigInt(endBlockStr);
     } else {
       console.error(
-        `Invalid end block specified for ${network}: ${blockRange}`
+        `Invalid end block specified for ${network}: ${blockRange}`,
       );
       process.exit(1);
     }
@@ -208,7 +208,7 @@ export function parseAndSanitizeCLIArgs(
 
   if (networkConfigs.length === 0) {
     console.log(
-      "Enter network configurations in the format `network=startBlock:endBlock` and separate multiple networks by space. Eg usage: `yarn start polygon=666000:667000` or `yarn start polygon=666000:667000 mainnet=100000:110000`"
+      "Enter network configurations in the format `network=startBlock:endBlock` and separate multiple networks by space. Eg usage: `yarn start polygon=666000:667000` or `yarn start polygon=666000:667000 mainnet=100000:110000`",
     );
 
     process.exit(1);
@@ -218,7 +218,7 @@ export function parseAndSanitizeCLIArgs(
 }
 
 export async function validateStartAndEndBlocks(
-  networkConfigs: NetworkConfig[]
+  networkConfigs: NetworkConfig[],
 ) {
   for (const networkConfig of networkConfigs) {
     let chainId;
@@ -245,7 +245,7 @@ export async function validateStartAndEndBlocks(
       networkConfig.startBlock !== period0StartBlock
     ) {
       console.error(
-        `${networkConfig.network} startBlock ${networkConfig.network} must be last settlement block + 1 or period 0 block`
+        `${networkConfig.network} startBlock ${networkConfig.network} must be last settlement block + 1 or period 0 block`,
       );
       process.exit(1);
     }
@@ -258,16 +258,16 @@ export async function validateStartAndEndBlocks(
 }
 
 export async function getLastSettlementBlockAndLatestBlock(
-  chain: ChainId
+  chain: ChainId,
 ): Promise<[bigint, bigint]> {
   const client = createRpcClient(chain);
   const matchingChainTanIssuanceHistory = tanIssuanceHistories.find(
-    (history) => history.chain === chain
+    (history) => history.chain === chain,
   );
 
   if (!matchingChainTanIssuanceHistory)
     throw new Error(
-      "No TanIssuanceHistory was found for the specified chain, update config in src/data/tanIssuanceHistories.ts"
+      "No TanIssuanceHistory was found for the specified chain, update config in src/data/tanIssuanceHistories.ts",
     );
 
   const lastSettlementBlock = await client.readContract({
@@ -282,7 +282,7 @@ export async function getLastSettlementBlockAndLatestBlock(
 
 export async function getBlockByTimestamp(
   chain: ChainId,
-  timestamp: bigint
+  timestamp: bigint,
 ): Promise<bigint> {
   // do a binary search to find the block number
   // we should return the block right before the timestamp (or the block with the timestamp)
@@ -313,7 +313,7 @@ export async function getBlockByTimestamp(
 export async function writeIncentivesToFile(
   stakerIncentives: Map<Address, UserRewardEntry>,
   blockRanges: NetworkConfig[],
-  filePath: string
+  filePath: string,
 ) {
   // serialize UserRewardEntrys
   const incentivesArray = Array.from(stakerIncentives.entries()).map(
@@ -322,10 +322,11 @@ export async function writeIncentivesToFile(
       reward: userRewardEntry.reward.toString(),
       metadata: {
         uncappedAmount: userRewardEntry.metadata.uncappedAmount!.toString(),
+        stakeCapAmount: userRewardEntry.metadata.stakeCapAmount?.toString(),
         fees: userRewardEntry.metadata.fees.toString(),
         refereeFees: userRewardEntry.metadata.refereeFees.toString(),
       },
-    })
+    }),
   );
 
   // convert block numbers to string for JSON serialization
@@ -334,7 +335,7 @@ export async function writeIncentivesToFile(
       network,
       startBlock: startBlock.toString(),
       endBlock: endBlock.toString(),
-    })
+    }),
   );
 
   const data = {
@@ -354,7 +355,7 @@ export async function writeIncentivesToFile(
 export function writeIncentivesToExcel(
   stakerIncentives: Map<Address, UserRewardEntry>,
   blockRanges: NetworkConfig[],
-  filePath: string
+  filePath: string,
 ) {
   // Process data to include the new column with formatted values
   const data = Array.from(stakerIncentives.entries()).map(
@@ -366,35 +367,42 @@ export function writeIncentivesToExcel(
       "Uncapped Reward (ERC20 TEL)": (
         Number(userRewardEntry.metadata.uncappedAmount) / 100
       ).toLocaleString(),
+      "Stake Cap Amount (ERC20 TEL)": (
+        Number(userRewardEntry.metadata.stakeCapAmount ?? 0) / 100
+      ).toLocaleString(),
       "Staker Fees": (
         Number(userRewardEntry.metadata.fees) / 100
       ).toLocaleString(),
       "Referee Fees": (
         Number(userRewardEntry.metadata.refereeFees) / 100
       ).toLocaleString(),
-    })
+    }),
   );
 
   const totals = data.reduce(
     (accumulator: any, entry: any) => {
       accumulator.totalRewardERC20 += Number(
-        entry["Reward (ERC20 TEL)"].replace(/,/g, "")
+        entry["Reward (ERC20 TEL)"].replace(/,/g, ""),
       );
       accumulator.totalUncappedIssuance += Number(
-        entry["Uncapped Reward (ERC20 TEL)"].replace(/,/g, "")
+        entry["Uncapped Reward (ERC20 TEL)"].replace(/,/g, ""),
+      );
+      accumulator.totalStakeCapAmount += Number(
+        entry["Stake Cap Amount (ERC20 TEL)"].replace(/,/g, ""),
       );
       accumulator.totalFees += Number(entry["Staker Fees"].replace(/,/g, ""));
       accumulator.totalRefereeFees += Number(
-        entry["Referee Fees"].replace(/,/g, "")
+        entry["Referee Fees"].replace(/,/g, ""),
       );
       return accumulator;
     },
     {
       totalRewardERC20: 0,
       totalUncappedIssuance: 0,
+      totalStakeCapAmount: 0,
       totalFees: 0,
       totalRefereeFees: 0,
-    }
+    },
   );
 
   // Add total row
@@ -403,6 +411,7 @@ export function writeIncentivesToExcel(
     "Reward (ERC20 TEL)": totals.totalRewardERC20.toLocaleString(),
     "Uncapped Reward (ERC20 TEL)":
       totals.totalUncappedIssuance.toLocaleString(),
+    "Stake Cap Amount (ERC20 TEL)": totals.totalStakeCapAmount.toLocaleString(),
     "Staker Fees": totals.totalFees.toLocaleString(),
     "Referee Fees": totals.totalRefereeFees.toLocaleString(),
   });
@@ -414,6 +423,7 @@ export function writeIncentivesToExcel(
     { wch: 20 }, // Staker Address
     { wch: 15 }, // Reward (ERC20 TEL)
     { wch: 20 }, // Uncapped Reward (ERC20 TEL)
+    { wch: 20 }, // Stake Cap Amount (ERC20 TEL)
     { wch: 10 }, // Staker Fees
     { wch: 15 }, // Referee Fees
   ];
@@ -434,7 +444,7 @@ export function writeIncentivesToExcel(
   if (workbook.Sheets[sheetName]) {
     delete workbook.Sheets[sheetName];
     workbook.SheetNames = workbook.SheetNames.filter(
-      (name: string) => name !== sheetName
+      (name: string) => name !== sheetName,
     );
   }
 
@@ -449,12 +459,12 @@ export function writeIncentivesToExcel(
 
 export function calculateIncentivesFromVolumeOrSimilar(
   mapping: Map<viem.Address, bigint>,
-  totalIncentive: bigint
+  totalIncentive: bigint,
 ) {
   const cappedIncentivesPerAccount = new Map<viem.Address, bigint>();
   const totalVolume = [...mapping.values()].reduce(
     (acc, volume) => acc + volume,
-    0n
+    0n,
   );
   for (const [address, volume] of mapping) {
     // identify address's share of the total incentive using its share of volume
@@ -575,7 +585,7 @@ export function getRandomBigInt(min: number, max: number): bigint {
 export function generateMockHex(
   length: number,
   endDigits: number,
-  isStaker?: boolean
+  isStaker?: boolean,
 ) {
   const padDigit = isStaker ? "1" : "0";
   return `0x${endDigits.toString(16).padStart(40, padDigit)}` as `0x${string}`;
@@ -583,7 +593,7 @@ export function generateMockHex(
 
 export function generateRandomReferralRelationships(
   users: Address[],
-  isStaker?: boolean
+  isStaker?: boolean,
 ): Map<Address, Address[]> {
   const referralRelationships = new Map<Address, Address[]>();
   const availableReferees = new Set(users);
