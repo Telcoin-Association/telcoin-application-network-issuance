@@ -67,7 +67,12 @@ interface CheckpointData {
   currency1: Address;
   positions: [bigint, PositionState][];
   lpData: [Address, LPData][];
+  vwapResult?: VwapResult;
 }
+
+export type VwapResult =
+  | { kind: "vwap"; priceScaled: bigint }
+  | { kind: "singleSided"; growingIsCurrency0: boolean };
 
 export type PoolConfig = {
   network: ChainId;
@@ -81,7 +86,7 @@ export type PoolConfig = {
   rewardAmounts: { FIRST: bigint; PERIOD: bigint };
 };
 
-const PRECISION = 10n ** 64n;
+export const PRECISION = 10n ** 64n;
 const INITIALIZE_REWARD_AMOUNT = 0n;
 const FIRST_PERIOD_REWARD_AMOUNT_ETH_TEL = 101_851_851n; // prorated
 const PERIOD_REWARD_AMOUNT_ETH_TEL = 64_814_814n;
@@ -167,7 +172,7 @@ export const POOLS = [BASE_ETH_TEL, POLYGON_ETH_TEL, POLYGON_USDC_EMXN];
  * @notice While public-facing periods are 1-indexed, this utility uses `period 0` internally
  * to refer to the initialization period from pool creation to first period start.
  */
-export const PERIODS = Array.from({ length: 35 }, (_, i) => i);
+export const PERIODS = Array.from({ length: 36 }, (_, i) => i);
 const NETWORKS = {
   [ChainId.Polygon]: {
     poolManager: getAddress("0x67366782805870060151383f4bbff9dab53e5cd6"),
@@ -210,6 +215,7 @@ const NETWORKS = {
       84_638_382n, // mar 25
       84_940_781n, // apr 1
       85_243_181n, // apr 8
+      85_545_578n, // apr 15
     ],
   },
   [ChainId.Base]: {
@@ -253,17 +259,19 @@ const NETWORKS = {
       43_803_726n, // mar 25
       44_106_126n, // apr 1
       44_408_526n, // apr 8
+      44_710_926n, // apr 15
     ],
   },
 };
 
 /**
- * @dev Usage: `yarn ts-node backend/calculators/TELxRewardsCalculator.ts <poolId>:<period>`
+ * @dev Usage: `yarn ts-node backend/calculators/TELxRewardsCalculator.ts <poolId>:<period> [--rerun]`
  * eg: `yarn ts-node backend/calculators/TELxRewardsCalculator.ts 0x29f94ec9b66df7fe4068e2d7e9bf0147b49afcdc7cd3283dff03088b8026169f:16`
+ * Pass `--rerun` to write to `<name>-<period>.rerun.json` instead of overwriting the canonical checkpoint.
  */
 async function main() {
   const args = process.argv.slice(2);
-  const [poolId, period] = parseCLIArgs(args);
+  const [poolId, period, rerun] = parseCLIArgs(args);
   const poolConfig = setPoolConfig(poolId, period);
 
   // Load state from checkpoint json if it exists and reset its period-specific fee fields
@@ -300,17 +308,22 @@ async function main() {
     poolConfig.currency0,
     poolConfig.currency1,
   );
-  const vwapPriceScaled = await getVolumeWeightedAveragePriceScaled(
-    client,
-    poolId,
-    poolConfig.stateView,
-    poolConfig.startBlock,
-    poolConfig.endBlock,
+  const { feeGrowthDelta0, feeGrowthDelta1 } =
+    await getFeeGrowthGlobalsPeriodDelta(
+      client,
+      poolId,
+      poolConfig.stateView,
+      poolConfig.startBlock,
+      poolConfig.endBlock,
+    );
+  const vwapResult: VwapResult = deriveVwapResult(
+    feeGrowthDelta0,
+    feeGrowthDelta1,
     denominatorIsCurrency0,
   );
   const lpData = await populateTotalFeesCommonDenominator(
     lpFees,
-    vwapPriceScaled,
+    vwapResult,
     denominatorIsCurrency0,
   );
 
@@ -332,8 +345,10 @@ async function main() {
     currency1: poolConfig.currency1,
     positions: Array.from(finalPositions.entries()),
     lpData: Array.from(lpRewards.entries()),
+    vwapResult,
   };
-  const outputFile = `${TELX_BASE_PATH}/${poolConfig.name}-${period}.json`;
+  const suffix = rerun ? ".rerun" : "";
+  const outputFile = `${TELX_BASE_PATH}/${poolConfig.name}-${period}${suffix}.json`;
   await writeFile(
     outputFile,
     JSON.stringify(
@@ -1130,27 +1145,40 @@ async function getTickBitmap(
   });
 }
 
-// Sums token0 and token1 amounts into a value denominated in a single currency based on current tick price
-// updates lpData map by setting `LPData.totalFeesDenominatedInTEL` for all entries
-async function populateTotalFeesCommonDenominator(
+// Sums each LP's token0 and token1 period fees into a single-currency total and
+// writes it to `LPData.totalFeesCommonDenominatorWeighted`. For a `vwap` result
+// the VWAP price converts the non-denominator side; for a `singleSided` result
+// only the growing side contributes (the absent side's price would cancel out
+// in the downstream reward share ratio anyway).
+export async function populateTotalFeesCommonDenominator(
   lpData: Map<Address, LPData>,
-  vwapPriceScaled: bigint,
+  vwapResult: VwapResult,
   denominatorIsCurrency0: boolean,
 ): Promise<Map<Address, LPData>> {
-  // convert both amounts into denominator and sum;
+  if (vwapResult.kind === "singleSided") {
+    for (const [lpAddress, fees] of lpData) {
+      const totalFeesInDenominatorWeighted = vwapResult.growingIsCurrency0
+        ? fees.periodFeesCurrency0Weighted
+        : fees.periodFeesCurrency1Weighted;
+      modifyLPData(lpData, lpAddress, {
+        totalFeesCommonDenominatorWeighted: totalFeesInDenominatorWeighted,
+      });
+    }
+    return lpData;
+  }
+  const vwapPriceScaled = vwapResult.priceScaled;
+
   for (const [lpAddress, fees] of lpData) {
     let totalFeesInDenominatorWeighted: bigint;
 
     if (denominatorIsCurrency0) {
-      // periodFeesCurrency0 is already in denominator; convert periodFeesCurrency1
       const amount1InDenominatorWeighted =
-        (fees.periodFeesCurrency1Weighted * vwapPriceScaled) / PRECISION; // unscale
+        (fees.periodFeesCurrency1Weighted * vwapPriceScaled) / PRECISION;
       totalFeesInDenominatorWeighted =
         fees.periodFeesCurrency0Weighted + amount1InDenominatorWeighted;
     } else {
-      // periodFeesCurrency1 is already in denominator, so convert periodFeesCurrency0
       const amount0InDenominatorWeighted =
-        (fees.periodFeesCurrency0Weighted * vwapPriceScaled) / PRECISION; // unscale
+        (fees.periodFeesCurrency0Weighted * vwapPriceScaled) / PRECISION;
       totalFeesInDenominatorWeighted =
         fees.periodFeesCurrency1Weighted + amount0InDenominatorWeighted;
     }
@@ -1195,47 +1223,27 @@ async function getFeeGrowthGlobalsPeriodDelta(
   const feeGrowthDelta1 =
     (endGrowth[1] - startGrowth[1] + MAX_UINT256) % MAX_UINT256;
 
-  if (feeGrowthDelta0 === 0n || feeGrowthDelta1 === 0n) {
-    throw new Error("No fee growth in one or both assets during the period.");
-  }
-
   return { feeGrowthDelta0, feeGrowthDelta1 };
 }
 
-// Use total global fee growth of period to calculate deltas as VWAP
-async function getVolumeWeightedAveragePriceScaled(
-  client: PublicClient,
-  poolId: `0x${string}`,
-  stateView: Address,
-  startBlock: bigint,
-  endBlock: bigint,
+// decides whether the two global fee-growth deltas yield a meaningful VWAP,
+// or whether the period was one-sided (one side saw zero fee growth).
+export function deriveVwapResult(
+  feeGrowthDelta0: bigint,
+  feeGrowthDelta1: bigint,
   denominatorIsCurrency0: boolean,
-): Promise<bigint> {
-  // fetch fee growth at start and end of period
-  const { feeGrowthDelta0, feeGrowthDelta1 } =
-    await getFeeGrowthGlobalsPeriodDelta(
-      client,
-      poolId,
-      stateView,
-      startBlock,
-      endBlock,
-    );
-
-  // Calculate VWAP based on fee ratio, representing average exchange rate for period
-  let scaledVwapPrice: bigint;
-  if (denominatorIsCurrency0) {
-    // Price = token1 / token0
-    scaledVwapPrice = (feeGrowthDelta0 * PRECISION) / feeGrowthDelta1;
-    return scaledVwapPrice;
-  } else {
-    // Price = token0 / token1
-    scaledVwapPrice = (feeGrowthDelta1 * PRECISION) / feeGrowthDelta0;
-    return scaledVwapPrice;
+): VwapResult {
+  if (feeGrowthDelta0 > 0n && feeGrowthDelta1 > 0n) {
+    const priceScaled = denominatorIsCurrency0
+      ? (feeGrowthDelta0 * PRECISION) / feeGrowthDelta1
+      : (feeGrowthDelta1 * PRECISION) / feeGrowthDelta0;
+    return { kind: "vwap", priceScaled };
   }
+  return { kind: "singleSided", growingIsCurrency0: feeGrowthDelta1 === 0n };
 }
 
 // allocates each LP the amount proportional to their share of the total reward amount
-function calculateRewardDistribution(
+export function calculateRewardDistribution(
   lpData: Map<Address, LPData>,
   rewardAmount: bigint,
 ): Map<Address, LPData> {
@@ -1593,9 +1601,9 @@ function setPoolConfig(poolId_: `0x${string}`, period: number) {
   };
 }
 
-function parseCLIArgs(args: string[]): [`0x${string}`, number] {
-  if (args.length !== 1) {
-    throw new Error("Usage: <poolId:period>");
+function parseCLIArgs(args: string[]): [`0x${string}`, number, boolean] {
+  if (args.length < 1 || args.length > 2) {
+    throw new Error("Usage: <poolId:period> [--rerun]");
   }
   const [poolId, periodStr] = args[0].split(":");
   if (!poolId?.startsWith("0x")) {
@@ -1605,7 +1613,11 @@ function parseCLIArgs(args: string[]): [`0x${string}`, number] {
   if (isNaN(period) || period < 0 || period > PERIODS.length - 1) {
     throw new Error(`Invalid period, must be [0:${PERIODS.length - 1}]`);
   }
-  return [poolId as `0x${string}`, period];
+  const rerun = args[1] === "--rerun";
+  if (args[1] !== undefined && !rerun) {
+    throw new Error(`Unknown flag: ${args[1]}`);
+  }
+  return [poolId as `0x${string}`, period, rerun];
 }
 
 function buildPeriodConfig(pool: PoolConfig, period: number) {
