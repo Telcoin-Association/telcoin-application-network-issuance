@@ -83,6 +83,16 @@ describe("deriveVwapResult", () => {
     const rewards = calculateRewardDistribution(populated, 1_000_000n);
     expect(rewards.size).to.equal(0);
   });
+
+  it("A7: equal non-zero deltas → priceScaled === PRECISION on both denom orientations", () => {
+    const resultDenom0 = deriveVwapResult(100n, 100n, true);
+    if (resultDenom0.kind !== "vwap") throw new Error("expected vwap");
+    expect(resultDenom0.priceScaled).to.equal(PRECISION);
+
+    const resultDenom1 = deriveVwapResult(100n, 100n, false);
+    if (resultDenom1.kind !== "vwap") throw new Error("expected vwap");
+    expect(resultDenom1.priceScaled).to.equal(PRECISION);
+  });
 });
 
 describe("populateTotalFeesCommonDenominator", () => {
@@ -225,6 +235,56 @@ describe("distribution equivalence when one side is globally flat", () => {
     const rewardsY = calculateRewardDistribution(lpY, REWARD);
 
     for (const [addr] of entries) {
+      expect(rewardsX.get(addr)?.reward).to.equal(rewardsY.get(addr)?.reward);
+    }
+  });
+
+  const entriesCur1Only: Array<[Address, bigint, bigint]> = [
+    [LP_A, 0n, 100n],
+    [LP_B, 0n, 250n],
+    [LP_C, 0n, 75n],
+  ];
+
+  it("C3: zero currency0 fees pool-wide; singleSided(cur1) ≡ vwap with denomIs0=true", async () => {
+    const lpX = makeLPMap(entriesCur1Only);
+    await populateTotalFeesCommonDenominator(
+      lpX,
+      { kind: "vwap", priceScaled: 2n * PRECISION },
+      true,
+    );
+    const rewardsX = calculateRewardDistribution(lpX, REWARD);
+
+    const lpY = makeLPMap(entriesCur1Only);
+    await populateTotalFeesCommonDenominator(
+      lpY,
+      { kind: "singleSided", growingIsCurrency0: false },
+      true,
+    );
+    const rewardsY = calculateRewardDistribution(lpY, REWARD);
+
+    for (const [addr] of entriesCur1Only) {
+      expect(rewardsX.get(addr)?.reward).to.equal(rewardsY.get(addr)?.reward);
+    }
+  });
+
+  it("C4: zero currency0 fees pool-wide; singleSided(cur1) ≡ vwap with denomIs0=false", async () => {
+    const lpX = makeLPMap(entriesCur1Only);
+    await populateTotalFeesCommonDenominator(
+      lpX,
+      { kind: "vwap", priceScaled: 5n * PRECISION },
+      false,
+    );
+    const rewardsX = calculateRewardDistribution(lpX, REWARD);
+
+    const lpY = makeLPMap(entriesCur1Only);
+    await populateTotalFeesCommonDenominator(
+      lpY,
+      { kind: "singleSided", growingIsCurrency0: false },
+      false,
+    );
+    const rewardsY = calculateRewardDistribution(lpY, REWARD);
+
+    for (const [addr] of entriesCur1Only) {
       expect(rewardsX.get(addr)?.reward).to.equal(rewardsY.get(addr)?.reward);
     }
   });
