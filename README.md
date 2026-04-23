@@ -214,6 +214,8 @@ The `backend/safeTxArrayBuilder.ts` script builds the function parameters which 
 
 #### The builder script prints the total amount of TEL needed to be transferred from the TANSafe to the history contract (and then to the plugin), as well as the `endBlock` for all networks in `rewards/staker_rewards_period_x.json`. The `rewards` array parameter is often too long to view in a terminal and sometimes too long to perform the period's distribution in a single transaction, so it is written to a series of chunks at`backend/temp/safe_param_period_x_chunk_y.json` file for the corresponding period number.
 
+NOTE: tokens must be transferred to the TANIssuanceHistory contract - `increaseClaimableByBatch()` does not pull tokens (which would require an approval)
+
 To run the script, use:
 
-`yarn ts-node backend/safeTxArrayBuilder.ts --period $DESIRED_PERIOD`
+`yarn ts-node backend/safeTxArrayBuilder.ts --period $DESIRED_PERIOD --tan`
