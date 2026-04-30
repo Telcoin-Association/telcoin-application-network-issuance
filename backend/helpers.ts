@@ -247,6 +247,7 @@ export async function validateStartAndEndBlocks(
       console.error(
         `${networkConfig.network} startBlock ${networkConfig.network} must be last settlement block + 1 or period 0 block`,
       );
+      console.log(`last settlement block: ${lastSettlementBlock}`);
       process.exit(1);
     }
     // endBlock must be deeper than reorgSafeDepth
