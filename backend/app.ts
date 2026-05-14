@@ -1,6 +1,7 @@
 import * as dotenv from "dotenv";
 dotenv.config();
 
+import { existsSync } from "fs";
 import { LocalFileExecutorRegistry } from "./datasources/ExecutorRegistry";
 import { BlocksDatabase } from "./datasources/persistent/BlocksDatabase";
 import { ChainId, config } from "./config";
@@ -29,7 +30,26 @@ let activeBlocksDatabases: BlocksDatabase[] = [];
  * @dev Then run the calculators.
  */
 async function main() {
-  const networkArgs = process.argv.slice(2);
+  const { period, rerun, networkArgs } = parseAppCLIArgs(
+    process.argv.slice(2),
+  );
+  // Build output path early so we can fail fast before doing any RPC work
+  // if the period would clobber an already-published rewards file.
+  const rewardsFilePath = `./rewards/staker_rewards_period_${period}${
+    rerun ? ".rerun" : ""
+  }.json`;
+  if (!rerun && existsSync(rewardsFilePath)) {
+    console.error(
+      `Aborting: ${rewardsFilePath} already exists.\n` +
+        `  - Pass --rerun to write to ${rewardsFilePath.replace(
+          ".json",
+          ".rerun.json",
+        )} instead.\n` +
+        `  - Or use a different --period if you meant a different week.`,
+    );
+    process.exit(1);
+  }
+
   const networks = parseAndSanitizeCLIArgs(networkArgs);
   await validateStartAndEndBlocks(networks);
   const polygonConfig = networks.find(
@@ -114,19 +134,59 @@ async function main() {
     `Total issuance amount for this period after applying rewards caps: ${totalIssuance}`
   );
 
-  // write incentives to `./staker_incentives.json`
+  // write incentives to `./rewards/staker_rewards_period_<n>.json`
   await writeIncentivesToFile(
     polygonStakerIncentives,
     networks,
-    "./staker_incentives.json"
+    rewardsFilePath
   );
 
-  // write incentives to `./staker_incentives.xlsx`
+  // write incentives to `./staker_incentives.xlsx` (sheet keyed by block range)
   writeIncentivesToExcel(
     polygonStakerIncentives,
     networks,
     "staker_incentives.xlsx"
   );
+}
+
+/**
+ * Splits CLI args into the staker-calculator's flags (`--period`, `--rerun`)
+ * and the remaining `network=start:end` args consumed by `parseAndSanitizeCLIArgs`.
+ */
+function parseAppCLIArgs(args: string[]): {
+  period: number;
+  rerun: boolean;
+  networkArgs: string[];
+} {
+  let period: number | undefined;
+  let rerun = false;
+  const networkArgs: string[] = [];
+
+  for (const arg of args) {
+    if (arg.startsWith("--period=")) {
+      const value = arg.slice("--period=".length);
+      const parsed = Number(value);
+      if (!Number.isInteger(parsed) || parsed < 0) {
+        console.error(`Invalid --period value: '${value}'`);
+        process.exit(1);
+      }
+      period = parsed;
+    } else if (arg === "--rerun") {
+      rerun = true;
+    } else {
+      networkArgs.push(arg);
+    }
+  }
+
+  if (period === undefined) {
+    console.error(
+      "Missing required --period=<n> flag.\n" +
+        "Example: `yarn start polygon=85847979:86150378 --period=29`",
+    );
+    process.exit(1);
+  }
+
+  return { period, rerun, networkArgs };
 }
 
 /**
