@@ -172,7 +172,7 @@ export const POOLS = [BASE_ETH_TEL, POLYGON_ETH_TEL, POLYGON_USDC_EMXN];
  * @notice While public-facing periods are 1-indexed, this utility uses `period 0` internally
  * to refer to the initialization period from pool creation to first period start.
  */
-export const PERIODS = Array.from({ length: 44 }, (_, i) => i);
+export const PERIODS = Array.from({ length: 45 }, (_, i) => i);
 const NETWORKS = {
   [ChainId.Polygon]: {
     poolManager: getAddress("0x67366782805870060151383f4bbff9dab53e5cd6"),
@@ -224,6 +224,7 @@ const NETWORKS = {
       87_485_873n, // may 27
       87_831_473n, // jun 3
       88_229_743n, // jun 10
+      88_632_942n, // jun 17
     ],
   },
   [ChainId.Base]: {
@@ -276,6 +277,7 @@ const NETWORKS = {
       46_525_326n, // may 27
       46_827_726n, // jun 3
       47_130_126n, // jun 10
+      47_432_526n, // jun 17
     ],
   },
 };
@@ -1512,7 +1514,7 @@ if (require.main === module) {
  * Initialize the script run by loading previous state from checkpoint file if it exists
  * and resetting all per-period fee values such as `position.feeGrowthInsidePeriod0/1`
  */
-async function initialize(
+export async function initialize(
   checkpointFile: string,
   period: number,
   startBlock: bigint,
@@ -1569,7 +1571,10 @@ async function initialize(
         args: [tokenId],
         blockNumber: startBlock,
       });
-      if (positionInfo === 0n) initialPositions.delete(key);
+      if (positionInfo === 0n) {
+        initialPositions.delete(key);
+        continue;
+      }
     }
 
     // wipe feeGrowthInsidePeriod0/1 to 0n at start of period to track per-period fees
