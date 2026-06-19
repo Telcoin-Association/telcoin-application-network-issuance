@@ -1,11 +1,16 @@
 import { expect } from "chai";
-import { getAddress, type Address } from "viem";
+import { getAddress, zeroAddress, type Address, type PublicClient } from "viem";
+import { writeFile, unlink } from "fs/promises";
+import { tmpdir } from "os";
+import { join } from "path";
 import {
   deriveVwapResult,
   populateTotalFeesCommonDenominator,
   calculateRewardDistribution,
+  initialize,
   PRECISION,
   LPData,
+  PositionState,
 } from "../calculators/TELxRewardsCalculator";
 
 const LP_A = getAddress("0x000000000000000000000000000000000000000a");
@@ -286,6 +291,112 @@ describe("distribution equivalence when one side is globally flat", () => {
 
     for (const [addr] of entriesCur1Only) {
       expect(rewardsX.get(addr)?.reward).to.equal(rewardsY.get(addr)?.reward);
+    }
+  });
+});
+
+describe("initialize burned-position handling", () => {
+  const CHECKPOINT_END = 1000n;
+  const START_BLOCK = CHECKPOINT_END + 1n;
+  const END_BLOCK = 2000n;
+  const POSITION_MANAGER = getAddress(
+    "0x0000000000000000000000000000000000000001",
+  );
+
+  // keys: 100 active, 200 liquidity-0 but still alive on-chain, 300 fully burned
+  const BURNED_KEY = 300n;
+
+  function makePosition(liquidity: bigint): PositionState {
+    return {
+      lastOwner: zeroAddress,
+      tickLower: -100,
+      tickUpper: 100,
+      liquidity,
+      feeGrowthInsidePeriod0: 123n,
+      feeGrowthInsidePeriod1: 456n,
+      feeGrowthInsidePeriod0Weighted: 0n,
+      feeGrowthInsidePeriod1Weighted: 0n,
+      liquidityModifications: [
+        {
+          blockNumber: 999n,
+          newLiquidityAmount: liquidity,
+          owner: zeroAddress,
+          isSubscribed: false,
+          type: "synthetic",
+        },
+      ],
+      designation: "ACTIVE",
+    };
+  }
+
+  // positionInfo returns 0n only for the fully-burned token, non-zero otherwise
+  const client = {
+    readContract: async ({ args }: { args: readonly bigint[] }) =>
+      args[0] === BURNED_KEY ? 0n : 1n,
+  } as unknown as PublicClient;
+
+  let checkpointFile: string;
+
+  beforeEach(async () => {
+    checkpointFile = join(tmpdir(), `telx-init-test-${Date.now()}.json`);
+    const checkpoint = {
+      blockRange: { network: "polygon", startBlock: 1n, endBlock: CHECKPOINT_END },
+      poolId: zeroAddress,
+      denominator: zeroAddress,
+      currency0: zeroAddress,
+      currency1: zeroAddress,
+      positions: [
+        [100n, makePosition(5n)],
+        [200n, makePosition(0n)],
+        [BURNED_KEY, makePosition(0n)],
+      ],
+      lpData: [],
+    };
+    await writeFile(
+      checkpointFile,
+      JSON.stringify(checkpoint, (_k, v) =>
+        typeof v === "bigint" ? v.toString() + "n" : v,
+      ),
+      "utf-8",
+    );
+  });
+
+  afterEach(async () => {
+    await unlink(checkpointFile).catch(() => {});
+  });
+
+  it("deletes a fully-burned position instead of re-touching the deleted key", async () => {
+    const positions = await initialize(
+      checkpointFile,
+      1,
+      START_BLOCK,
+      END_BLOCK,
+      client,
+      POSITION_MANAGER,
+    );
+
+    // burned position dropped; the other two survive
+    expect(positions.has(BURNED_KEY)).to.equal(false);
+    expect(positions.has(100n)).to.equal(true);
+    expect(positions.has(200n)).to.equal(true);
+  });
+
+  it("wipes per-period fees and modifications on surviving positions", async () => {
+    const positions = await initialize(
+      checkpointFile,
+      1,
+      START_BLOCK,
+      END_BLOCK,
+      client,
+      POSITION_MANAGER,
+    );
+
+    // including the liquidity-0 position that stayed alive on-chain (200)
+    for (const key of [100n, 200n]) {
+      const p = positions.get(key)!;
+      expect(p.feeGrowthInsidePeriod0).to.equal(0n);
+      expect(p.feeGrowthInsidePeriod1).to.equal(0n);
+      expect(p.liquidityModifications).to.deep.equal([]);
     }
   });
 });
