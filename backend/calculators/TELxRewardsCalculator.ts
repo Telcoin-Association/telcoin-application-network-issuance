@@ -173,7 +173,7 @@ export const POOLS = [BASE_ETH_TEL, POLYGON_ETH_TEL, POLYGON_USDC_EMXN];
  * to refer to the initialization period from pool creation to first period start.
  */
 export const PERIODS = Array.from({ length: 45 }, (_, i) => i);
-const NETWORKS = {
+export const NETWORKS = {
   [ChainId.Polygon]: {
     poolManager: getAddress("0x67366782805870060151383f4bbff9dab53e5cd6"),
     positionRegistry: getAddress("0x2c33fC9c09CfAC5431e754b8fe708B1dA3F5B954"),
@@ -425,7 +425,7 @@ async function updateFeesAndPositions(
   return { lpData, finalPositions };
 }
 
-async function updatePositions(
+export async function updatePositions(
   poolId: `0x${string}`,
   startBlock: bigint,
   endBlock: bigint,
@@ -771,28 +771,48 @@ async function processFees(
       // check the "isSubscribed" flag at start of sub-period
       const isEligibleForRewards = prevChange.isSubscribed;
 
-      // get fee growth values and calculate the subperiod delta
-      const [feeGrowthStart, feeGrowthEnd] = await Promise.all([
-        getFeeGrowthInsideOffchain(
-          client,
-          poolId,
-          stateView,
-          position.tickLower,
-          position.tickUpper,
-          tickSpacing,
-          prevChange.blockNumber, // Fee growth at the start of the sub-period
-        ),
-        getFeeGrowthInsideOffchain(
-          // The new, safe function
-          client,
-          poolId,
-          stateView,
-          position.tickLower,
-          position.tickUpper,
-          tickSpacing,
-          currChange.blockNumber, // Fee growth at the end of the sub-period
-        ),
-      ]);
+      // get fee growth values and calculate the subperiod delta.
+      //
+      // FIX (period-44 fee-inflation): clamp the tick bounds ONCE at the
+      // sub-period START block - where the position's boundary ticks are still
+      // initialized - and reuse those stable bounds at both endpoints. This
+      // prevents a mid-sub-period tick de-initialization from snapping the
+      // bound search to an unrelated tick and reconstructing a phantom
+      // feeGrowthInside (~9e31) that the underflow guard would then credit.
+      let feeGrowthStart = {
+        feeGrowthInside0X128: 0n,
+        feeGrowthInside1X128: 0n,
+      };
+      let feeGrowthEnd = { feeGrowthInside0X128: 0n, feeGrowthInside1X128: 0n };
+      const [clLower, clUpper] = await clampTicksToInitialized(
+        client,
+        poolId,
+        stateView,
+        position.tickLower,
+        position.tickUpper,
+        tickSpacing,
+        prevChange.blockNumber, // clamp at the START block, reused for both
+      );
+      if (clLower !== null && clUpper !== null && clLower < clUpper) {
+        [feeGrowthStart, feeGrowthEnd] = await Promise.all([
+          getFeeGrowthInsideOffchainAtBounds(
+            client,
+            poolId,
+            stateView,
+            clLower,
+            clUpper,
+            prevChange.blockNumber, // start of the sub-period
+          ),
+          getFeeGrowthInsideOffchainAtBounds(
+            client,
+            poolId,
+            stateView,
+            clLower,
+            clUpper,
+            currChange.blockNumber, // end of the sub-period, SAME bounds
+          ),
+        ]);
+      }
 
       // calculate subperiod's fees and add to period total for this position
       const { token0Fees: feesEarned0, token1Fees: feesEarned1 } =
@@ -851,7 +871,7 @@ async function processFees(
 }
 
 // calculates fees earned for the given `liquidity` between start and end checkpoints
-function calculateFees(
+export function calculateFees(
   liquidity: bigint,
   feeGrowthInside0End: bigint,
   feeGrowthInside1End: bigint,
@@ -961,7 +981,7 @@ function modifyLPData(
  * Then calls v4 StateView to fetch fee growth outside using safe initialized tick range
  * To derive the fee growth inside the range in line with onchain Solidity derivation
  */
-async function getFeeGrowthInsideOffchain(
+export async function getFeeGrowthInsideOffchain(
   client: PublicClient,
   poolId: `0x${string}`,
   stateView: Address,
@@ -1077,7 +1097,240 @@ function parseTickInfo(tickInfo: readonly [bigint, bigint, bigint, bigint]): {
 }
 
 /**
+ * Decompose a tick into its [wordPosition, bitPosition] in the v4 tick bitmap,
+ * using the same compression math as `tickToWord`.
+ */
+function tickToWordAndBit(tick: number, tickSpacing: number): [number, number] {
+  let compressed = Math.floor(tick / tickSpacing);
+  if (tick < 0 && tick % tickSpacing !== 0) compressed -= 1;
+  return [compressed >> 8, compressed & 255];
+}
+
+/**
+ * Searches UPWARD from `tickLower` (inclusive) for the first initialized tick
+ * that lies WITHIN the position's declared range [tickLower, tickUpper].
+ * Returns null if no initialized tick exists in range.
+ *
+ * Unlike `findInitializedTickUnder`, this search is strictly bounded by the
+ * position's own range, so it can never snap to a tick outside [tickLower, tickUpper].
+ */
+async function findInitializedTickForward(
+  client: PublicClient,
+  poolId: `0x${string}`,
+  stateView: Address,
+  tickLower: number,
+  tickUpper: number,
+  tickSpacing: number,
+  blockNumber: bigint,
+): Promise<number | null> {
+  const [startWord, startBit] = tickToWordAndBit(tickLower, tickSpacing);
+  const [endWord, endBit] = tickToWordAndBit(tickUpper, tickSpacing);
+
+  for (let word = startWord; word <= endWord; word++) {
+    const bitmap = await getTickBitmap(
+      client,
+      poolId,
+      stateView,
+      word,
+      blockNumber,
+    );
+    if (bitmap !== 0n) {
+      const beginBit = word === startWord ? startBit : 0;
+      const stopBit = word === endWord ? endBit : 255;
+      for (let i = beginBit; i <= stopBit; i++) {
+        if ((bitmap & (1n << BigInt(i))) !== 0n) {
+          return (word * 256 + i) * tickSpacing;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Searches DOWNWARD from `tickUpper` (inclusive) for the first initialized tick
+ * that lies WITHIN the position's declared range [tickLower, tickUpper].
+ * Returns null if no initialized tick exists in range.
+ */
+async function findInitializedTickBackward(
+  client: PublicClient,
+  poolId: `0x${string}`,
+  stateView: Address,
+  tickLower: number,
+  tickUpper: number,
+  tickSpacing: number,
+  blockNumber: bigint,
+): Promise<number | null> {
+  const [startWord, startBit] = tickToWordAndBit(tickLower, tickSpacing);
+  const [endWord, endBit] = tickToWordAndBit(tickUpper, tickSpacing);
+
+  for (let word = endWord; word >= startWord; word--) {
+    const bitmap = await getTickBitmap(
+      client,
+      poolId,
+      stateView,
+      word,
+      blockNumber,
+    );
+    if (bitmap !== 0n) {
+      const topBit = word === endWord ? endBit : 255;
+      const bottomBit = word === startWord ? startBit : 0;
+      for (let i = topBit; i >= bottomBit; i--) {
+        if ((bitmap & (1n << BigInt(i))) !== 0n) {
+          return (word * 256 + i) * tickSpacing;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Computes a STABLE [clLower, clUpper] pair of initialized ticks within the
+ * position's declared range, evaluated ONCE at the sub-period START block.
+ *
+ * Reusing this pair at both the start and end fee-growth queries is the core of
+ * the period-44 fee-inflation fix: it prevents a tick de-initialization that
+ * occurs mid-sub-period from shifting the basis of the fee-growth delta. The
+ * legacy `getFeeGrowthInsideOffchain` recomputed the bounds independently at
+ * each endpoint, so a de-initialized boundary tick would snap the search to an
+ * unrelated tick and reconstruct a phantom feeGrowthInside.
+ */
+export async function clampTicksToInitialized(
+  client: PublicClient,
+  poolId: `0x${string}`,
+  stateView: Address,
+  tickLower: number,
+  tickUpper: number,
+  tickSpacing: number,
+  startBlock: bigint,
+): Promise<[number | null, number | null]> {
+  const clLower = await findInitializedTickForward(
+    client,
+    poolId,
+    stateView,
+    tickLower,
+    tickUpper,
+    tickSpacing,
+    startBlock,
+  );
+  const clUpper = await findInitializedTickBackward(
+    client,
+    poolId,
+    stateView,
+    tickLower,
+    tickUpper,
+    tickSpacing,
+    startBlock,
+  );
+  // no initialized tick in range (or only one) => position earns nothing this sub-period
+  if (clLower === null || clUpper === null || clLower > clUpper) {
+    return [null, null];
+  }
+  return [clLower, clUpper];
+}
+
+/**
+ * Reconstructs feeGrowthInside using EXPLICIT, pre-clamped tick bounds (computed
+ * once at the sub-period start by `clampTicksToInitialized`). The bounds are NOT
+ * recomputed here, so a tick that de-initializes mid-sub-period cannot snap the
+ * search to an unrelated tick.
+ *
+ * Hardening: if either clamped tick has de-initialized by `blockNumber`, the
+ * position had no active liquidity at that boundary, so it earns nothing for the
+ * sub-period and {0, 0} is returned rather than proceeding with stale tick data.
+ */
+export async function getFeeGrowthInsideOffchainAtBounds(
+  client: PublicClient,
+  poolId: `0x${string}`,
+  stateView: Address,
+  clLower: number,
+  clUpper: number,
+  blockNumber: bigint,
+): Promise<{ feeGrowthInside0X128: bigint; feeGrowthInside1X128: bigint }> {
+  // verify both clamped ticks are still initialized at the query block
+  const [lowerTickInfoResult, upperTickInfoResult] = await Promise.all([
+    client.readContract({
+      address: stateView,
+      abi: STATE_VIEW_ABI,
+      functionName: "getTickInfo",
+      args: [poolId, clLower],
+      blockNumber,
+    }),
+    client.readContract({
+      address: stateView,
+      abi: STATE_VIEW_ABI,
+      functionName: "getTickInfo",
+      args: [poolId, clUpper],
+      blockNumber,
+    }),
+  ]);
+  const lowerInitialized =
+    lowerTickInfoResult[0] !== 0n || lowerTickInfoResult[1] !== 0n;
+  const upperInitialized =
+    upperTickInfoResult[0] !== 0n || upperTickInfoResult[1] !== 0n;
+  if (!lowerInitialized || !upperInitialized) {
+    return { feeGrowthInside0X128: 0n, feeGrowthInside1X128: 0n };
+  }
+
+  const [, currentTick] = await client.readContract({
+    address: stateView,
+    abi: STATE_VIEW_ABI,
+    functionName: "getSlot0",
+    args: [poolId],
+    blockNumber,
+  });
+  const [feeGrowthGlobal0X128, feeGrowthGlobal1X128] =
+    await client.readContract({
+      address: stateView,
+      abi: STATE_VIEW_ABI,
+      functionName: "getFeeGrowthGlobals",
+      args: [poolId],
+      blockNumber,
+    });
+
+  const lowerTickInfo = parseTickInfo(lowerTickInfoResult);
+  const upperTickInfo = parseTickInfo(upperTickInfoResult);
+
+  // replicate getFeeGrowthInside on-chain logic, anchored to the clamped bounds
+  let feeGrowthBelow0X128: bigint;
+  let feeGrowthBelow1X128: bigint;
+  if (currentTick >= clLower) {
+    feeGrowthBelow0X128 = lowerTickInfo.feeGrowthOutside0X128;
+    feeGrowthBelow1X128 = lowerTickInfo.feeGrowthOutside1X128;
+  } else {
+    feeGrowthBelow0X128 =
+      feeGrowthGlobal0X128 - lowerTickInfo.feeGrowthOutside0X128;
+    feeGrowthBelow1X128 =
+      feeGrowthGlobal1X128 - lowerTickInfo.feeGrowthOutside1X128;
+  }
+
+  let feeGrowthAbove0X128: bigint;
+  let feeGrowthAbove1X128: bigint;
+  if (currentTick < clUpper) {
+    feeGrowthAbove0X128 = upperTickInfo.feeGrowthOutside0X128;
+    feeGrowthAbove1X128 = upperTickInfo.feeGrowthOutside1X128;
+  } else {
+    feeGrowthAbove0X128 =
+      feeGrowthGlobal0X128 - upperTickInfo.feeGrowthOutside0X128;
+    feeGrowthAbove1X128 =
+      feeGrowthGlobal1X128 - upperTickInfo.feeGrowthOutside1X128;
+  }
+
+  const feeGrowthInside0X128 =
+    feeGrowthGlobal0X128 - feeGrowthBelow0X128 - feeGrowthAbove0X128;
+  const feeGrowthInside1X128 =
+    feeGrowthGlobal1X128 - feeGrowthBelow1X128 - feeGrowthAbove1X128;
+
+  return { feeGrowthInside0X128, feeGrowthInside1X128 };
+}
+
+/**
  * Finds the highest safe initialized tick under `startTick` by searching downward (inclusive)
+ *
+ * @deprecated Retained only for the `inspectSwaps` diagnostic. The sub-period
+ * fee-growth path now uses `clampTicksToInitialized` +
+ * `getFeeGrowthInsideOffchainAtBounds`, which fix the de-initialization snap bug.
  */
 async function findInitializedTickUnder(
   client: PublicClient,
