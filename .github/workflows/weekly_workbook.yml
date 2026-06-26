@@ -1,0 +1,56 @@
+name: TANIP1 Weekly Workbook Builder
+on:
+  schedule:
+    - cron: '0 20 * * 3'   # Wednesday 3pm EST (standard time)
+    - cron: '0 19 * * 3'   # Wednesday 3pm EDT (daylight saving)
+  workflow_dispatch:
+    inputs:
+      period:
+        description: 'Override period number (leave blank to auto-detect latest)'
+        required: false
+        type: string
+jobs:
+  build-workbook:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-openpyxl-pandas
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      - name: Install dependencies
+        run: pip install openpyxl pandas requests
+      - name: Build workbook
+        id: build
+        run: |
+          python scripts/build_workbook.py \
+            --period "${{ github.event.inputs.period }}" \
+            --template reports/TANIP1_Rewards_Distribution_template.xlsx \
+            --output-dir reports
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Commit and push updated workbook
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add reports/
+          if git diff --cached --quiet; then
+            echo "No changes to commit — period may already be up to date."
+          else
+            PERIOD=$(cat /tmp/tanip1_period.txt 2>/dev/null || echo "unknown")
+            git commit -m "Auto: TANIP1 workbook updated for Period ${PERIOD} [skip ci]"
+            git push
+            echo "✅ Workbook committed for Period ${PERIOD}"
+          fi
