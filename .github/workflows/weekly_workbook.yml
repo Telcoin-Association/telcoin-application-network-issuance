@@ -27,11 +27,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-openpyxl-pandas
+          key: ${{ runner.os }}-pip-openpyxl
           restore-keys: |
             ${{ runner.os }}-pip-
       - name: Install dependencies
-        run: pip install openpyxl pandas requests
+        run: pip install openpyxl requests
       - name: Build workbook
         id: build
         run: |
