@@ -133,9 +133,10 @@ jobs:
         if: steps.telx.outputs.TELX_READY != 'true'
         run: |
           echo "::warning::TELx period ${{ steps.telx.outputs.TELX_PERIOD }} is not ready — " \
-               "append the period end-boundary block(s) to NETWORKS.periodStarts and bump " \
-               "PERIODS in backend/calculators/TELxRewardsCalculator.ts. The start block is " \
-               "derived automatically from the prior checkpoint; only the end boundary is manual."
+               "a prior checkpoint is missing. Ensure all pools have period ${{ steps.telx.outputs.TELX_PERIOD - 1 }} " \
+               "checkpoint files in backend/checkpoints/. Both block range boundaries are now " \
+               "derived automatically: start from the prior checkpoint endBlock + 1, end from " \
+               "the most recent Wednesday 00:00 UTC epoch boundary on-chain."
 
       # ── Open one PR carrying both programs' artifacts ──────────────────────
       - name: Open pull request for review
@@ -171,15 +172,15 @@ jobs:
             the on-chain `RewardsSettled` event the community can observe.
 
             ### TELx liquidity rewards (Base + Polygon) — period ${{ steps.telx.outputs.TELX_PERIOD }}
-            Ready: `${{ steps.telx.outputs.TELX_READY }}`. Each pool's start block is
-            derived from its previous checkpoint's end block + 1 (not hand-entered);
-            the period end boundary stays defined in `periodStarts`.
+            Ready: `${{ steps.telx.outputs.TELX_READY }}`. Both block range boundaries
+            are fully automatic: start = prior checkpoint endBlock + 1; end = block at
+            the most recent Wednesday 00:00 UTC boundary on each chain (no manual entry).
             - `backend/checkpoints/<pool>-${{ steps.telx.outputs.TELX_PERIOD }}.json` (3 pools)
             - `backend/checkpoints/<pool>-${{ steps.telx.outputs.TELX_PERIOD }}.xlsx` (human-readable reports)
             - Safe arrays for the TELx distribution
 
-            If TELx shows `Ready: false`, append the period end-boundary block(s) to
-            `NETWORKS.periodStarts` and bump `PERIODS`, then re-run.
+            If TELx shows `Ready: false`, a prior checkpoint is missing for one of the
+            3 pools. Both boundaries are now derived automatically — no code change needed.
           labels: |
             rewards
             automated

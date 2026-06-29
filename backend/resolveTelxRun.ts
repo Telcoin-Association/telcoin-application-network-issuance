@@ -4,28 +4,21 @@ dotenv.config();
 import { existsSync, readdirSync, appendFileSync } from "fs";
 import {
   POOLS,
-  PERIODS,
-  NETWORKS,
   TELX_BASE_PATH,
-  SupportedChainId,
 } from "./calculators/TELxRewardsCalculator";
 
 /**
- * @notice Resolves which TELx period to run next, per pool, with no human input
- *         for the start block.
+ * @notice Resolves which TELx period to run next with zero human input.
  *
- * @dev The start of a TELx period is derived inside the calculator from the
- *      previous period's checkpoint end block + 1 (see buildPeriodConfig), so
- *      this resolver only has to determine *which* period is next and confirm
- *      the calculator-owned END boundary for it is in place.
+ * @dev Both block range boundaries are now fully automatic:
+ *      - Start: derived inside the calculator from the previous period's
+ *        checkpoint endBlock + 1 (see buildPeriodConfig / previousPeriodEndBlock).
+ *      - End: derived from the most recent Wednesday 00:00 UTC epoch boundary
+ *        queried on-chain (see buildPeriodConfig / mostRecentEpochBoundary +
+ *        getBlockByTimestamp). No manual periodStarts entry is required.
  *
- *      Target period = (latest existing checkpoint period) + 1. A period is
- *      "ready" to run when:
- *        - its END boundary exists: NETWORKS[chain].periodStarts[target] is set
- *          (period N's end = periodStarts[N] - 1), and
- *        - PERIODS includes it (so telxHumanReadable will emit its .xlsx).
- *      If a boundary is missing the resolver reports NOT ready and names the
- *      block that still has to be appended — it never invents one.
+ *      Target period = max(latest checkpoint period across all pools) + 1.
+ *      TELX_READY=true as long as all pools have a checkpoint for target - 1.
  *
  * Usage:
  *   yarn ts-node backend/resolveTelxRun.ts
@@ -71,36 +64,22 @@ function main(): void {
   const runs: string[] = [];
 
   for (const pool of POOLS) {
-    const net = NETWORKS[pool.network as SupportedChainId];
-    const endBoundary = net.periodStarts[target]; // period N end = periodStarts[N] - 1
     const prevPeriod = latestCheckpointPeriod(pool.name);
 
     if (prevPeriod !== target - 1) {
       blockers.push(
         `${pool.name}: latest checkpoint is period ${prevPeriod}, expected ${target - 1}`,
       );
-    }
-    if (endBoundary === undefined) {
-      blockers.push(
-        `${pool.name} (${pool.network}): missing END boundary periodStarts[${target}] — ` +
-          `append the period-${target} boundary block to NETWORKS`,
-      );
     } else {
       runs.push(`${pool.poolId}:${target}`);
     }
     console.log(
-      `  ${pool.name.padEnd(20)} prev=${prevPeriod} endBoundary=` +
-        `${endBoundary !== undefined ? endBoundary : "MISSING"}`,
+      `  ${pool.name.padEnd(20)} prev=${prevPeriod}`,
     );
   }
 
-  const periodsIncludesTarget = PERIODS.includes(target);
-  if (!periodsIncludesTarget) {
-    blockers.push(
-      `PERIODS does not include ${target} — bump its length so telxHumanReadable emits the report`,
-    );
-  }
-
+  // End block is now derived from the epoch boundary on-chain — no manual
+  // periodStarts entry required. The only blocker is a missing prior checkpoint.
   const ready = blockers.length === 0;
   console.log("─────────────────────────");
   if (!ready) {
