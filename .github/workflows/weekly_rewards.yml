@@ -163,7 +163,12 @@ jobs:
             endBlock = block at the most recent Wednesday 00:00 UTC boundary.
             - `rewards/staker_rewards_period_${{ steps.tanip.outputs.PERIOD }}.json`
             - `reports/TANIP1_Rewards_Distribution_Period${{ steps.tanip.outputs.PERIOD }}.xlsx` (4-gate verified)
-            - Safe arrays for `increaseClaimableByBatch`
+            - Safe arrays for `increaseClaimableByBatch` + `notifyRewardsSettled`
+
+            **Safe batch order:** (1) `TEL.approve(TANIssuanceHistory, total)`,
+            (2) `TANIssuanceHistory.increaseClaimableByBatch(rewards[], endBlock)`,
+            (3) `RewardsNotifier.notifyRewardsSettled(period, endBlock, total)` — emits
+            the on-chain `RewardsSettled` event the community can observe.
 
             ### TELx liquidity rewards (Base + Polygon) — period ${{ steps.telx.outputs.TELX_PERIOD }}
             Ready: `${{ steps.telx.outputs.TELX_READY }}`. Each pool's start block is
