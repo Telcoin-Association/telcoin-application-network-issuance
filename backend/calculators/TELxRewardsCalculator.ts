@@ -10,7 +10,7 @@ import {
   type PublicClient,
 } from "viem";
 import * as dotenv from "dotenv";
-import { existsSync, readFileSync } from "fs";
+import { existsSync, readFileSync, readdirSync } from "fs";
 import { readFile, writeFile, mkdir } from "fs/promises";
 import {
   createRpcClient,
@@ -180,13 +180,14 @@ export const POOLS = [BASE_ETH_TEL, POLYGON_ETH_TEL, POLYGON_USDC_EMXN];
  */
 export function derivePeriods(): number[] {
   if (!existsSync(TELX_BASE_PATH)) return [0];
-  const { readdirSync } = require("fs") as typeof import("fs");
-  const max = readdirSync(TELX_BASE_PATH)
-    .flatMap((f: string) =>
-      POOLS.map((p) => f.match(new RegExp(`^${p.name}-(\\d+)\\.json$`))).filter(Boolean)
-    )
-    .map((m: RegExpMatchArray) => Number(m![1]))
-    .reduce((a: number, b: number) => Math.max(a, b), 0);
+  const files = readdirSync(TELX_BASE_PATH);
+  let max = 0;
+  for (const f of files) {
+    for (const p of POOLS) {
+      const m = f.match(new RegExp(`^${p.name}-(\\d+)\\.json$`));
+      if (m) max = Math.max(max, Number(m[1]));
+    }
+  }
   return Array.from({ length: max + 1 }, (_, i) => i);
 }
 export const PERIODS = derivePeriods();
@@ -1943,6 +1944,18 @@ async function buildPeriodConfig(pool: PoolConfig, period: number) {
     console.log(
       `  ${pool.name} period ${period}: end block derived from epoch boundary → ${end}`,
     );
+    // Guard: the derived end must be strictly past the start. If the most recent
+    // Wednesday boundary is at or before the period's start block, this period
+    // has not closed yet — refuse rather than compute a zero/negative window.
+    // (e.g. running on the same day the prior period's boundary fell.)
+    if (end <= start) {
+      throw new Error(
+        `${pool.name} period ${period}: derived endBlock ${end} <= startBlock ` +
+          `${start}. The epoch has not closed yet — the most recent Wednesday ` +
+          `00:00 UTC boundary is not past this period's start. Run after the ` +
+          `period's end boundary has elapsed and is reorg-safe.`,
+      );
+    }
   }
 
   // Contiguity guard: if a curated boundary exists for this period's start, the
