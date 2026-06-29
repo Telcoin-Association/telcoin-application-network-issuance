@@ -390,28 +390,44 @@ the gates but differs from the known-good file means a gate is missing.
 
 ## Cron Schedule
 
-| Cron | UTC | Local |
+| Cron | UTC | Why |
 |---|---|---|
-| `0 20 * * 3` | Wednesday 20:00 UTC | Wednesday 3 pm EST (UTC−5) |
-| `0 19 * * 3` | Wednesday 19:00 UTC | Wednesday 3 pm EDT (UTC−4) |
+| `0 12 * * 4` | Thursday 12:00 UTC | A full day after the Wed 00:00 UTC epoch boundary, so the end block is comfortably past the reorg-safe depth on both Polygon and Base. |
 
-Both crons fire weekly. The script is idempotent: if `new_period` is already
-in Period Totals, it exits cleanly without writing anything.
+Fires weekly. The workbook builder is idempotent: if the period is already in
+Period Totals it exits cleanly. TELx is gated on readiness (`resolveTelxRun.js`)
+and is skipped with a warning if the period's end boundary has not been appended.
 
 ---
 
 ## One-Time Setup (after merge)
 
-**Settings → Actions → General → Workflow permissions → Read and write permissions**
+**1. Workflow permissions**
+Settings → Actions → General → Workflow permissions → **Read and write permissions**,
+and enable **Allow GitHub Actions to create and approve pull requests** (the
+pipeline opens a PR rather than pushing to the default branch).
 
-No external secrets needed. The built-in `GITHUB_TOKEN` is sufficient.
+**2. Repository secrets** — Settings → Secrets and variables → Actions → New repository secret
+
+| Secret | Used by | Purpose |
+|---|---|---|
+| `POLYGON_RPC_URL` | TANIP staker calc, TELx Polygon pools, block-range resolver, reports | Polygon archive RPC endpoint |
+| `BASE_RPC_URL` | TELx Base pool calc + report | Base archive RPC endpoint |
+| `MAINNET_RPC_URL` | block-range validation helpers | Ethereum mainnet RPC (TANIP not live on mainnet, but the config requires the var) |
+
+Use **archive** endpoints — the calculators read historical state and logs across
+the full period block range, which pruned nodes cannot serve. The built-in
+`GITHUB_TOKEN` covers the PR creation; no additional token is required.
+
+> These secrets are referenced only by name in `.github/workflows/weekly_rewards.yml`
+> (`${{ secrets.* }}`). No endpoint URLs or keys are committed to the repo.
 
 ---
 
 ## Running Manually
 
 ```bash
-pip install openpyxl pandas requests
+pip install openpyxl requests
 
 python scripts/build_workbook.py \
   --period 38 \
@@ -420,3 +436,16 @@ python scripts/build_workbook.py \
 ```
 
 Omit `--period` to auto-detect the latest period in `rewards/`.
+
+The calculators (run before the workbook builder in CI) need the RPC secrets
+above exported locally to run by hand:
+
+```bash
+export POLYGON_RPC_URL=... BASE_RPC_URL=... MAINNET_RPC_URL=...
+yarn build
+node dist/resolveBlockRange.js                       # TANIP: prints sequential range + period
+node dist/app.js polygon=START:END --period=38       # TANIP staker calculator
+node dist/resolveTelxRun.js                           # TELx: prints target period + readiness
+node dist/calculators/TELxRewardsCalculator.js <poolId>:<period>   # per pool
+node dist/telxHumanReadable.js                        # TELx human-readable xlsx
+```
