@@ -422,6 +422,30 @@ the full period block range, which pruned nodes cannot serve. The built-in
 > These secrets are referenced only by name in `.github/workflows/weekly_rewards.yml`
 > (`${{ secrets.* }}`). No endpoint URLs or keys are committed to the repo.
 
+**3. Deploy RewardsNotifier** (one-time, on Polygon)
+
+`src/issuance/RewardsNotifier.sol` emits an on-chain `RewardsSettled` event each
+time rewards are settled. This gives the community a subscribable signal without
+requiring them to parse the Safe's internal multisig transaction structure.
+
+```bash
+# Deploy with the TAO Safe as admin (replace <TAO_SAFE> with the deployed safe address)
+forge script script/DeployRewardsNotifier.s.sol \
+  --rpc-url $POLYGON_RPC_URL \
+  --broadcast \
+  --constructor-args <TAO_SAFE>
+```
+
+After deployment:
+1. Add `"RewardsNotifier": "<deployed_address>"` to `deployments/deployments.json`.
+2. Grant `NOTIFIER_ROLE` to the TAO Safe if it was not passed as the constructor `admin`
+   (the constructor grants both `DEFAULT_ADMIN_ROLE` and `NOTIFIER_ROLE` to `admin`).
+
+The `safeTxArrayBuilder` will then include a `safe_param_period_N_tan_notify.json`
+alongside the distribution chunks. Add it as the **final** transaction in the Safe
+settlement batch — after `increaseClaimableByBatch` — so the event fires only on
+successful settlement.
+
 ---
 
 ## Running Manually
