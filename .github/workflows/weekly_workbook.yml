@@ -1,56 +1,137 @@
-name: TANIP1 Weekly Workbook Builder
+name: TANIP1 Weekly Rewards Pipeline
+
+# Runs once a week after the epoch boundary (Wednesday 00:00 UTC) has passed and
+# the chain is reorg-safe. The pipeline derives its own block range from chain
+# state, runs the rewards calculator, formats the distribution workbook, and
+# opens a pull request for the councils/devs to review. It never pushes to the
+# default branch and never settles on chain — settlement stays a separate,
+# multisig-gated step.
 on:
   schedule:
-    - cron: '0 20 * * 3'   # Wednesday 3pm EST (standard time)
-    - cron: '0 19 * * 3'   # Wednesday 3pm EDT (daylight saving)
+    # Thursday 12:00 UTC — a full day after the Wed 00:00 UTC boundary so the
+    # end block is comfortably past the Polygon reorg-safe depth (500 blocks).
+    - cron: '0 12 * * 4'
   workflow_dispatch:
     inputs:
       period:
-        description: 'Override period number (leave blank to auto-detect latest)'
+        description: 'Override period number (blank = auto-detect next period)'
         required: false
         type: string
+      args:
+        description: 'Override calculator args, e.g. "polygon=START:END --period=N" (blank = resolve from chain)'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
-  build-workbook:
+  build-rewards:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Set up Node 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'yarn'
+
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Cache pip packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-openpyxl
-          restore-keys: |
-            ${{ runner.os }}-pip-
-      - name: Install dependencies
+
+      - name: Install Node dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Install Python dependencies
         run: pip install openpyxl requests
-      - name: Build workbook
-        id: build
+
+      - name: Compile TypeScript
+        run: yarn build
+
+      - name: Resolve block range and period
+        id: resolve
+        env:
+          POLYGON_RPC_URL: ${{ secrets.POLYGON_RPC_URL }}
+          MAINNET_RPC_URL: ${{ secrets.MAINNET_RPC_URL }}
+        run: |
+          if [ -n "${{ github.event.inputs.args }}" ]; then
+            echo "Using manual override args."
+            echo "ARGS=${{ github.event.inputs.args }}" >> "$GITHUB_OUTPUT"
+            # Extract period from the override for naming/messages.
+            PERIOD=$(echo "${{ github.event.inputs.args }}" | sed -n 's/.*--period=\([0-9]\+\).*/\1/p')
+            echo "PERIOD=${PERIOD}" >> "$GITHUB_OUTPUT"
+          else
+            node dist/resolveBlockRange.js
+          fi
+
+      - name: Run rewards calculator
+        env:
+          POLYGON_RPC_URL: ${{ secrets.POLYGON_RPC_URL }}
+          MAINNET_RPC_URL: ${{ secrets.MAINNET_RPC_URL }}
+        run: |
+          echo "Calculator args: ${{ steps.resolve.outputs.ARGS }}"
+          node dist/app.js ${{ steps.resolve.outputs.ARGS }}
+
+      - name: Build distribution workbook
         run: |
           python scripts/build_workbook.py \
-            --period "${{ github.event.inputs.period }}" \
+            --period "${{ steps.resolve.outputs.PERIOD }}" \
             --template reports/TANIP1_Rewards_Distribution_template.xlsx \
             --output-dir reports
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Commit and push updated workbook
+
+      - name: Roll workbook template forward
+        # The template is the rolling cumulative base (through the prior period).
+        # Promote this period's output to the template so the merged PR carries
+        # it into next week's run — without this the workbook would not
+        # accumulate across periods.
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add reports/
-          if git diff --cached --quiet; then
-            echo "No changes to commit — period may already be up to date."
-          else
-            PERIOD=$(cat /tmp/tanip1_period.txt 2>/dev/null || echo "unknown")
-            git commit -m "Auto: TANIP1 workbook updated for Period ${PERIOD} [skip ci]"
-            git push
-            echo "✅ Workbook committed for Period ${PERIOD}"
-          fi
+          cp "reports/TANIP1_Rewards_Distribution_Period${{ steps.resolve.outputs.PERIOD }}.xlsx" \
+             "reports/TANIP1_Rewards_Distribution_template.xlsx"
+
+      - name: Build Safe transaction arrays
+        run: |
+          npx ts-node backend/safeTxArrayBuilder.ts \
+            --period ${{ steps.resolve.outputs.PERIOD }} --tan
+
+      - name: Open pull request for review
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: auto/tanip1-period-${{ steps.resolve.outputs.PERIOD }}
+          base: master
+          title: "feat: TANIP-1 rewards for period ${{ steps.resolve.outputs.PERIOD }}"
+          commit-message: "feat: TANIP-1 rewards for period ${{ steps.resolve.outputs.PERIOD }}"
+          add-paths: |
+            rewards/
+            reports/
+          body: |
+            ## TANIP-1 rewards — period ${{ steps.resolve.outputs.PERIOD }}
+
+            Automated weekly run. **Review the numbers before merging.** Merging
+            approves the distribution; it does **not** move funds. On-chain
+            settlement remains a separate, multisig-gated step (see below).
+
+            **Block range (sequential, chain-derived):**
+            `${{ steps.resolve.outputs.ARGS }}`
+            startBlock = `lastSettlementBlock + 1` (read from `TANIssuanceHistory`),
+            endBlock = block at the most recent Wednesday 00:00 UTC boundary.
+
+            **Artifacts in this PR**
+            - `rewards/staker_rewards_period_${{ steps.resolve.outputs.PERIOD }}.json` — raw distribution
+            - `reports/TANIP1_Rewards_Distribution_Period${{ steps.resolve.outputs.PERIOD }}.xlsx` — formatted workbook (passed 4-gate verification)
+            - Safe transaction arrays for `increaseClaimableByBatch`
+
+            **After approval / merge**
+            A council signer proposes the `increaseClaimableByBatch(rewards, endBlock)`
+            transaction from the TAN Council Safe using the arrays above. Executing
+            it advances `lastSettlementBlock` on chain, which becomes next week's
+            sequential start block.
+          labels: |
+            rewards
+            automated
