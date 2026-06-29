@@ -1,0 +1,180 @@
+name: Weekly Rewards Pipeline
+
+# Runs once a week after the epoch boundary (Wednesday 00:00 UTC) has passed and
+# the chains are reorg-safe. The pipeline derives its block ranges from prior
+# output (never the clock), runs both reward calculators, formats the human
+# review artifacts, and opens a pull request for the councils/devs to review.
+# It never pushes to the default branch and never distributes on chain —
+# distribution stays a separate, manually-reviewed-and-executed transaction.
+#
+# Two independent programs run in one PR:
+#   - TANIP-1 staker rewards  (Polygon)             -> rewards/ + reports/ workbook
+#   - TELx liquidity rewards  (Base + Polygon, 3 pools) -> backend/checkpoints/ json + xlsx
+on:
+  schedule:
+    # Thursday 12:00 UTC — a full day after the Wed 00:00 UTC boundary so the
+    # end block is comfortably past the reorg-safe depth on both chains.
+    - cron: '0 12 * * 4'
+  workflow_dispatch:
+    inputs:
+      tanip_args:
+        description: 'Override TANIP calculator args, e.g. "polygon=START:END --period=N" (blank = resolve from chain)'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  build-rewards:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'yarn'
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Node dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Install Python dependencies
+        run: pip install openpyxl requests
+
+      - name: Compile TypeScript
+        run: yarn build
+
+      # ── TANIP-1 staker rewards (Polygon) ───────────────────────────────────
+      - name: Resolve TANIP block range and period
+        id: tanip
+        env:
+          POLYGON_RPC_URL: ${{ secrets.POLYGON_RPC_URL }}
+          MAINNET_RPC_URL: ${{ secrets.MAINNET_RPC_URL }}
+        run: |
+          if [ -n "${{ github.event.inputs.tanip_args }}" ]; then
+            echo "Using manual override args."
+            echo "ARGS=${{ github.event.inputs.tanip_args }}" >> "$GITHUB_OUTPUT"
+            PERIOD=$(echo "${{ github.event.inputs.tanip_args }}" | sed -n 's/.*--period=\([0-9]\+\).*/\1/p')
+            echo "PERIOD=${PERIOD}" >> "$GITHUB_OUTPUT"
+          else
+            node dist/resolveBlockRange.js
+          fi
+
+      - name: Run TANIP staker calculator
+        env:
+          POLYGON_RPC_URL: ${{ secrets.POLYGON_RPC_URL }}
+          MAINNET_RPC_URL: ${{ secrets.MAINNET_RPC_URL }}
+        run: |
+          echo "Calculator args: ${{ steps.tanip.outputs.ARGS }}"
+          node dist/app.js ${{ steps.tanip.outputs.ARGS }}
+
+      - name: Build TANIP distribution workbook
+        run: |
+          python scripts/build_workbook.py \
+            --period "${{ steps.tanip.outputs.PERIOD }}" \
+            --template reports/TANIP1_Rewards_Distribution_template.xlsx \
+            --output-dir reports
+
+      - name: Roll TANIP workbook template forward
+        # The template is the rolling cumulative base (through the prior period).
+        # Promote this period's output to the template so the merged PR carries
+        # it into next week's run — without this the workbook would not
+        # accumulate across periods.
+        run: |
+          cp "reports/TANIP1_Rewards_Distribution_Period${{ steps.tanip.outputs.PERIOD }}.xlsx" \
+             "reports/TANIP1_Rewards_Distribution_template.xlsx"
+
+      - name: Build TANIP Safe transaction arrays
+        run: |
+          node dist/safeTxArrayBuilder.js \
+            --period ${{ steps.tanip.outputs.PERIOD }} --tan
+
+      # ── TELx liquidity rewards (Base + Polygon, 3 pools) ───────────────────
+      - name: Resolve TELx run
+        id: telx
+        run: node dist/resolveTelxRun.js
+
+      - name: Run TELx calculator (per pool)
+        if: steps.telx.outputs.TELX_READY == 'true'
+        env:
+          POLYGON_RPC_URL: ${{ secrets.POLYGON_RPC_URL }}
+          BASE_RPC_URL: ${{ secrets.BASE_RPC_URL }}
+        run: |
+          for run in ${{ steps.telx.outputs.TELX_RUNS }}; do
+            echo "TELx calculator: $run"
+            node dist/calculators/TELxRewardsCalculator.js "$run"
+          done
+
+      - name: Generate TELx human-readable reports
+        if: steps.telx.outputs.TELX_READY == 'true'
+        env:
+          POLYGON_RPC_URL: ${{ secrets.POLYGON_RPC_URL }}
+          BASE_RPC_URL: ${{ secrets.BASE_RPC_URL }}
+        run: node dist/telxHumanReadable.js
+
+      - name: Build TELx Safe transaction arrays
+        if: steps.telx.outputs.TELX_READY == 'true'
+        run: |
+          node dist/safeTxArrayBuilder.js \
+            --period ${{ steps.telx.outputs.TELX_PERIOD }} --telx
+
+      - name: Note when TELx is not ready
+        if: steps.telx.outputs.TELX_READY != 'true'
+        run: |
+          echo "::warning::TELx period ${{ steps.telx.outputs.TELX_PERIOD }} is not ready — " \
+               "append the period end-boundary block(s) to NETWORKS.periodStarts and bump " \
+               "PERIODS in backend/calculators/TELxRewardsCalculator.ts. The start block is " \
+               "derived automatically from the prior checkpoint; only the end boundary is manual."
+
+      # ── Open one PR carrying both programs' artifacts ──────────────────────
+      - name: Open pull request for review
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: auto/rewards-tanip-${{ steps.tanip.outputs.PERIOD }}
+          base: master
+          title: "feat: weekly rewards — TANIP period ${{ steps.tanip.outputs.PERIOD }}, TELx period ${{ steps.telx.outputs.TELX_PERIOD }}"
+          commit-message: "feat: weekly rewards — TANIP ${{ steps.tanip.outputs.PERIOD }}, TELx ${{ steps.telx.outputs.TELX_PERIOD }}"
+          add-paths: |
+            rewards/
+            reports/
+            backend/checkpoints/
+          body: |
+            ## Weekly rewards run
+
+            Automated. **Review the numbers before merging.** Merging approves the
+            distribution; it does **not** move funds. Distribution remains a
+            separate, manually-reviewed-and-executed transaction (per the current
+            process: calculator → human-readable Excel → manual review → manual tx).
+
+            ### TANIP-1 staker rewards (Polygon) — period ${{ steps.tanip.outputs.PERIOD }}
+            Block range (sequential, chain-derived): `${{ steps.tanip.outputs.ARGS }}`
+            startBlock = `lastSettlementBlock + 1` (read from `TANIssuanceHistory`),
+            endBlock = block at the most recent Wednesday 00:00 UTC boundary.
+            - `rewards/staker_rewards_period_${{ steps.tanip.outputs.PERIOD }}.json`
+            - `reports/TANIP1_Rewards_Distribution_Period${{ steps.tanip.outputs.PERIOD }}.xlsx` (4-gate verified)
+            - Safe arrays for `increaseClaimableByBatch`
+
+            ### TELx liquidity rewards (Base + Polygon) — period ${{ steps.telx.outputs.TELX_PERIOD }}
+            Ready: `${{ steps.telx.outputs.TELX_READY }}`. Each pool's start block is
+            derived from its previous checkpoint's end block + 1 (not hand-entered);
+            the period end boundary stays defined in `periodStarts`.
+            - `backend/checkpoints/<pool>-${{ steps.telx.outputs.TELX_PERIOD }}.json` (3 pools)
+            - `backend/checkpoints/<pool>-${{ steps.telx.outputs.TELX_PERIOD }}.xlsx` (human-readable reports)
+            - Safe arrays for the TELx distribution
+
+            If TELx shows `Ready: false`, append the period end-boundary block(s) to
+            `NETWORKS.periodStarts` and bump `PERIODS`, then re-run.
+          labels: |
+            rewards
+            automated
