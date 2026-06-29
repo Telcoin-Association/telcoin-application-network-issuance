@@ -6,6 +6,7 @@ import { ChainId, config } from "./config";
 import {
   getBlockByTimestamp,
   getLastSettlementBlockAndLatestBlock,
+  mostRecentEpochBoundary,
 } from "./helpers";
 
 /**
@@ -52,20 +53,6 @@ function nextPeriodNumber(): number {
   return Math.max(...periods) + 1;
 }
 
-/**
- * Most recent epoch boundary at or before `now`. Epoch boundaries fall on
- * Wednesday 00:00 UTC (Wednesday === getUTCDay() 3), matching the published
- * distribution cadence.
- */
-function mostRecentEpochBoundary(now: Date): bigint {
-  const d = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0),
-  );
-  // Walk back to the most recent Wednesday (UTC day 3).
-  const daysSinceWednesday = (d.getUTCDay() - 3 + 7) % 7;
-  d.setUTCDate(d.getUTCDate() - daysSinceWednesday);
-  return BigInt(Math.floor(d.getTime() / 1000));
-}
 
 function parseNetworkArg(args: string[]): "polygon" {
   const idx = args.indexOf("--network");

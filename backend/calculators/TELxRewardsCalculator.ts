@@ -12,7 +12,13 @@ import {
 import * as dotenv from "dotenv";
 import { existsSync, readFileSync } from "fs";
 import { readFile, writeFile, mkdir } from "fs/promises";
-import { createRpcClient, NetworkConfig, toBigInt } from "../helpers";
+import {
+  createRpcClient,
+  getBlockByTimestamp,
+  mostRecentEpochBoundary,
+  NetworkConfig,
+  toBigInt,
+} from "../helpers";
 import { ChainId, config } from "../config";
 dotenv.config();
 
@@ -168,11 +174,22 @@ export type SupportedChainId = ChainId.Polygon | ChainId.Base;
 export const POOLS = [BASE_ETH_TEL, POLYGON_ETH_TEL, POLYGON_USDC_EMXN];
 
 /**
- * @dev For new periods, increment length here and add the new blocknumbers to `periodStarts`
- * @notice While public-facing periods are 1-indexed, this utility uses `period 0` internally
- * to refer to the initialization period from pool creation to first period start.
+ * Derives the list of periods [0..maxCheckpointPeriod] by scanning the
+ * checkpoint directory, so telxHumanReadable always covers every period that
+ * has been run — no manual counter to bump.
  */
-export const PERIODS = Array.from({ length: 46 }, (_, i) => i);
+export function derivePeriods(): number[] {
+  if (!existsSync(TELX_BASE_PATH)) return [0];
+  const { readdirSync } = require("fs") as typeof import("fs");
+  const max = readdirSync(TELX_BASE_PATH)
+    .flatMap((f: string) =>
+      POOLS.map((p) => f.match(new RegExp(`^${p.name}-(\\d+)\\.json$`))).filter(Boolean)
+    )
+    .map((m: RegExpMatchArray) => Number(m![1]))
+    .reduce((a: number, b: number) => Math.max(a, b), 0);
+  return Array.from({ length: max + 1 }, (_, i) => i);
+}
+export const PERIODS = derivePeriods();
 export const NETWORKS = {
   [ChainId.Polygon]: {
     poolManager: getAddress("0x67366782805870060151383f4bbff9dab53e5cd6"),
@@ -292,7 +309,7 @@ export const NETWORKS = {
 async function main() {
   const args = process.argv.slice(2);
   const [poolId, period, rerun] = parseCLIArgs(args);
-  const poolConfig = setPoolConfig(poolId, period);
+  const poolConfig = await setPoolConfig(poolId, period);
 
   // Load state from checkpoint json if it exists and reset its period-specific fee fields
   const client = createRpcClient(poolConfig.network);
@@ -1844,7 +1861,7 @@ export async function initialize(
   return initialPositions;
 }
 
-function setPoolConfig(poolId_: `0x${string}`, period: number) {
+async function setPoolConfig(poolId_: `0x${string}`, period: number) {
   const pool = POOLS.find((p) => p.poolId === poolId_);
   if (!pool) throw new Error("Unrecognized pool ID");
 
@@ -1856,7 +1873,7 @@ function setPoolConfig(poolId_: `0x${string}`, period: number) {
     NETWORKS[network as SupportedChainId];
   const checkpointFile = `${TELX_BASE_PATH}/${pool.name}-${period - 1}.json`;
 
-  const { reward, start, end } = buildPeriodConfig(pool, period);
+  const { reward, start, end } = await buildPeriodConfig(pool, period);
 
   return {
     network,
@@ -1896,7 +1913,7 @@ function parseCLIArgs(args: string[]): [`0x${string}`, number, boolean] {
   return [poolId as `0x${string}`, period, rerun];
 }
 
-function buildPeriodConfig(pool: PoolConfig, period: number) {
+async function buildPeriodConfig(pool: PoolConfig, period: number) {
   const networkCfg = NETWORKS[pool.network as SupportedChainId];
   if (period === 0) {
     return {
@@ -1908,19 +1925,28 @@ function buildPeriodConfig(pool: PoolConfig, period: number) {
 
   const index = period - 1;
 
-  // Automate the start block: a period begins on the block immediately after
-  // the previous period's recorded end block (read from its checkpoint output),
-  // rather than a hand-entered value. This removes the manual start-block
-  // selection that previously had to be typed in, and guarantees the range is
-  // sequential and contiguous with the last epoch — derived from output, not
-  // from the clock. `periodStarts` remains the source of truth for the period
-  // END boundary.
+  // Start block: the block immediately after the previous period's recorded end
+  // block (read from its checkpoint output). Sequential by construction.
   const start = previousPeriodEndBlock(pool, period) + 1n;
-  const end = networkCfg.periodStarts[index + 1] - 1n;
+
+  // End block: use the curated periodStarts boundary when available (historical
+  // runs recompute to the exact same block), otherwise derive from the most
+  // recent Wednesday 00:00 UTC epoch boundary on the pool's chain. This removes
+  // the manual periodStarts append that was required before each new run.
+  let end: bigint;
+  const curatedEnd = networkCfg.periodStarts[index + 1];
+  if (curatedEnd !== undefined) {
+    end = curatedEnd - 1n;
+  } else {
+    const boundaryTs = mostRecentEpochBoundary(new Date());
+    end = await getBlockByTimestamp(pool.network as SupportedChainId, boundaryTs);
+    console.log(
+      `  ${pool.name} period ${period}: end block derived from epoch boundary → ${end}`,
+    );
+  }
 
   // Contiguity guard: if a curated boundary exists for this period's start, the
-  // derived value must agree with it — catches gaps/overlaps from a mistyped
-  // boundary block before any fees are computed.
+  // derived value must agree — catches gaps/overlaps from a mistyped boundary.
   const curatedStart = networkCfg.periodStarts[index];
   if (curatedStart !== undefined && start !== curatedStart) {
     throw new Error(
