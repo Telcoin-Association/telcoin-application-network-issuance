@@ -10,7 +10,7 @@ import {
   type PublicClient,
 } from "viem";
 import * as dotenv from "dotenv";
-import { existsSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import { readFile, writeFile, mkdir } from "fs/promises";
 import { createRpcClient, NetworkConfig, toBigInt } from "../helpers";
 import { ChainId, config } from "../config";
@@ -1907,12 +1907,57 @@ function buildPeriodConfig(pool: PoolConfig, period: number) {
   }
 
   const index = period - 1;
-  const start = networkCfg.periodStarts[index];
+
+  // Automate the start block: a period begins on the block immediately after
+  // the previous period's recorded end block (read from its checkpoint output),
+  // rather than a hand-entered value. This removes the manual start-block
+  // selection that previously had to be typed in, and guarantees the range is
+  // sequential and contiguous with the last epoch — derived from output, not
+  // from the clock. `periodStarts` remains the source of truth for the period
+  // END boundary.
+  const start = previousPeriodEndBlock(pool, period) + 1n;
   const end = networkCfg.periodStarts[index + 1] - 1n;
+
+  // Contiguity guard: if a curated boundary exists for this period's start, the
+  // derived value must agree with it — catches gaps/overlaps from a mistyped
+  // boundary block before any fees are computed.
+  const curatedStart = networkCfg.periodStarts[index];
+  if (curatedStart !== undefined && start !== curatedStart) {
+    throw new Error(
+      `Derived startBlock ${start} for ${pool.name} period ${period} does not ` +
+        `match periodStarts[${index}] (${curatedStart}). Check the boundary ` +
+        `blocks in NETWORKS — the previous period's checkpoint ended at ` +
+        `${start - 1n}.`,
+    );
+  }
+
   const reward =
     period === 1 ? pool.rewardAmounts.FIRST : pool.rewardAmounts.PERIOD;
 
   return { reward, start, end };
+}
+
+/**
+ * Reads the end block recorded in the previous period's checkpoint output so
+ * the next period can continue sequentially from it. The start of period N is,
+ * by definition, the block immediately after period N-1's end — so it is
+ * recovered from prior output and never chosen by hand.
+ */
+function previousPeriodEndBlock(pool: PoolConfig, period: number): bigint {
+  const checkpointFile = `${TELX_BASE_PATH}/${pool.name}-${period - 1}.json`;
+  if (!existsSync(checkpointFile)) {
+    throw new Error(
+      `Cannot derive startBlock for ${pool.name} period ${period}: previous ` +
+        `checkpoint ${checkpointFile} not found. Run period ${period - 1} first.`,
+    );
+  }
+  const raw = JSON.parse(readFileSync(checkpointFile, "utf-8"));
+  if (!raw?.blockRange?.endBlock) {
+    throw new Error(
+      `Checkpoint ${checkpointFile} has no blockRange.endBlock to continue from.`,
+    );
+  }
+  return toBigInt(raw.blockRange.endBlock);
 }
 
 // identifies whether denominator is token0 or token1
