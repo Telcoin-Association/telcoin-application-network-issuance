@@ -178,19 +178,7 @@ export const POOLS = [BASE_ETH_TEL, POLYGON_ETH_TEL, POLYGON_USDC_EMXN];
  * checkpoint directory, so telxHumanReadable always covers every period that
  * has been run — no manual counter to bump.
  */
-export function derivePeriods(): number[] {
-  if (!existsSync(TELX_BASE_PATH)) return [0];
-  const files = readdirSync(TELX_BASE_PATH);
-  let max = 0;
-  for (const f of files) {
-    for (const p of POOLS) {
-      const m = f.match(new RegExp(`^${p.name}-(\\d+)\\.json$`));
-      if (m) max = Math.max(max, Number(m[1]));
-    }
-  }
-  return Array.from({ length: max + 1 }, (_, i) => i);
-}
-export const PERIODS = derivePeriods();
+export const PERIODS = Array.from({ length: 48 }, (_, i) => i);
 export const NETWORKS = {
   [ChainId.Polygon]: {
     poolManager: getAddress("0x67366782805870060151383f4bbff9dab53e5cd6"),
@@ -244,6 +232,8 @@ export const NETWORKS = {
       88_229_743n, // jun 10
       88_632_942n, // jun 17
       89_036_136n, // jun 24
+      89_439_336n, // jul 1
+      89_842_536n, // jul 8
     ],
   },
   [ChainId.Base]: {
@@ -298,6 +288,8 @@ export const NETWORKS = {
       47_130_126n, // jun 10
       47_432_526n, // jun 17
       47_734_926n, // jun 24
+      48_037_326n, // jul 1
+      48_339_726n, // jul 8
     ],
   },
 };
