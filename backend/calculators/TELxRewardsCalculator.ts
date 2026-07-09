@@ -172,7 +172,7 @@ export const POOLS = [BASE_ETH_TEL, POLYGON_ETH_TEL, POLYGON_USDC_EMXN];
  * @notice While public-facing periods are 1-indexed, this utility uses `period 0` internally
  * to refer to the initialization period from pool creation to first period start.
  */
-export const PERIODS = Array.from({ length: 47 }, (_, i) => i);
+export const PERIODS = Array.from({ length: 48 }, (_, i) => i);
 export const NETWORKS = {
   [ChainId.Polygon]: {
     poolManager: getAddress("0x67366782805870060151383f4bbff9dab53e5cd6"),
@@ -227,6 +227,7 @@ export const NETWORKS = {
       88_632_942n, // jun 17
       89_036_136n, // jun 24
       89_439_336n, // jul 1
+      89_842_536n, // jul 8
     ],
   },
   [ChainId.Base]: {
@@ -282,6 +283,7 @@ export const NETWORKS = {
       47_432_526n, // jun 17
       47_734_926n, // jun 24
       48_037_326n, // jul 1
+      48_339_726n, // jul 8
     ],
   },
 };
