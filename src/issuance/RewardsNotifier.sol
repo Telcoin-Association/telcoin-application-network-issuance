@@ -1,7 +1,11 @@
-// SPDX-License-Identifier: MIT or Apache-2.0
+// SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.26;
 
 import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol";
+
+interface ITANIssuanceHistory {
+    function lastSettlementBlock() external view returns (uint256);
+}
 
 /**
  * @title RewardsNotifier
@@ -51,11 +55,22 @@ contract RewardsNotifier is AccessControl {
         address indexed settler
     );
 
+    /// @notice The TANIssuanceHistory whose `lastSettlementBlock` must equal a
+    ///         reported `endBlock`. Set once at deployment.
+    ITANIssuanceHistory public immutable tanIssuanceHistory;
+
     /**
      * @param admin Address that receives DEFAULT_ADMIN_ROLE and NOTIFIER_ROLE.
      *              Pass the TAO Safe address on deployment.
+     * @param tanIssuanceHistory_ The TANIssuanceHistory used to settle TANIP-1
+     *              rewards. `notifyRewardsSettled` asserts the reported endBlock
+     *              matches its `lastSettlementBlock`, so a mis-built batch cannot
+     *              emit a wrong endBlock.
      */
-    constructor(address admin) {
+    constructor(address admin, address tanIssuanceHistory_) {
+        require(admin != address(0), "admin is zero address");
+        require(tanIssuanceHistory_ != address(0), "history is zero address");
+        tanIssuanceHistory = ITANIssuanceHistory(tanIssuanceHistory_);
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(NOTIFIER_ROLE, admin);
     }
@@ -69,12 +84,21 @@ contract RewardsNotifier is AccessControl {
      * @param totalRewards Sum of all `IssuanceReward.amount` values in the
      *                     batch, in raw EVM units (TEL × 10^2 per the TANIP-1
      *                     calculator output; match what was passed on chain).
+     *
+     * Reverts if `endBlock` does not equal the TANIssuanceHistory's current
+     * `lastSettlementBlock`. Because `increaseClaimableByBatch` sets that value
+     * to `endBlock` earlier in the same Safe batch, the check passes for a
+     * correctly-built batch and rejects a mismatched `endBlock`.
      */
     function notifyRewardsSettled(
         uint256 period,
         uint256 endBlock,
         uint256 totalRewards
     ) external onlyRole(NOTIFIER_ROLE) {
+        require(
+            endBlock == tanIssuanceHistory.lastSettlementBlock(),
+            "endBlock != lastSettlementBlock"
+        );
         emit RewardsSettled(period, endBlock, totalRewards, msg.sender);
     }
 }
