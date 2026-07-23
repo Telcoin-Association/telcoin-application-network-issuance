@@ -218,13 +218,15 @@ RPC were exercised only where no network was required):
   unrelated type errors in `DeveloperIncentivesCalculator` are present on
   `master` and untouched here.)
 
-> **Before merge:** the branch has been updated with `master` (TANIP periods 38–39
-> and TELx periods 46–47 are now committed) and the workbook template re-seeded
-> through the last settled period. The remaining verification step is **one real
-> `workflow_dispatch` run from a test branch** with the repository secrets, to
-> confirm the pipeline goes green end to end against current chain state. That
-> single run exercises the workflow syntax, the job-level env, and the TELx
-> next-period path together.
+> **Before merge:** the branch is merged with `master` through TANIP period 41 /
+> TELx period 49, and the workbook template is re-seeded through period 41. The
+> derived boundary blocks were verified against live Polygon data: the jul-15 and
+> jul-22 boundaries reproduce the curated values (90245736 / 90648935) exactly,
+> and the resolver correctly reports period 41 as merged-but-not-yet-settled. The
+> remaining verification step is **one real `workflow_dispatch` run from a test
+> branch** with the repository secrets, to confirm the pipeline goes green end to
+> end against current chain state. That single run exercises the workflow syntax,
+> the job-level env, and the TELx next-period path together.
 
 ---
 
