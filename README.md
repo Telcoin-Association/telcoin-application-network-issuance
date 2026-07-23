@@ -212,7 +212,7 @@ The `backend/safeTxArrayBuilder.ts` script builds the function parameters which 
 - an array of Solidity `IssuanceReward` structs defined within `TANIssuanceHistory.sol`, called `rewards`
 - the settlement chain's end block used for the period's calculation run, aptly called `endBlock`
 
-#### The builder script prints the total amount of TEL needed to be transferred from the TANSafe to the history contract (and then to the plugin), as well as the `endBlock` for all networks in `rewards/staker_rewards_period_x.json`. The `rewards` array parameter is often too long to view in a terminal and sometimes too long to perform the period's distribution in a single transaction, so it is written to a series of chunks at`backend/temp/safe_param_period_x_chunk_y.json` file for the corresponding period number.
+#### The builder script prints the total amount of TEL needed to be transferred from the TANSafe to the history contract (and then to the plugin), as well as the `endBlock` for all networks in `rewards/staker_rewards_period_x.json`. The `rewards` array parameter is often too long to view in a terminal and sometimes too long to perform the period's distribution in a single transaction, so it is written to a series of chunks at`safe-params/safe_param_period_x_chunk_y.json` file for the corresponding period number.
 
 NOTE: tokens must be transferred to the TANIssuanceHistory contract - `increaseClaimableByBatch()` does not pull tokens (which would require an approval)
 

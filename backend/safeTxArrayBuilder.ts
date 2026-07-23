@@ -242,7 +242,11 @@ async function writeOutputFiles(
   project: "tan" | "telx",
   poolIdentifier: string = "" // optional, used only for TELx
 ) {
-  const outputDir = path.join(__dirname, "temp");
+  // Write to a tracked, repo-relative directory (not __dirname/temp, which is
+  // dist/temp in CI and gitignored) so create-pull-request commits these Safe
+  // params into the review PR the body references. Runs from the repo root under
+  // both `node dist/...` (CI) and `yarn ts-node backend/...` (local).
+  const outputDir = path.join(process.cwd(), "safe-params");
   await fs.mkdir(outputDir, { recursive: true });
 
   let chunkSize: number;
@@ -334,7 +338,11 @@ async function writeNotifyParams(
       "event that community dashboards and notification bots subscribe to.",
   };
 
-  const outputDir = path.join(__dirname, "temp");
+  // Write to a tracked, repo-relative directory (not __dirname/temp, which is
+  // dist/temp in CI and gitignored) so create-pull-request commits these Safe
+  // params into the review PR the body references. Runs from the repo root under
+  // both `node dist/...` (CI) and `yarn ts-node backend/...` (local).
+  const outputDir = path.join(process.cwd(), "safe-params");
   await fs.mkdir(outputDir, { recursive: true });
   const outputFilePath = path.join(
     outputDir,
@@ -424,10 +432,11 @@ async function sumMultiplePeriods(periods: number[], project: "tan" | "telx") {
     }
     // write to file
     const outputFilePath = path.join(
-      __dirname,
-      "temp",
+      process.cwd(),
+      "safe-params",
       `safe_param_periods_${periods.join("_")}_tan_aggregate.json`
     );
+    await fs.mkdir(path.dirname(outputFilePath), { recursive: true });
     await fs.writeFile(
       outputFilePath,
       JSON.stringify(issuanceRewards, null, 2)
@@ -453,10 +462,11 @@ async function sumMultiplePeriods(periods: number[], project: "tan" | "telx") {
       `Total amount of TEL in raw EVM value to approve (no decimals applied): ${totalAmount}`
     );
     const outputFilePath = path.join(
-      __dirname,
-      "temp",
+      process.cwd(),
+      "safe-params",
       `safe_param_periods_${periods.join("_")}_telx_aggregate.json`
     );
+    await fs.mkdir(path.dirname(outputFilePath), { recursive: true });
     const outputData = { wallets, amounts };
     await fs.writeFile(outputFilePath, JSON.stringify(outputData, null, 2));
     console.log(
