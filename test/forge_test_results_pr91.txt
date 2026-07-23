@@ -1,0 +1,47 @@
+# forge verification — weekly rewards pipeline review fixes (branch feat/tanip1-workbook-automation, fixes atop 2d9c5ad)
+
+$ forge --version
+forge Version: 1.7.2-dev
+
+$ forge build
+Compiling 52 files with Solc 0.8.26 — success (style lint notes only, no errors)
+
+$ forge test --match-contract 'RewardsNotifierTest|DeploymentsDecodeTest' -vv
+No files changed, compilation skipped
+Ran 6 tests for test/RewardsNotifier.t.sol:RewardsNotifierTest
+[PASS] test_constructor_grantsRolesAndBindsHistory() (gas: 42198)
+[PASS] test_constructor_revertsOnZeroAdmin() (gas: 6515)
+[PASS] test_constructor_revertsOnZeroHistory() (gas: 6463)
+[PASS] test_notify_emitsWhenEndBlockMatches() (gas: 44511)
+[PASS] test_notify_revertsForNonNotifier() (gas: 40899)
+[PASS] test_notify_revertsOnEndBlockMismatch() (gas: 40359)
+Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 1.19ms (908.90µs CPU time)
+Ran 1 test for test/DeploymentsDecode.t.sol:DeploymentsDecodeTest
+[PASS] test_deploymentsJson_decodesWithoutFieldShift() (gas: 19323)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 1.25ms (843.22µs CPU time)
+Ran 2 test suites in 7.47ms (2.44ms CPU time): 7 tests passed, 0 failed, 0 skipped (7 total tests)
+
+$ forge test --no-match-contract ForkTest   # full unit suite (fork test needs live RPC)
+Ran 6 tests for test/RewardsNotifier.t.sol:RewardsNotifierTest
+[PASS] test_constructor_grantsRolesAndBindsHistory() (gas: 42198)
+[PASS] test_constructor_revertsOnZeroAdmin() (gas: 6515)
+[PASS] test_constructor_revertsOnZeroHistory() (gas: 6463)
+[PASS] test_notify_emitsWhenEndBlockMatches() (gas: 44511)
+[PASS] test_notify_revertsForNonNotifier() (gas: 40899)
+[PASS] test_notify_revertsOnEndBlockMismatch() (gas: 40359)
+Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 9.05s (923.74µs CPU time)
+Ran 4 tests for test/TANIssuanceHistoryTest.t.sol:TANIssuanceHistoryTest
+[PASS] testCumulativeRewardsAtBlock() (gas: 290627)
+[FAIL: EvmError: Revert; counterexample: calldata=0x689bc9f4000000000000000000000000000000000000000000000000000000000000d83b args=[55355 [5.535e4]]] testFuzz_increaseClaimableByBatch(uint16) (runs: 97, μ: 187614120, ~: 34982277)
+[PASS] testIncreaseClaimableByBatchWhenDeactivated() (gas: 153619)
+[PASS] testIntegrationTANIssuanceHistory() (gas: 518481)
+Suite result: FAILED. 3 passed; 1 failed; 0 skipped; finished in 9.05s (9.05s CPU time)
+Ran 1 test for test/DeploymentsDecode.t.sol:DeploymentsDecodeTest
+[PASS] test_deploymentsJson_decodesWithoutFieldShift() (gas: 19323)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 9.06s (9.05s CPU time)
+Ran 3 test suites in 9.06s (27.16s CPU time): 10 tests passed, 1 failed, 0 skipped (11 total tests)
+[FAIL: EvmError: Revert; counterexample: calldata=0x689bc9f4000000000000000000000000000000000000000000000000000000000000d83b args=[55355 [5.535e4]]] testFuzz_increaseClaimableByBatch(uint16) (runs: 97, μ: 187614120, ~: 34982277)
+
+NOTE: testFuzz_increaseClaimableByBatch fails identically on the unmodified PR head
+(2d9c5ad) with the same fuzz seed — EvmError: OutOfGas at ~28k batch entries from an
+unbounded uint16 fuzz input. Pre-existing, unrelated to this change set.
