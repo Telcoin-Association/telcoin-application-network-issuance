@@ -115,7 +115,24 @@ full period block range. Secrets are referenced only by name via
 `${{ secrets.* }}`; no URLs or keys are committed. The built-in `GITHUB_TOKEN`
 covers PR creation.
 
-**3. Deploy RewardsNotifier** (one-time, Polygon)
+**3. Workbook template (already seeded)**
+The tracked `reports/TANIP1_Rewards_Distribution_template.xlsx` is the rolling
+cumulative base. It is committed **already seeded through period 39** (the last
+settled TANIP-1 period at authoring); each merged weekly PR rolls the new period
+into it, so no action is normally required. To re-seed from scratch — e.g. after a
+correction, or when standing the pipeline up against a different starting period —
+replay the build over the committed period JSON (this is what the weekly job does):
+
+```bash
+cp <headers-only-template>.xlsx /tmp/t.xlsx           # start from an empty template
+for N in $(seq 1 <lastSettledPeriod>); do
+  python scripts/build_workbook.py --period "$N" --template /tmp/t.xlsx --output-dir /tmp/out
+  cp "/tmp/out/TANIP1_Rewards_Distribution_Period${N}.xlsx" /tmp/t.xlsx
+done
+cp /tmp/t.xlsx reports/TANIP1_Rewards_Distribution_template.xlsx
+```
+
+**4. Deploy RewardsNotifier** (one-time, Polygon)
 
 `src/issuance/RewardsNotifier.sol` emits a public `RewardsSettled` event each
 time rewards settle, so the community can subscribe without decoding the Safe's
@@ -127,7 +144,9 @@ forge script script/DeployRewardsNotifier.s.sol \
 ```
 
 The constructor grants `DEFAULT_ADMIN_ROLE` and `NOTIFIER_ROLE` to the TAO Safe
-(read from `deployments/deployments.json`). After deployment:
+and binds the notifier to `TANIssuanceHistory` (both read from
+`deployments/deployments.json`); `notifyRewardsSettled` reverts unless the reported
+`endBlock` equals the history's `lastSettlementBlock`. After deployment:
 1. The script writes the deployed address into `deployments/deployments.json`
    under `RewardsNotifier`.
 2. Confirm the TAO Safe holds `NOTIFIER_ROLE`.
@@ -140,10 +159,12 @@ it as the **final** transaction in the Safe settlement batch — after
 
 ## Running manually
 
+Requires **Python 3.10+** (`build_workbook.py` uses `X | None` type hints).
+
 ```bash
-pip install openpyxl requests
+pip install openpyxl
 python scripts/build_workbook.py \
-  --period 38 \
+  --period 40 \
   --template reports/TANIP1_Rewards_Distribution_template.xlsx \
   --output-dir reports
 ```
@@ -175,5 +196,6 @@ After the PR is reviewed and merged, operators build and sign this Safe batch:
 3. `RewardsNotifier.notifyRewardsSettled(period, endBlock, total)` — emits the
    public event.
 
-Parameters come from `backend/temp/safe_param_period_N_tan_*.json`. Merging
-approved the numbers; the money moves only when signers execute this batch.
+Parameters come from `safe-params/safe_param_period_N_tan_*.json` (committed into
+the review PR). Merging approved the numbers; the money moves only when signers
+execute this batch.

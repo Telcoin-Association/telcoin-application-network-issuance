@@ -77,6 +77,14 @@ UTC epoch boundary.** Time only ever bounds the *end*; it never decides the
 - **Guards:** the end must be reorg-safe (deeper than the configured reorg depth)
   and strictly greater than the start, or the job fails loudly rather than
   emitting a bad range.
+- **Period number:** unlike the block range, the TANIP period *number* is not read
+  from chain — it is `max(period in rewards/staker_rewards_period_*.json) + 1`. The
+  start block still comes from on-chain `lastSettlementBlock`, so if a prior week's
+  PR was merged (its rewards JSON committed) but **not yet settled on chain**, the
+  file-derived period would advance while the chain-derived start would not,
+  producing an overlapping, mislabeled range. `resolveBlockRange.ts` guards this: it
+  refuses to run unless the previous period's recorded `endBlock` equals the on-chain
+  `lastSettlementBlock` (settle the prior period first, then re-run).
 
 Implemented in `backend/resolveBlockRange.ts`.
 
@@ -102,6 +110,14 @@ Implemented in `backend/calculators/TELxRewardsCalculator.ts`
 > from prior state makes that class of error impossible. We verified the derived
 > TELx start for period 46 reproduces the curated `periodStarts` value exactly
 > for all three pools (see §6).
+
+> **Design note — skipped weeks:** the reward per period is a fixed amount while
+> the end block is clock-derived (most recent Wednesday boundary). If a week is
+> skipped (the job does not run, or a period is not settled), the next run produces
+> a single window spanning both weeks — roughly double length — but still carrying
+> one period's fixed reward. This is contiguous and not a gap/overlap, but operators
+> should be aware that a skipped week is not automatically topped up with a second
+> reward; it is one longer period at the standard amount.
 
 ---
 
@@ -198,6 +214,14 @@ RPC were exercised only where no network was required):
   unrelated type errors in `DeveloperIncentivesCalculator` are present on
   `master` and untouched here.)
 
+> **Before merge:** the branch has been updated with `master` (TANIP periods 38–39
+> and TELx periods 46–47 are now committed) and the workbook template re-seeded
+> through the last settled period. The remaining verification step is **one real
+> `workflow_dispatch` run from a test branch** with the repository secrets, to
+> confirm the pipeline goes green end to end against current chain state. That
+> single run exercises the workflow syntax, the job-level env, and the TELx
+> next-period path together.
+
 ---
 
 ## 7. Security model (paramount)
@@ -233,13 +257,15 @@ contradiction (range gap/overlap, end ≤ start, not reorg-safe, JSON mutated
 mid-build, dropped period) rather than emitting a plausible-but-wrong artifact.
 
 **7. The notifier is observability, not control.** `RewardsNotifier`
-(`src/issuance/RewardsNotifier.sol`) is a stateless, fund-less contract whose
-only effect is emitting `RewardsSettled(period, endBlock, totalRewards,
-settler)`. It uses `AccessControl` (`NOTIFIER_ROLE`) so the TAO Safe — and only
-authorized callers — can emit it, added as the final call in the settlement
-batch so the event fires only on a successful settlement. It cannot move funds
-and gates nothing; it exists so the community can subscribe to a clean event
-instead of trying to decode the Safe's internal multisig transaction (G6).
+(`src/issuance/RewardsNotifier.sol`) is a fund-less contract whose only effect is
+emitting `RewardsSettled(period, endBlock, totalRewards, settler)`. It holds no
+funds and no mutable state (only an immutable `TANIssuanceHistory` reference set at
+deployment). It uses `AccessControl` (`NOTIFIER_ROLE`) so the TAO Safe — and only
+authorized callers — can emit it, added as the final call in the settlement batch;
+`notifyRewardsSettled` reverts unless `endBlock` equals the history's current
+`lastSettlementBlock`, so the event cannot report a block the batch did not settle.
+It cannot move funds and gates nothing; it exists so the community can subscribe to
+a clean event instead of decoding the Safe's internal multisig transaction (G6).
 
 **8. Supply chain.** Node dependencies install from the lockfile; the pinned
 `peter-evans/create-pull-request` action is the only third-party action and is
@@ -278,9 +304,13 @@ See `scripts/TANIP1_WORKBOOK_AUTOMATION.md` for the detailed runbook. In short:
    create and approve pull requests."
 2. **Repository secrets:** add `POLYGON_RPC_URL`, `BASE_RPC_URL`,
    `MAINNET_RPC_URL` (archive endpoints).
-3. **Deploy `RewardsNotifier`** on Polygon with the TAO Safe as admin, record its
-   address in `deployments/deployments.json`, and grant `NOTIFIER_ROLE` to the
-   Safe.
+3. **Deploy `RewardsNotifier`** on Polygon with the TAO Safe as admin (the deploy
+   script also binds it to `TANIssuanceHistory` from `deployments.json`), record its
+   address in `deployments/deployments.json`, and grant `NOTIFIER_ROLE` to the Safe.
+
+The workbook template (`reports/TANIP1_Rewards_Distribution_template.xlsx`) is
+committed already seeded through the last settled period, so no template seeding is
+required for the first run (see the runbook to re-seed).
 
 No per-period manual input is required after setup: both programs derive their
 full block range automatically each week.
@@ -291,7 +321,7 @@ full block range automatically each week.
 
 | Area | File | Purpose |
 |---|---|---|
-| TANIP range | `backend/resolveBlockRange.ts` | Derive sequential Polygon block range + period from chain state |
+| TANIP range | `backend/resolveBlockRange.ts` | Derive sequential Polygon block range from chain state (period number from committed rewards files) |
 | TELx range | `backend/resolveTelxRun.ts` | Pick next TELx period + readiness from checkpoints |
 | TELx calc | `backend/calculators/TELxRewardsCalculator.ts` | Auto-derive start (prior checkpoint) and end (epoch boundary) block |
 | Shared | `backend/helpers.ts` | `mostRecentEpochBoundary` shared by both programs |
@@ -299,5 +329,7 @@ full block range automatically each week.
 | Safe params | `backend/safeTxArrayBuilder.ts` | Emit Safe call parameters incl. `notifyRewardsSettled` |
 | Notifier | `src/issuance/RewardsNotifier.sol` | Emit the public `RewardsSettled` event on settlement |
 | Deploy | `script/DeployRewardsNotifier.s.sol` | One-time notifier deployment |
+| Tests | `test/RewardsNotifier.t.sol` | Notifier unit tests: roles, zero-address guards, endBlock assertion, event emission |
+| Tests | `test/DeploymentsDecode.t.sol` | Guards the deployments.json whole-struct decode against field misalignment |
 | Workflow | `.github/workflows/weekly_rewards.yml` | The weekly pipeline that opens the review PR |
 | Runbook | `scripts/TANIP1_WORKBOOK_AUTOMATION.md` | Operator runbook + setup detail |
