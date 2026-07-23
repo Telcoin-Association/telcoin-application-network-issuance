@@ -31,6 +31,17 @@ export interface TelxIncentivesJson {
   lpData: LpDataEntry[];
 }
 
+// Params written to safe_param_period_N_tan_notify.json for the RewardsNotifier call.
+// See src/issuance/RewardsNotifier.sol — add this as the final tx in the Safe batch.
+interface NotifyParams {
+  contract: string;
+  function: string;
+  period: number;
+  endBlock: string;
+  totalRewards: string;
+  note: string;
+}
+
 interface CliArgs {
   period: string;
   project: "tan" | "telx";
@@ -55,9 +66,10 @@ async function main() {
       console.log(`Reading TAN rewards file: ${fileName}`);
       try {
         const rawData = await fs.readFile(fileName, "utf-8");
-        const jsonData = JSON.parse(rawData);
-        outputData = processTanRewards(jsonData as IncentivesJson);
+        const jsonData = JSON.parse(rawData) as IncentivesJson;
+        outputData = processTanRewards(jsonData);
         await writeOutputFiles(outputData, period, project);
+        await writeNotifyParams(outputData as TanOutput, jsonData, period);
       } catch (err) {
         console.error(
           `Unable to parse file at ${fileName}, did you provide correct value to --period flag?`
@@ -230,7 +242,11 @@ async function writeOutputFiles(
   project: "tan" | "telx",
   poolIdentifier: string = "" // optional, used only for TELx
 ) {
-  const outputDir = path.join(__dirname, "temp");
+  // Write to a tracked, repo-relative directory (not __dirname/temp, which is
+  // dist/temp in CI and gitignored) so create-pull-request commits these Safe
+  // params into the review PR the body references. Runs from the repo root under
+  // both `node dist/...` (CI) and `yarn ts-node backend/...` (local).
+  const outputDir = path.join(process.cwd(), "safe-params");
   await fs.mkdir(outputDir, { recursive: true });
 
   let chunkSize: number;
@@ -271,6 +287,75 @@ async function writeOutputFiles(
       );
       chunkIndex++;
     }
+  }
+}
+
+/**
+ * Writes the params for RewardsNotifier::notifyRewardsSettled as the final Safe batch call.
+ * Add this tx AFTER increaseClaimableByBatch so the event fires only on successful settlement.
+ *
+ * The RewardsNotifier contract address must be set in deployments/deployments.json as
+ * "RewardsNotifier" after the one-time deployment.
+ */
+async function writeNotifyParams(
+  issuanceRewards: TanOutput,
+  jsonData: IncentivesJson,
+  period: string
+): Promise<void> {
+  let notifierAddress = "DEPLOY_FIRST";
+  try {
+    const deployments = JSON.parse(
+      await fs.readFile("deployments/deployments.json", "utf-8")
+    );
+    const addr: string = deployments.RewardsNotifier ?? "";
+    if (addr.length > 0 && addr !== "DEPLOY_FIRST") {
+      notifierAddress = addr;
+    }
+  } catch {
+    // deployments.json missing or unreadable — leave placeholder
+  }
+
+  const totalRewards = issuanceRewards.reduce(
+    (acc, [, amt]) => acc + BigInt(amt),
+    0n
+  );
+
+  // Use the Polygon end block from blockRanges (the settlement chain for TANIP-1)
+  const polygonRange = jsonData.blockRanges.find(
+    (r) => r.network?.toLowerCase().includes("polygon") || r.network === "polygon"
+  );
+  const endBlock = polygonRange?.endBlock ?? jsonData.blockRanges[0]?.endBlock ?? "0";
+
+  const params: NotifyParams = {
+    contract: notifierAddress,
+    function: "notifyRewardsSettled(uint256,uint256,uint256)",
+    period: Number(period),
+    endBlock: String(endBlock),
+    totalRewards: totalRewards.toString(),
+    note:
+      "Add as the FINAL transaction in the Safe settlement batch, after " +
+      "increaseClaimableByBatch succeeds. This emits the on-chain RewardsSettled " +
+      "event that community dashboards and notification bots subscribe to.",
+  };
+
+  // Write to a tracked, repo-relative directory (not __dirname/temp, which is
+  // dist/temp in CI and gitignored) so create-pull-request commits these Safe
+  // params into the review PR the body references. Runs from the repo root under
+  // both `node dist/...` (CI) and `yarn ts-node backend/...` (local).
+  const outputDir = path.join(process.cwd(), "safe-params");
+  await fs.mkdir(outputDir, { recursive: true });
+  const outputFilePath = path.join(
+    outputDir,
+    `safe_param_period_${period}_tan_notify.json`
+  );
+  await fs.writeFile(outputFilePath, JSON.stringify(params, null, 2));
+  console.log(`\nRewardsNotifier call params written to:\n  ${outputFilePath}`);
+  if (notifierAddress === "DEPLOY_FIRST") {
+    console.warn(
+      "WARNING: RewardsNotifier not yet deployed. " +
+        "Deploy src/issuance/RewardsNotifier.sol, grant NOTIFIER_ROLE to the TAO Safe, " +
+        'and add "RewardsNotifier": "<address>" to deployments/deployments.json.'
+    );
   }
 }
 
@@ -347,10 +432,11 @@ async function sumMultiplePeriods(periods: number[], project: "tan" | "telx") {
     }
     // write to file
     const outputFilePath = path.join(
-      __dirname,
-      "temp",
+      process.cwd(),
+      "safe-params",
       `safe_param_periods_${periods.join("_")}_tan_aggregate.json`
     );
+    await fs.mkdir(path.dirname(outputFilePath), { recursive: true });
     await fs.writeFile(
       outputFilePath,
       JSON.stringify(issuanceRewards, null, 2)
@@ -376,10 +462,11 @@ async function sumMultiplePeriods(periods: number[], project: "tan" | "telx") {
       `Total amount of TEL in raw EVM value to approve (no decimals applied): ${totalAmount}`
     );
     const outputFilePath = path.join(
-      __dirname,
-      "temp",
+      process.cwd(),
+      "safe-params",
       `safe_param_periods_${periods.join("_")}_telx_aggregate.json`
     );
+    await fs.mkdir(path.dirname(outputFilePath), { recursive: true });
     const outputData = { wallets, amounts };
     await fs.writeFile(outputFilePath, JSON.stringify(outputData, null, 2));
     console.log(

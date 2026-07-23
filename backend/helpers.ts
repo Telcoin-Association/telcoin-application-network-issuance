@@ -281,6 +281,19 @@ export async function getLastSettlementBlockAndLatestBlock(
   return [lastSettlementBlock, latestBlock];
 }
 
+/**
+ * Returns the Unix timestamp (seconds) of the most recent Wednesday 00:00 UTC
+ * at or before `now`. Wednesday boundaries define TANIP-1 and TELx epoch ends.
+ */
+export function mostRecentEpochBoundary(now: Date): bigint {
+  const d = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0),
+  );
+  const daysSinceWednesday = (d.getUTCDay() - 3 + 7) % 7;
+  d.setUTCDate(d.getUTCDate() - daysSinceWednesday);
+  return BigInt(Math.floor(d.getTime() / 1000));
+}
+
 export async function getBlockByTimestamp(
   chain: ChainId,
   timestamp: bigint,

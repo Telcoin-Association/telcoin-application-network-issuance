@@ -153,7 +153,7 @@ async function generateFakeData(
         developerTotal +
           scaleDecimals(
             newClaimable - oldClaimable,
-            config.telToken[plugin.chain].decimals,
+            config.telToken[plugin.chain as keyof typeof config.telToken].decimals,
             config.canonicalDecimals
           )
       );
