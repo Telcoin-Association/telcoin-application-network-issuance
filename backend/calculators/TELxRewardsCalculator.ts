@@ -1952,9 +1952,17 @@ async function buildPeriodConfig(pool: PoolConfig, period: number) {
     end = curatedEnd - 1n;
   } else {
     const boundaryTs = mostRecentEpochBoundary(new Date());
-    end = await getBlockByTimestamp(pool.network as SupportedChainId, boundaryTs);
+    // Convention from every curated period: the boundary block itself is the
+    // START of the next period, so this period ends one block before it
+    // (end = periodStarts[i+1] - 1). E.g. period 49 ran ...→90648934 and the
+    // jul-22 boundary block 90648935 opens period 50. Match that exactly.
+    const boundaryBlock = await getBlockByTimestamp(
+      pool.network as SupportedChainId,
+      boundaryTs,
+    );
+    end = boundaryBlock - 1n;
     console.log(
-      `  ${pool.name} period ${period}: end block derived from epoch boundary → ${end}`,
+      `  ${pool.name} period ${period}: end block derived from epoch boundary → ${end} (boundary block ${boundaryBlock})`,
     );
     // Guard: the derived end must be strictly past the start. If the most recent
     // Wednesday boundary is at or before the period's start block, this period

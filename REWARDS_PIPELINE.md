@@ -95,8 +95,12 @@ Implemented in `backend/resolveBlockRange.ts`.
   1. Same invariant as TANIP, sourced from the prior run's own output.
 - **End:** if a curated boundary exists in `periodStarts[]` (historical periods),
   use it — this guarantees past periods recompute to byte-identical ranges.
-  Otherwise (the new period) derive the end from the most recent Wednesday 00:00
-  UTC boundary on that pool's chain, exactly like TANIP.
+  Otherwise (the new period) derive it from the most recent Wednesday 00:00 UTC
+  boundary on that pool's chain. Note the one-block convention difference from
+  TANIP, taken from every prior run: the boundary block itself starts the *next*
+  TELx period, so a TELx period ends at `boundaryBlock - 1` (e.g. period 49 ends
+  at 90648934 and the jul-22 boundary block 90648935 opens period 50), whereas a
+  TANIP period ends at the boundary block itself (period 41 ends at 90648935).
 - **Guards:** a contiguity check (derived start must match the curated start when
   one exists) and an end-must-exceed-start check (refuses to run a period that
   has not closed yet).
