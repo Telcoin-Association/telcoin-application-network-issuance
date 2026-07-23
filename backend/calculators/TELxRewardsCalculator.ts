@@ -1896,8 +1896,12 @@ function parseCLIArgs(args: string[]): [`0x${string}`, number, boolean] {
     throw new Error("Invalid poolId format");
   }
   const period = Number(periodStr);
-  if (isNaN(period) || period < 0 || period > PERIODS.length - 1) {
-    throw new Error(`Invalid period, must be [0:${PERIODS.length - 1}]`);
+  // `PERIODS` is derived from existing checkpoints (indices 0..maxCheckpoint), so
+  // `PERIODS.length` is exactly the next, not-yet-run period. Allow it — otherwise
+  // the automated pipeline (which always targets maxCheckpoint + 1) is rejected on
+  // every first run of a new period.
+  if (isNaN(period) || period < 0 || period > PERIODS.length) {
+    throw new Error(`Invalid period, must be [0:${PERIODS.length}]`);
   }
   const rerun = args[1] === "--rerun";
   if (args[1] !== undefined && !rerun) {
