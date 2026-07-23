@@ -1,12 +1,13 @@
 import * as dotenv from "dotenv";
 dotenv.config();
 
-import { existsSync, readdirSync, appendFileSync } from "fs";
+import { existsSync, readdirSync, readFileSync, appendFileSync } from "fs";
 import { ChainId, config } from "./config";
 import {
   getBlockByTimestamp,
   getLastSettlementBlockAndLatestBlock,
   mostRecentEpochBoundary,
+  toBigInt,
 } from "./helpers";
 
 /**
@@ -53,6 +54,24 @@ function nextPeriodNumber(): number {
   return Math.max(...periods) + 1;
 }
 
+/**
+ * Reads the Polygon `endBlock` recorded in a period's committed rewards file,
+ * or null if the file (or that field) is absent. Used to cross-check the
+ * file-derived period against on-chain settlement state.
+ */
+function recordedEndBlock(period: number): bigint | null {
+  const file = `${REWARDS_DIR}/staker_rewards_period_${period}.json`;
+  if (!existsSync(file)) return null;
+  const raw = JSON.parse(readFileSync(file, "utf-8"));
+  const ranges: Array<{ network?: string; endBlock?: unknown }> =
+    raw?.blockRanges ?? [];
+  const polygon =
+    ranges.find((r) => (r.network ?? "").toLowerCase().includes("polygon")) ??
+    ranges[0];
+  if (polygon?.endBlock === undefined || polygon.endBlock === null) return null;
+  return toBigInt(polygon.endBlock);
+}
+
 
 function parseNetworkArg(args: string[]): "polygon" {
   const idx = args.indexOf("--network");
@@ -88,6 +107,27 @@ async function main(): Promise<void> {
   // when this run fires. Time (below) only bounds how far the current window
   // extends; it never determines where it starts.
   const startBlock = lastSettlementBlock + 1n;
+
+  // CONTIGUITY GUARD: the period number is derived from the committed rewards
+  // files (`nextPeriodNumber`), but the start block is derived from on-chain
+  // `lastSettlementBlock`. Those two sources only agree once the previous
+  // period has actually been settled on chain. If a prior period's PR was
+  // merged (its JSON committed) but not yet settled, the file count advances
+  // while `lastSettlementBlock` does not — and we would emit period N with a
+  // start block that overlaps period N-1's already-computed range. Refuse
+  // loudly rather than produce an overlapping, mislabeled window.
+  const prevRecordedEnd = recordedEndBlock(period - 1);
+  if (prevRecordedEnd !== null && prevRecordedEnd !== lastSettlementBlock) {
+    throw new Error(
+      `Period ${period - 1} recorded endBlock ${prevRecordedEnd} but on-chain ` +
+        `lastSettlementBlock is ${lastSettlementBlock}. The previous period has ` +
+        `not been settled on chain yet (or its recorded range disagrees with ` +
+        `settlement). Refusing to resolve period ${period}: settling period ` +
+        `${period - 1} first sets lastSettlementBlock to ${prevRecordedEnd}, ` +
+        `after which period ${period} starts contiguously at ` +
+        `${prevRecordedEnd + 1n}. Settle period ${period - 1}, then re-run.`,
+    );
+  }
 
   const boundaryTimestamp = mostRecentEpochBoundary(new Date());
   const endBlock = await getBlockByTimestamp(chainId, boundaryTimestamp);

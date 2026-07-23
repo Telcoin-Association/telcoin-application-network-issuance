@@ -370,6 +370,17 @@ def build(period: int | None, template: str, output_dir: str) -> None:
     rows = parse_incentives(data)
     print(f"  {len(rows)} staker entries")
 
+    # A zero-row period would sail through every verification gate (each one
+    # compares the workbook against `rows`, so 0 == 0 passes) and silently emit
+    # an empty period. Almost always this means the source JSON is empty or its
+    # schema drifted (e.g. the `stakerIncentives` key was renamed). Fail loudly.
+    if not rows:
+        raise ValueError(
+            f"Period {period}: parsed 0 staker rows from {json_path}. Refusing "
+            f"to build an empty workbook — check the JSON has a non-empty "
+            f"'stakerIncentives' array."
+        )
+
     template_path = Path(template)
     if not template_path.exists():
         raise FileNotFoundError(f"Template not found: {template}")
