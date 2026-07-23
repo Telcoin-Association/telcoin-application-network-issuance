@@ -114,7 +114,7 @@ export class DeveloperIncentivesCalculator implements ICalculator<bigint> {
       for (const event of claimableIncreasedEvents) {
         const amount = scaleDecimals(
           event.newClaimable - event.oldClaimable,
-          config.telToken[plugin.chain].decimals,
+          config.telToken[plugin.chain as keyof typeof config.telToken].decimals,
           config.canonicalDecimals
         );
 
