@@ -12,7 +12,7 @@ import {
   scaleDecimals,
   unorderedArraysEqual,
 } from "../helpers";
-import { ChainId, config } from "../config";
+import { ChainId, config, telTokenFor } from "../config";
 
 /**
  * This class calculates TAN developers' referrals incentives.
@@ -60,7 +60,7 @@ export class DeveloperIncentivesCalculator implements ICalculator<bigint> {
    * @dev Then fetches all executors' transactions within `[startBlock:endBlock]` range
    * @dev Maps each executor address to its `Transaction`s
    * @dev Also maps each `Transaction` hash to its executor address (`== tx.origin`)
-   * @dev Fetches `SimplePlugin::claimableIncreased` events to get referrals and amounts (`newClaimable - oldClaimable`)
+   * @dev Fetches `SimplePlugin::ClaimableIncreased` events, which carry the credited amount directly
    * @dev Finally maps each developer to its number of referrals
    * @returns `referralsPerDeveloper` Intended to be passed to `calculateIncentivesFromVolumeOrSimilar()`
    */
@@ -113,8 +113,8 @@ export class DeveloperIncentivesCalculator implements ICalculator<bigint> {
       // process each event to identify claimable amount delta in referrals
       for (const event of claimableIncreasedEvents) {
         const amount = scaleDecimals(
-          event.newClaimable - event.oldClaimable,
-          config.telToken[plugin.chain].decimals,
+          event.amount,
+          telTokenFor(plugin.chain).decimals,
           config.canonicalDecimals
         );
 

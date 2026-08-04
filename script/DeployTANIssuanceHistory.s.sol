@@ -44,7 +44,7 @@ contract DeployTANIssuanceHistory is Script {
         vm.stopBroadcast();
 
         // asserts
-        assert(tanIssuanceHistory.tel() == tel);
+        assert(tanIssuanceHistory.tel() == address(tel));
         assert(tanIssuanceHistory.owner() == owner);
         assert(tanIssuanceHistory.tanIssuancePlugin() == tanIssuancePlugin);
         assert(tanIssuanceHistory.clock() == block.number);

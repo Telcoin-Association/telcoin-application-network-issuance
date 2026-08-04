@@ -45,7 +45,7 @@ contract TANIssuanceHistoryForkTest is Test {
         deployments = abi.decode(data, (Deployments));
 
         plugin = ISimplePlugin(deployments.TANIssuancePlugin);
-        tanIssuanceHistory = TANIssuanceHistory(deployments.TANIssuanceHistory);
+        tanIssuanceHistory = TANIssuanceHistory(payable(deployments.TANIssuanceHistory));
 
         amirX = MockAmirX(deployments.mockAmirX);
         tel = ERC20(deployments.polygonTEL);
@@ -118,20 +118,22 @@ contract TANIssuanceHistoryForkTest is Test {
         endBlock = block.number;
 
         // distribute rewards (funds come from TAN safe)
+        uint256 historyBalanceBefore = tel.balanceOf(address(tanIssuanceHistory));
+        uint256 pluginBalanceBefore = tel.balanceOf(address(plugin));
         vm.prank(tanSafe);
         tel.transfer(address(tanIssuanceHistory), userFeeVolume);
 
-        // pre-settlement sanity asserts
-        assertEq(tel.balanceOf(address(tanIssuanceHistory)), userFeeVolume);
-        assertEq(tel.balanceOf(address(plugin)), 0);
+        // pre-settlement sanity assert
+        assertEq(tel.balanceOf(address(tanIssuanceHistory)), historyBalanceBefore + userFeeVolume);
 
         // owner of TANIssuanceHistory contract is configured as TAN safe
         vm.prank(tanSafe);
         tanIssuanceHistory.increaseClaimableByBatch(rewards, endBlock);
 
-        // asserts
-        assertEq(tel.balanceOf(address(tanIssuanceHistory)), 0);
-        assertEq(tel.balanceOf(address(plugin)), userFeeVolume);
+        /// @dev the fork runs against live state at whatever block it was created at, so balances are
+        /// asserted as deltas rather than absolutes
+        assertEq(tel.balanceOf(address(tanIssuanceHistory)), historyBalanceBefore);
+        assertEq(tel.balanceOf(address(plugin)), pluginBalanceBefore + userFeeVolume);
         assertEq(tanIssuanceHistory.lastSettlementBlock(), endBlock);
         assertEq(tanIssuanceHistory.cumulativeRewards(user), userReward);
     }

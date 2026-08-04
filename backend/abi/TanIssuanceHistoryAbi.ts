@@ -1,211 +1,531 @@
+// ABI of `TANIssuanceHistory`. Generated from this repo's forge artifact via `forge build`.
 export default [
   {
     type: "constructor",
     inputs: [
       {
-        name: "tanIssuancePlugin_",
         type: "address",
-        internalType: "contract ISimplePlugin",
+        name: "tanIssuancePlugin_",
+        internalType: "contract ISimplePlugin"
       },
+      {
+        type: "address",
+        name: "owner_",
+        internalType: "address"
+      }
     ],
-    stateMutability: "nonpayable",
+    stateMutability: "nonpayable"
+  },
+  {
+    type: "receive",
+    stateMutability: "payable"
   },
   {
     type: "function",
     name: "CLOCK_MODE",
     inputs: [],
-    outputs: [{ name: "", type: "string", internalType: "string" }],
-    stateMutability: "view",
+    outputs: [
+      {
+        type: "string",
+        name: "",
+        internalType: "string"
+      }
+    ],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "backfillCumulativeRewards",
+    inputs: [
+      {
+        type: "address[]",
+        name: "accounts",
+        internalType: "address[]"
+      },
+      {
+        type: "uint256[]",
+        name: "cumulativeAmounts",
+        internalType: "uint256[]"
+      },
+      {
+        type: "uint256",
+        name: "atBlock",
+        internalType: "uint256"
+      }
+    ],
+    outputs: [],
+    stateMutability: "nonpayable"
+  },
+  {
+    type: "function",
+    name: "backfillSealed",
+    inputs: [],
+    outputs: [
+      {
+        type: "bool",
+        name: "",
+        internalType: "bool"
+      }
+    ],
+    stateMutability: "view"
   },
   {
     type: "function",
     name: "clock",
     inputs: [],
-    outputs: [{ name: "", type: "uint48", internalType: "uint48" }],
-    stateMutability: "view",
+    outputs: [
+      {
+        type: "uint48",
+        name: "",
+        internalType: "uint48"
+      }
+    ],
+    stateMutability: "view"
   },
   {
     type: "function",
     name: "cumulativeRewards",
-    inputs: [{ name: "account", type: "address", internalType: "address" }],
-    outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
-    stateMutability: "view",
+    inputs: [
+      {
+        type: "address",
+        name: "account",
+        internalType: "address"
+      }
+    ],
+    outputs: [
+      {
+        type: "uint256",
+        name: "",
+        internalType: "uint256"
+      }
+    ],
+    stateMutability: "view"
   },
   {
     type: "function",
     name: "cumulativeRewardsAtBlock",
     inputs: [
-      { name: "account", type: "address", internalType: "address" },
-      { name: "queryBlock", type: "uint256", internalType: "uint256" },
+      {
+        type: "address",
+        name: "account",
+        internalType: "address"
+      },
+      {
+        type: "uint256",
+        name: "queryBlock",
+        internalType: "uint256"
+      }
     ],
-    outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
-    stateMutability: "view",
+    outputs: [
+      {
+        type: "uint256",
+        name: "",
+        internalType: "uint256"
+      }
+    ],
+    stateMutability: "view"
   },
   {
     type: "function",
     name: "cumulativeRewardsAtBlockBatched",
     inputs: [
-      { name: "accounts", type: "address[]", internalType: "address[]" },
-      { name: "queryBlock", type: "uint256", internalType: "uint256" },
+      {
+        type: "address[]",
+        name: "accounts",
+        internalType: "address[]"
+      },
+      {
+        type: "uint256",
+        name: "queryBlock",
+        internalType: "uint256"
+      }
     ],
     outputs: [
-      { name: "", type: "address[]", internalType: "address[]" },
-      { name: "", type: "uint256[]", internalType: "uint256[]" },
+      {
+        type: "address[]",
+        name: "",
+        internalType: "address[]"
+      },
+      {
+        type: "uint256[]",
+        name: "",
+        internalType: "uint256[]"
+      }
     ],
-    stateMutability: "view",
+    stateMutability: "view"
   },
   {
     type: "function",
     name: "deactivated",
     inputs: [],
-    outputs: [{ name: "", type: "bool", internalType: "bool" }],
-    stateMutability: "view",
+    outputs: [
+      {
+        type: "bool",
+        name: "",
+        internalType: "bool"
+      }
+    ],
+    stateMutability: "view"
   },
   {
     type: "function",
     name: "increaseClaimableByBatch",
     inputs: [
-      { name: "accounts", type: "address[]", internalType: "address[]" },
-      { name: "amounts", type: "uint256[]", internalType: "uint256[]" },
+      {
+        type: "tuple[]",
+        name: "rewards",
+        internalType: "struct TANIssuanceHistory.IssuanceReward[]",
+        components: [
+          {
+            type: "address",
+            name: "account",
+            internalType: "address"
+          },
+          {
+            type: "uint256",
+            name: "amount",
+            internalType: "uint256"
+          }
+        ]
+      },
+      {
+        type: "uint256",
+        name: "endBlock",
+        internalType: "uint256"
+      }
     ],
     outputs: [],
-    stateMutability: "nonpayable",
+    stateMutability: "nonpayable"
   },
   {
     type: "function",
     name: "lastSettlementBlock",
     inputs: [],
-    outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
-    stateMutability: "view",
+    outputs: [
+      {
+        type: "uint256",
+        name: "",
+        internalType: "uint256"
+      }
+    ],
+    stateMutability: "view"
   },
   {
     type: "function",
     name: "owner",
     inputs: [],
-    outputs: [{ name: "", type: "address", internalType: "address" }],
-    stateMutability: "view",
+    outputs: [
+      {
+        type: "address",
+        name: "",
+        internalType: "address"
+      }
+    ],
+    stateMutability: "view"
   },
   {
     type: "function",
     name: "renounceOwnership",
     inputs: [],
     outputs: [],
-    stateMutability: "nonpayable",
+    stateMutability: "nonpayable"
   },
   {
     type: "function",
     name: "rescueTokens",
     inputs: [
-      { name: "token", type: "address", internalType: "contract IERC20" },
-      { name: "to", type: "address", internalType: "address" },
+      {
+        type: "address",
+        name: "token",
+        internalType: "contract IERC20"
+      },
+      {
+        type: "address",
+        name: "recipient",
+        internalType: "address"
+      }
     ],
     outputs: [],
-    stateMutability: "nonpayable",
+    stateMutability: "nonpayable"
+  },
+  {
+    type: "function",
+    name: "sealBackfill",
+    inputs: [],
+    outputs: [],
+    stateMutability: "nonpayable"
+  },
+  {
+    type: "function",
+    name: "setTanIssuancePlugin",
+    inputs: [
+      {
+        type: "address",
+        name: "newPlugin",
+        internalType: "contract ISimplePlugin"
+      }
+    ],
+    outputs: [],
+    stateMutability: "nonpayable"
   },
   {
     type: "function",
     name: "tanIssuancePlugin",
     inputs: [],
     outputs: [
-      { name: "", type: "address", internalType: "contract ISimplePlugin" },
+      {
+        type: "address",
+        name: "",
+        internalType: "contract ISimplePlugin"
+      }
     ],
-    stateMutability: "view",
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "tel",
+    inputs: [],
+    outputs: [
+      {
+        type: "address",
+        name: "",
+        internalType: "address"
+      }
+    ],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "telIsNative",
+    inputs: [],
+    outputs: [
+      {
+        type: "bool",
+        name: "",
+        internalType: "bool"
+      }
+    ],
+    stateMutability: "view"
   },
   {
     type: "function",
     name: "transferOwnership",
-    inputs: [{ name: "newOwner", type: "address", internalType: "address" }],
+    inputs: [
+      {
+        type: "address",
+        name: "newOwner",
+        internalType: "address"
+      }
+    ],
     outputs: [],
-    stateMutability: "nonpayable",
+    stateMutability: "nonpayable"
+  },
+  {
+    type: "event",
+    name: "BackfillSealed",
+    inputs: [],
+    anonymous: false
   },
   {
     type: "event",
     name: "ClaimableIncreased",
     inputs: [
       {
-        name: "account",
         type: "address",
+        name: "account",
         indexed: true,
-        internalType: "address",
+        internalType: "address"
       },
       {
+        type: "uint256",
         name: "oldClaimable",
-        type: "uint256",
         indexed: false,
-        internalType: "uint256",
+        internalType: "uint256"
       },
       {
-        name: "newClaimable",
         type: "uint256",
+        name: "newClaimable",
         indexed: false,
-        internalType: "uint256",
-      },
+        internalType: "uint256"
+      }
     ],
-    anonymous: false,
+    anonymous: false
+  },
+  {
+    type: "event",
+    name: "CumulativeRewardsBackfilled",
+    inputs: [
+      {
+        type: "address",
+        name: "account",
+        indexed: true,
+        internalType: "address"
+      },
+      {
+        type: "uint256",
+        name: "amount",
+        indexed: false,
+        internalType: "uint256"
+      },
+      {
+        type: "uint256",
+        name: "atBlock",
+        indexed: false,
+        internalType: "uint256"
+      }
+    ],
+    anonymous: false
   },
   {
     type: "event",
     name: "OwnershipTransferred",
     inputs: [
       {
-        name: "previousOwner",
         type: "address",
+        name: "previousOwner",
         indexed: true,
-        internalType: "address",
+        internalType: "address"
       },
       {
-        name: "newOwner",
         type: "address",
+        name: "newOwner",
         indexed: true,
-        internalType: "address",
-      },
+        internalType: "address"
+      }
     ],
-    anonymous: false,
+    anonymous: false
   },
   {
     type: "error",
-    name: "AddressEmptyCode",
-    inputs: [{ name: "target", type: "address", internalType: "address" }],
+    name: "BackfillIsSealed",
+    inputs: []
   },
   {
     type: "error",
-    name: "AddressInsufficientBalance",
-    inputs: [{ name: "account", type: "address", internalType: "address" }],
+    name: "BackfillLengthMismatch",
+    inputs: [
+      {
+        type: "uint256",
+        name: "accountsLength",
+        internalType: "uint256"
+      },
+      {
+        type: "uint256",
+        name: "amountsLength",
+        internalType: "uint256"
+      }
+    ]
   },
-  { type: "error", name: "ArityMismatch", inputs: [] },
-  { type: "error", name: "CheckpointUnorderedInsertion", inputs: [] },
-  { type: "error", name: "Deactivated", inputs: [] },
-  { type: "error", name: "ERC6372InconsistentClock", inputs: [] },
-  { type: "error", name: "FailedInnerCall", inputs: [] },
+  {
+    type: "error",
+    name: "CheckpointUnorderedInsertion",
+    inputs: []
+  },
+  {
+    type: "error",
+    name: "ERC6372InconsistentClock",
+    inputs: []
+  },
   {
     type: "error",
     name: "FutureLookup",
     inputs: [
-      { name: "queriedBlock", type: "uint256", internalType: "uint256" },
-      { name: "clockBlock", type: "uint48", internalType: "uint48" },
-    ],
+      {
+        type: "uint256",
+        name: "queriedBlock",
+        internalType: "uint256"
+      },
+      {
+        type: "uint48",
+        name: "clockBlock",
+        internalType: "uint48"
+      }
+    ]
+  },
+  {
+    type: "error",
+    name: "IncompatiblePlugin",
+    inputs: []
+  },
+  {
+    type: "error",
+    name: "IncreaseClaimableByBatchFailed",
+    inputs: []
+  },
+  {
+    type: "error",
+    name: "InvalidAddress",
+    inputs: [
+      {
+        type: "address",
+        name: "invalidAddress",
+        internalType: "address"
+      }
+    ]
+  },
+  {
+    type: "error",
+    name: "InvalidBlock",
+    inputs: [
+      {
+        type: "uint256",
+        name: "endBlock",
+        internalType: "uint256"
+      }
+    ]
   },
   {
     type: "error",
     name: "OwnableInvalidOwner",
-    inputs: [{ name: "owner", type: "address", internalType: "address" }],
+    inputs: [
+      {
+        type: "address",
+        name: "owner",
+        internalType: "address"
+      }
+    ]
   },
   {
     type: "error",
     name: "OwnableUnauthorizedAccount",
-    inputs: [{ name: "account", type: "address", internalType: "address" }],
+    inputs: [
+      {
+        type: "address",
+        name: "account",
+        internalType: "address"
+      }
+    ]
   },
   {
     type: "error",
     name: "SafeCastOverflowedUintDowncast",
     inputs: [
-      { name: "bits", type: "uint8", internalType: "uint8" },
-      { name: "value", type: "uint256", internalType: "uint256" },
-    ],
+      {
+        type: "uint8",
+        name: "bits",
+        internalType: "uint8"
+      },
+      {
+        type: "uint256",
+        name: "value",
+        internalType: "uint256"
+      }
+    ]
   },
   {
     type: "error",
     name: "SafeERC20FailedOperation",
-    inputs: [{ name: "token", type: "address", internalType: "address" }],
+    inputs: [
+      {
+        type: "address",
+        name: "token",
+        internalType: "address"
+      }
+    ]
   },
+  {
+    type: "error",
+    name: "UnexpectedNative",
+    inputs: []
+  }
 ] as const;

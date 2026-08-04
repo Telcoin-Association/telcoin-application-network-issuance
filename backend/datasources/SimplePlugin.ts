@@ -15,8 +15,8 @@ import { mainnet, polygon } from "viem/chains";
 export type ClaimableIncreasedEvent = {
   txHash: Hash;
   account: Address;
-  oldClaimable: bigint;
-  newClaimable: bigint;
+  /// The amount credited by this event, denominated in the plugin's reward token.
+  amount: bigint;
 };
 
 /**
@@ -110,8 +110,7 @@ export class SimplePlugin extends BaseSimplePlugin {
     return logs.map((log) => ({
       txHash: log.transactionHash!,
       account: getAddress(log.args.account!),
-      oldClaimable: log.args.oldClaimable!,
-      newClaimable: log.args.newClaimable!,
+      amount: log.args.amount!,
     }));
   }
 }

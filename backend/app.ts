@@ -4,7 +4,7 @@ dotenv.config();
 import { existsSync } from "fs";
 import { LocalFileExecutorRegistry } from "./datasources/ExecutorRegistry";
 import { BlocksDatabase } from "./datasources/persistent/BlocksDatabase";
-import { ChainId, config } from "./config";
+import { assertTelTokensConfigured, ChainId, config } from "./config";
 import {
   parseAndSanitizeCLIArgs,
   validateStartAndEndBlocks,
@@ -49,6 +49,10 @@ async function main() {
     );
     process.exit(1);
   }
+
+  // fail before any RPC work if a reward token address is still unpopulated, since an unset
+  // address would match no transfers and quietly yield an empty reward set
+  assertTelTokensConfigured();
 
   const networks = parseAndSanitizeCLIArgs(networkArgs);
   await validateStartAndEndBlocks(networks);
