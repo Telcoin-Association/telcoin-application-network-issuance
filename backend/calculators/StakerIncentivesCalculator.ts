@@ -149,6 +149,18 @@ export class StakerIncentivesCalculator implements ICalculator<UserRewardEntry> 
     console.log("Fetching UserFeeTransfers...");
     const userFeeTransfers = await this.fetchUserFeeTransfers();
 
+    // A settled period always has user fees. Finding none means the inputs are wrong rather than
+    // the week being quiet: the wrong TEL token is configured for the chain, the AmirX set is
+    // stale, or the block range is. Left unchecked this publishes an empty reward file with no
+    // error, so refuse to produce a distribution off it.
+    if (userFeeTransfers.length === 0) {
+      throw new Error(
+        "No user fee transfers found for this period. Check that config.telToken matches the token " +
+          "AmirX actually collects fees in, that data/amirXs.ts is current, and that the block range " +
+          "is correct.",
+      );
+    }
+
     console.log("Fetching onchain data for eligible (staked) users");
     const [eligibleStakerSwaps, addressToRewardDatas] =
       await this.fetchOnchainData(userFeeTransfers);

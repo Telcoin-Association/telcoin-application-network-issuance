@@ -538,7 +538,12 @@ describe("StakerIncentivesCalculator", () => {
     }
 
     beforeEach(() => {
-      jest.spyOn(calculator, "fetchUserFeeTransfers").mockResolvedValue([]);
+      // These cases stub `fetchOnchainData`, so the transfers themselves are unused. One placeholder
+      // still stands in for a real fetch, since an empty result means a misconfigured period rather
+      // than a quiet one and is rejected before any reward is derived.
+      jest
+        .spyOn(calculator, "fetchUserFeeTransfers")
+        .mockResolvedValue([generateTestTokenTransfer(0, stakerA, stakerB)]);
     });
 
     it("should not apply the fee rebate cap when uncapped reward is below both stake cap and own fees", async () => {
