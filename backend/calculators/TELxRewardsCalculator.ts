@@ -232,6 +232,7 @@ export const NETWORKS = {
       90_648_935n, // jul 22
       91_052_120n, // jul 29
       91_455_316n, // aug 5
+      91_858_515n, // aug 12
     ],
   },
   [ChainId.Base]: {
@@ -292,6 +293,7 @@ export const NETWORKS = {
       48_944_526n, // jul 22
       49_246_926n, // jul 29
       49_549_326n, // aug 5
+      49_851_726n, // aug 12
     ],
   },
 };
