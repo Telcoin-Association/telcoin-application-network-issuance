@@ -7,7 +7,7 @@ import {
 } from "../datasources/ExecutorRegistry";
 import { BaseBlocksDatabase } from "../datasources/persistent/BlocksDatabase";
 import { readFileSync } from "fs";
-import { ChainId, config } from "../config";
+import { ChainId, config, telTokenFor } from "../config";
 import {
   BaseSimplePlugin,
   ClaimableIncreasedEvent,
@@ -56,8 +56,14 @@ class FakeSimplePlugin extends BaseSimplePlugin {
   }
 }
 
+// a SimplePlugin can only exist on a chain TEL is deployed to, so restrict generated plugins to
+// those chains and keep reward amounts denominated in something
+const telChains = config.chains
+  .map((chain) => chain.id as ChainId)
+  .filter((chain) => chain in config.telToken);
+
 function randomChainId(): ChainId {
-  return config.chains[Math.floor(Math.random() * config.chains.length)].id;
+  return telChains[Math.floor(Math.random() * telChains.length)];
 }
 
 function randomHex(bytes: number): `0x${string}` {
@@ -102,9 +108,10 @@ async function generateFakeData(
   executorRegistry.setExecutors(executors);
 
   // generate fake blocks dbs (and set a fake block #1 in rpc)
+  // one database per TEL chain, matching the start/end block maps the calculator is constructed with
   const blocksDbs: FakeBlocksDatabase[] = [];
-  for (const chain of config.chains) {
-    const db = new FakeBlocksDatabase(chain.id);
+  for (const chain of telChains) {
+    const db = new FakeBlocksDatabase(chain);
 
     db._rpc.set(1n, copyByJson(blockTemplate));
 
@@ -120,13 +127,11 @@ async function generateFakeData(
     simplePlugins.push(plugin);
 
     for (let j = 0; j < nEventsPerPlugin; j++) {
-      const oldClaimable = randBigInt(0n, 1000n);
-      const newClaimable = oldClaimable + randBigInt(0n, 1000n);
+      const amount = randBigInt(0n, 1000n);
       const event: ClaimableIncreasedEvent = {
         txHash: randomHash(),
         account: randomAddress(),
-        oldClaimable,
-        newClaimable,
+        amount,
       };
       plugin.events.push(event);
 
@@ -152,8 +157,8 @@ async function generateFakeData(
         executor.developerAddress,
         developerTotal +
           scaleDecimals(
-            newClaimable - oldClaimable,
-            config.telToken[plugin.chain].decimals,
+            amount,
+            telTokenFor(plugin.chain).decimals,
             config.canonicalDecimals
           )
       );

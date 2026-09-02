@@ -1,10 +1,7 @@
 import {
-  AbiEvent,
   Address,
   decodeFunctionData,
-  getAbiItem,
   getAddress,
-  GetLogsReturnType,
   PublicClient,
   zeroAddress,
 } from "viem";
@@ -49,11 +46,16 @@ type OnchainRewardData = {
   prevCumulativeRewards: bigint;
 };
 
-export type StakeChangedEvent = {
-  account: Address;
+/**
+ * A single entry of an account's sTEL vote history on the StakingModule.
+ *
+ * `StakingModule` is an `ERC20Votes` token that auto-self-delegates on first receipt, so an
+ * account's votes track its staked balance and `votes` is the balance in effect from
+ * `blockNumber` onward, until the next checkpoint.
+ */
+export type VoteCheckpoint = {
   blockNumber: bigint;
-  oldStake: bigint;
-  newStake: bigint;
+  votes: bigint;
 };
 
 export class StakerIncentivesCalculator implements ICalculator<UserRewardEntry> {
@@ -146,6 +148,18 @@ export class StakerIncentivesCalculator implements ICalculator<UserRewardEntry> 
   async calculateRewardsPerStaker(): Promise<Map<Address, UserRewardEntry>> {
     console.log("Fetching UserFeeTransfers...");
     const userFeeTransfers = await this.fetchUserFeeTransfers();
+
+    // A settled period always has user fees. Finding none means the inputs are wrong rather than
+    // the week being quiet: the wrong TEL token is configured for the chain, the AmirX set is
+    // stale, or the block range is. Left unchecked this publishes an empty reward file with no
+    // error, so refuse to produce a distribution off it.
+    if (userFeeTransfers.length === 0) {
+      throw new Error(
+        "No user fee transfers found for this period. Check that config.telToken matches the token " +
+          "AmirX actually collects fees in, that data/amirXs.ts is current, and that the block range " +
+          "is correct.",
+      );
+    }
 
     console.log("Fetching onchain data for eligible (staked) users");
     const [eligibleStakerSwaps, addressToRewardDatas] =
@@ -255,7 +269,6 @@ export class StakerIncentivesCalculator implements ICalculator<UserRewardEntry> 
   ): Promise<[UserFeeSwap[], Map<Address, OnchainRewardData[]>]> {
     const addressToOnchainRewardDatas = new Map<Address, OnchainRewardData[]>();
 
-    // note that this entire block could be replaced with a solidity checkpoint reading function on the StakingModule
     let eligibleUserFeeSwaps: UserFeeSwap[][] = await Promise.all(
       // map over all chains, delineated by staking modules
       this._stakingModules.map(async (currentChainStakingModule) => {
@@ -273,37 +286,24 @@ export class StakerIncentivesCalculator implements ICalculator<UserRewardEntry> 
           (issuanceHistory) => issuanceHistory.chain === currentChain,
         );
 
-        // fetch `StakingModule::StakeChanged()` events to identify lowest stake balance during period and update rewardDatas
-        const stakeChangedAbiItem = getAbiItem({
-          abi: currentChainStakingModule.abi,
-          name: "StakeChanged",
-        });
-        // create set to filter stake changed events for those including users or referrers
+        // every account that appears in a swap, as either the wallet or the referrer
         const accountsOfInterest = new Set<Address>();
         userFeeSwaps.map((swap) => {
           accountsOfInterest.add(swap.userAddress);
         });
+        accountsOfInterest.delete(zeroAddress);
 
-        const stakeChangedEvents = await this.fetchStakeChangedEvents(
+        const accountToAverageStake = await this.calculateAvgStakedAmountsPerAccount(
           client,
           currentChainStakingModule.address,
-          stakeChangedAbiItem as AbiEvent,
-          { account: Array.from(accountsOfInterest) },
+          Array.from(accountsOfInterest),
           this._startBlocks[currentChain]!,
           this._endBlocks[currentChain]!,
         );
 
-        const accountToAverageStake =
-          await this.CalculateAvgStakedAmountsPerAccount(
-            stakeChangedEvents,
-            this._startBlocks[currentChain]!,
-            this._endBlocks[currentChain]!,
-          );
-
         return await this.processUserFeeSwaps(
           userFeeSwaps,
           client,
-          currentChainStakingModule.address,
           currentChainTanIssuanceHistory!.address,
           addressToOnchainRewardDatas,
           accountToAverageStake,
@@ -314,66 +314,127 @@ export class StakerIncentivesCalculator implements ICalculator<UserRewardEntry> 
     return [eligibleUserFeeSwaps.flat(), addressToOnchainRewardDatas];
   }
 
-  async CalculateAvgStakedAmountsPerAccount(
-    stakeChangedEvents: StakeChangedEvent[],
+  /**
+   * @dev Reads each account's full sTEL vote checkpoint history from the StakingModule and reduces it
+   * to a duration-weighted average stake over `[fromBlock, toBlock]`.
+   *
+   * The StakingModule keeps these checkpoints as contract storage, so this reads the same source
+   * `getPastVotes` resolves against rather than replaying logs. That avoids provider log-range
+   * limits entirely, and it means every account is measured the same way whether or not its stake
+   * happened to move during the period.
+   *
+   * @returns A map of account to its duration-weighted average stake. Accounts that held nothing
+   * across the whole period map to `0n`.
+   */
+  async calculateAvgStakedAmountsPerAccount(
+    client: PublicClient,
+    stakingModule: Address,
+    accounts: Address[],
     fromBlock: bigint,
     toBlock: bigint,
   ): Promise<Map<Address, bigint>> {
-    // populate a map of Address => newStakeAmount which will be used to skip RPC calls to `StakingModule::stakedByAt()`
-    const accountToLowestStake = new Map<Address, bigint>();
+    const accountToAverageStake = new Map<Address, bigint>();
 
-    // Group stakeChangedEvents by their `args.account`
-    const groupedStakeChangedEvents = stakeChangedEvents.reduce(
-      (grouped, event) => {
-        if (!grouped.has(event.account)) {
-          grouped.set(event.account, []);
-        }
-        grouped.get(event.account)!.push(event);
-        return grouped;
-      },
-      new Map<Address, typeof stakeChangedEvents>(),
+    const histories = await Promise.all(
+      accounts.map((account) =>
+        this.fetchVoteCheckpoints(client, account, stakingModule),
+      ),
     );
 
-    // Loop over the grouping and log account and its corresponding events
-    groupedStakeChangedEvents.forEach((events, account) => {
-      events.sort((a, b) => (a.blockNumber > b.blockNumber ? 1 : -1));
-
-      let lowestBlockNumber = fromBlock;
-
-      const stakedAmount: { blocks: bigint; stake: bigint }[] = [];
-      for (let i = 0; i < events.length; i++) {
-        stakedAmount.push({
-          blocks: events[i].blockNumber - lowestBlockNumber!,
-          stake: events[i].oldStake,
-        });
-
-        if (i == events.length - 1) {
-          stakedAmount.push({
-            blocks: toBlock! - events[i].blockNumber,
-            stake: events[i].newStake,
-          });
-        }
-
-        lowestBlockNumber = events[i].blockNumber;
-      }
-
-      // calculate the total number of blocks available in our period here.
-      const totalBlocks = (toBlock ?? 0n) - (fromBlock ?? 0n);
-
-      // Calculate the total staked amount weighted by the duration for each stake period
-      let totalWeightedStake = 0n;
-
-      stakedAmount.forEach(({ blocks, stake }) => {
-        totalWeightedStake += stake * blocks;
-      });
-
-      // Calculate the average stake over the total duration and total blocks
-      const averageStakeOverTime = totalWeightedStake / totalBlocks;
-
-      accountToLowestStake.set(account, averageStakeOverTime);
+    accounts.forEach((account, i) => {
+      accountToAverageStake.set(
+        account,
+        this.durationWeightedStake(histories[i], fromBlock, toBlock),
+      );
     });
 
-    return accountToLowestStake;
+    return accountToAverageStake;
+  }
+
+  /**
+   * @dev Reduces a checkpoint history to the average stake held across `[fromBlock, toBlock]`,
+   * weighting each stake level by the number of blocks it was in effect for.
+   *
+   * A checkpoint at block `k` with value `v` means the account held `v` from block `k` onward, so
+   * the opening balance is the newest checkpoint at or before `fromBlock`, and checkpoints after
+   * `toBlock` are ignored.
+   */
+  durationWeightedStake(
+    checkpoints: VoteCheckpoint[],
+    fromBlock: bigint,
+    toBlock: bigint,
+  ): bigint {
+    const ordered = [...checkpoints].sort((a, b) =>
+      a.blockNumber === b.blockNumber
+        ? 0
+        : a.blockNumber < b.blockNumber
+          ? -1
+          : 1,
+    );
+
+    // stake in effect at the start of the period
+    let currentStake = 0n;
+    for (const checkpoint of ordered) {
+      if (checkpoint.blockNumber > fromBlock) break;
+      currentStake = checkpoint.votes;
+    }
+
+    const totalBlocks = toBlock - fromBlock;
+    // a single-block period has no duration to weight by, so the opening balance is the answer
+    if (totalBlocks <= 0n) return currentStake;
+
+    let totalWeightedStake = 0n;
+    let cursor = fromBlock;
+    for (const checkpoint of ordered) {
+      if (checkpoint.blockNumber <= fromBlock) continue;
+      if (checkpoint.blockNumber > toBlock) break;
+
+      totalWeightedStake += currentStake * (checkpoint.blockNumber - cursor);
+      currentStake = checkpoint.votes;
+      cursor = checkpoint.blockNumber;
+    }
+    totalWeightedStake += currentStake * (toBlock - cursor);
+
+    return totalWeightedStake / totalBlocks;
+  }
+
+  /**
+   * @dev Reads every sTEL vote checkpoint recorded for `account`.
+   *
+   * `numCheckpoints` and `checkpoints` are the standard `ERC20Votes` accessors. The client batches
+   * concurrent reads into multicalls, so the per-entry reads collapse into a small number of
+   * requests.
+   */
+  async fetchVoteCheckpoints(
+    client: PublicClient,
+    account: Address,
+    stakingModule: Address,
+  ): Promise<VoteCheckpoint[]> {
+    // A failed read must not be reported as "no stake". That would silently drop the account's
+    // reward cap to zero and pay it nothing, so let the error abort the period instead.
+    const numCheckpoints = await client.readContract({
+      address: stakingModule,
+      abi: StakingModuleAbi,
+      functionName: "numCheckpoints",
+      args: [account],
+    });
+
+    const positions = Array.from({ length: Number(numCheckpoints) }, (_, i) => i);
+    const checkpoints = await Promise.all(
+      positions.map((pos) =>
+        client.readContract({
+          address: stakingModule,
+          abi: StakingModuleAbi,
+          functionName: "checkpoints",
+          args: [account, pos],
+        }),
+      ),
+    );
+
+    return checkpoints.map((checkpoint) => ({
+      blockNumber: BigInt(checkpoint._key),
+      votes: BigInt(checkpoint._value),
+    }));
   }
 
   /**
@@ -384,7 +445,6 @@ export class StakerIncentivesCalculator implements ICalculator<UserRewardEntry> 
   private async processUserFeeSwaps(
     userFeeSwaps: UserFeeSwap[],
     client: PublicClient,
-    stakingModuleContract: Address,
     tanIssuanceHistory: Address,
     addressToOnchainRewardDatas: Map<Address, OnchainRewardData[]>,
     accountToAverageStake: Map<Address, bigint>,
@@ -405,7 +465,6 @@ export class StakerIncentivesCalculator implements ICalculator<UserRewardEntry> 
         const userEligible = await this.processAddress(
           userFeeSwap.userAddress,
           client,
-          stakingModuleContract,
           tanIssuanceHistory,
           addressToOnchainRewardDatas,
           accountToAverageStake,
@@ -420,15 +479,13 @@ export class StakerIncentivesCalculator implements ICalculator<UserRewardEntry> 
 
   /**
    * @returns True if the `UserFeeSwap` user is eligible for rewards and was successfully processed; else false
-   * @dev Checks whether onchain data, ie stake and cumulative rewards, has already been fetched for given `address`
-   * If not, cross reference `address` against known stake changes previously detected from `StakeChanged` events
-   * If a change in stake for `address` was emitted, stake is known so only fetch cumulative rewards and return true
-   * If no stake change was emitted, fetch the stake. If 0, return false. If > 0, fetch cumulative rewards and return true
+   * @dev An account is eligible when it held stake at some point during the period, which is exactly
+   * when its duration-weighted average stake is nonzero. That average is already known for every
+   * account of interest, so the only remaining read is the account's prior cumulative rewards.
    */
   private async processAddress(
     address: Address,
     client: PublicClient,
-    stakingModuleContract: Address,
     tanIssuanceHistory: Address,
     addressToOnchainRewardDatas: Map<Address, OnchainRewardData[]>,
     accountToAverageStake: Map<Address, bigint>,
@@ -447,68 +504,29 @@ export class StakerIncentivesCalculator implements ICalculator<UserRewardEntry> 
       return true;
     }
 
-    // query `TANIssuanceHistory` contract with period's start block so runs on settled periods
-    // return cumulative rewards for this period's pre-settlement value and not the next period's
+    const averageStake = accountToAverageStake.get(address) ?? 0n;
+    // ignore addresses that are not staked; they are not eligible so their cumulative rewards are irrelevant
+    if (averageStake === 0n) return false;
+
+    // query `TANIssuanceHistory` one block before the period ends so that re-running a settled period
+    // returns this period's pre-settlement value rather than the next period's
     const currentChainEndBlock = this._endBlocks[chainId]! - 1n;
-    const existingAverageStake = accountToAverageStake.get(address);
-    // check whether the account's lowest stake for the period was detected from `StakeChanged` events
-    if (existingAverageStake) {
-      // if nonzero lowest stake was identified by `StakeChanged` events, only fetch cumulative rewards
-      const prevCumulativeRewards = await this.fetchCumulativeRewardsAtBlock(
-        client,
-        address,
-        currentChainEndBlock,
-        tanIssuanceHistory,
-      );
-      addressToOnchainRewardDatas.set(address, [
-        {
-          chain: chainId,
-          userStake: existingAverageStake!,
-          prevCumulativeRewards: prevCumulativeRewards,
-        },
-      ]);
+    const prevCumulativeRewards = await this.fetchCumulativeRewardsAtBlock(
+      client,
+      address,
+      currentChainEndBlock,
+      tanIssuanceHistory,
+    );
+    addressToOnchainRewardDatas.set(address, [
+      {
+        chain: chainId,
+        userStake: averageStake,
+        prevCumulativeRewards: prevCumulativeRewards,
+      },
+    ]);
 
-      // no more RPC calls necessary when the account's lowest stake was discerned from `StakeChanged` events
-      // in which case this function is being invoked for a `UserFeeSwap` that should be processed
-      return true;
-    } else {
-      // account's stake did not emit a change event during the period so it must be fetched
-      console.log(
-        `No StakeChanged events during period for ${address}, fetching from StakingModule`,
-      );
-      const stake = await this.fetchStake(
-        client,
-        address,
-        currentChainEndBlock,
-        stakingModuleContract,
-      );
-
-      // ignore addresses that are not staked; they are not eligible so their cumulative rewards are irrelevant
-      if (stake !== 0n) {
-        console.log(
-          `Nonzero stake returned for ${address}: ${stake} TEL, fetching cumulative rewards`,
-        );
-        const prevCumulativeRewards = await this.fetchCumulativeRewardsAtBlock(
-          client,
-          address,
-          currentChainEndBlock,
-          tanIssuanceHistory,
-        );
-        addressToOnchainRewardDatas.set(address, [
-          {
-            chain: chainId,
-            userStake: stake,
-            prevCumulativeRewards: prevCumulativeRewards,
-          },
-        ]);
-
-        // address is eligible (ie staked) and has been processed (ie added to `addressToOnchainRewardDatas`)
-        return true;
-      }
-    }
-
-    // address did not meet eligibility criteria
-    return false;
+    // address is eligible (ie staked) and has been processed (ie added to `addressToOnchainRewardDatas`)
+    return true;
   }
 
   /**
@@ -595,89 +613,20 @@ export class StakerIncentivesCalculator implements ICalculator<UserRewardEntry> 
     stakerFeeTotalsMap.set(address, feeTotals);
   }
 
-  async fetchStakeChangedEvents(
-    client: PublicClient,
-    stakingModuleAddress: Address,
-    stakeChangedEvent: AbiEvent,
-    args: { account: Address[] },
-    startBlock: bigint,
-    endBlock: bigint,
-  ): Promise<StakeChangedEvent[]> {
-    const loggedEvents: GetLogsReturnType<
-      AbiEvent,
-      [AbiEvent],
-      undefined,
-      bigint | undefined,
-      bigint | undefined
-    > = await client.getLogs({
-      address: stakingModuleAddress,
-      event: stakeChangedEvent,
-      args: args,
-      fromBlock: startBlock,
-      toBlock: endBlock,
-    });
-
-    return loggedEvents.map((event) => {
-      const { account, oldStake, newStake } = event.args as {
-        account: Address;
-        oldStake: bigint;
-        newStake: bigint;
-      };
-
-      return {
-        blockNumber: event.blockNumber,
-        account: account,
-        oldStake: oldStake,
-        newStake: newStake,
-      } as StakeChangedEvent;
-    });
-  }
-
-  async fetchStake(
-    client: PublicClient,
-    userAddress: Address,
-    endBlock: bigint,
-    stakingModule: Address,
-  ): Promise<bigint> {
-    try {
-      const currentlyStaked = await client.readContract({
-        address: stakingModule,
-        abi: StakingModuleAbi,
-        functionName: "stakedByAt",
-        args: [userAddress, endBlock],
-      });
-
-      return currentlyStaked;
-    } catch (err) {
-      // log error to console but don't panic at this point
-      console.error(`Error fetching stake for user ${userAddress}`, err);
-      return 0n;
-    }
-  }
-
   async fetchCumulativeRewardsAtBlock(
     client: PublicClient,
     userAddress: Address,
     endBlock: bigint,
     tanIssuanceHistory: Address,
   ): Promise<bigint> {
-    try {
-      const prevCumulativeRewards = await client.readContract({
-        address: tanIssuanceHistory,
-        abi: TanIssuanceHistoryAbi,
-        functionName: "cumulativeRewardsAtBlock",
-        args: [userAddress, endBlock],
-      });
-
-      return prevCumulativeRewards;
-    } catch (err) {
-      // log error to console but don't panic at this point
-      console.error(
-        `Error fetching cumulativeRewards for user ${userAddress} at block ${endBlock}`,
-        err,
-      );
-      return 0n;
-    }
+    // A failed read must not be reported as zero prior rewards. That would lift the account's reward
+    // cap to its full stake and overpay it, so let the error abort the period instead.
+    return await client.readContract({
+      address: tanIssuanceHistory,
+      abi: TanIssuanceHistoryAbi,
+      functionName: "cumulativeRewardsAtBlock",
+      args: [userAddress, endBlock],
+    });
   }
 
   /**

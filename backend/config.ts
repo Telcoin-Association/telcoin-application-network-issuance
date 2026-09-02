@@ -1,8 +1,16 @@
 import * as dotenv from "dotenv";
 dotenv.config();
 
-import { Address, getAddress } from "viem";
+import { Address, getAddress, zeroAddress } from "viem";
 import { base, mainnet, polygon } from "viem/chains";
+
+/**
+ * TelcoinV3 on Polygon, the reward token TAN issuance settles in after the V3 cutover.
+ *
+ * TODO: fill in once TelcoinV3 is deployed to Polygon. `assertTelTokensConfigured` rejects a period
+ * run while this is unset, so an unconfigured value cannot silently produce an empty reward set.
+ */
+const POLYGON_TEL_V3: Address = zeroAddress;
 
 // TODO: add Telcoin Network to the list of supported chains and to the ChainId enum
 // see: https://viem.sh/docs/clients/chains.html#build-your-own
@@ -33,7 +41,8 @@ export const config = {
   incentivesAmounts: {
     telcoinNetworkGasFeesIncentivesAmount: 100000000n,
     developerIncentivesAmount: 100000000n,
-    stakerIncentivesAmount: 320512820n,
+    // 3,205,128.20 TEL per period, denominated in the 18-decimal reward token
+    stakerIncentivesAmount: 320512820n * 10n ** 16n,
   },
   simplePlugins: {
     // list of SimplePlugins, for use with the DeveloperIncentivesCalculator
@@ -57,8 +66,8 @@ export const config = {
   },
   telToken: {
     [ChainId.Polygon]: {
-      address: getAddress("0xdF7837DE1F2Fa4631D716CF2502f8b230F1dcc32"),
-      decimals: 2n,
+      address: POLYGON_TEL_V3,
+      decimals: 18n,
       chain: ChainId.Polygon,
     },
     [ChainId.Mainnet]: {
@@ -71,7 +80,39 @@ export const config = {
       address: getAddress(""), // use WTEL
       decimals: 2n,
       chain: ChainId.TelcoinNetwork,
-    }, 
+    },
    */
   },
 } as const;
+
+/**
+ * The TEL token for a chain, or a thrown error if that chain has none configured.
+ *
+ * `ChainId` covers more chains than TEL is deployed on, so indexing `config.telToken` directly with
+ * an arbitrary `ChainId` is not type-safe.
+ */
+export function telTokenFor(chain: ChainId): Token {
+  const token = (config.telToken as Partial<Record<ChainId, Token>>)[chain];
+  if (token === undefined) {
+    throw new Error(`No TEL token is configured for chain ${chain}`);
+  }
+
+  return token;
+}
+
+/**
+ * Throws unless every configured TEL token has a real address behind it.
+ *
+ * Called at the start of a period run so that an unconfigured deployment fails immediately rather
+ * than silently matching zero transfers and producing an empty reward set.
+ */
+export function assertTelTokensConfigured(): void {
+  for (const token of Object.values(config.telToken) as Token[]) {
+    if (token.address === zeroAddress) {
+      throw new Error(
+        `TEL token address for chain ${token.chain} is unset. ` +
+          `Populate it in backend/config.ts from the deployment before running a period.`,
+      );
+    }
+  }
+}
