@@ -1,0 +1,791 @@
+{
+  "blockRanges": [
+    {
+      "network": "polygon",
+      "startBlock": "93471312",
+      "endBlock": "93874511"
+    }
+  ],
+  "stakerIncentives": [
+    {
+      "address": "0x426d787930A93314048488c4D10946FCeD265Cc7",
+      "reward": "4504655",
+      "metadata": {
+        "uncappedAmount": "20109151",
+        "stakeCapAmount": "10775880329",
+        "fees": "4504655",
+        "refereeFees": "0"
+      }
+    },
+    {
+      "address": "0x4994A7059A2921398780818c203F83613A9Bf743",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "20109151",
+        "stakeCapAmount": "9850875942",
+        "fees": "0",
+        "refereeFees": "4504655"
+      }
+    },
+    {
+      "address": "0x75485F16369524930e3c331BF56eEDb98B7C8352",
+      "reward": "11531880",
+      "metadata": {
+        "uncappedAmount": "51479263",
+        "stakeCapAmount": "213097479",
+        "fees": "11531880",
+        "refereeFees": "0"
+      }
+    },
+    {
+      "address": "0xB51e05e0F9b9a22D714fC181aBA3a43d79d728bB",
+      "reward": "1952",
+      "metadata": {
+        "uncappedAmount": "8713",
+        "stakeCapAmount": "1674539988",
+        "fees": "1952",
+        "refereeFees": "0"
+      }
+    },
+    {
+      "address": "0x033047D46C9dD342b21274a0f328DD04c3ABa9b7",
+      "reward": "61869",
+      "metadata": {
+        "uncappedAmount": "284902",
+        "stakeCapAmount": "1303123814",
+        "fees": "61869",
+        "refereeFees": "1952"
+      }
+    },
+    {
+      "address": "0x79622cD63ff61A74613fAFB805B7f32D3cf78A95",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "13308394",
+        "stakeCapAmount": "55111987",
+        "fees": "0",
+        "refereeFees": "2981216"
+      }
+    },
+    {
+      "address": "0xDe113Cfea35386619bB00AD4B84130b22222c742",
+      "reward": "41494",
+      "metadata": {
+        "uncappedAmount": "1959192",
+        "stakeCapAmount": "1191049416",
+        "fees": "41494",
+        "refereeFees": "397385"
+      }
+    },
+    {
+      "address": "0x212A3caD6d1572C706959d2aeF63071e61914bf2",
+      "reward": "145178",
+      "metadata": {
+        "uncappedAmount": "648086",
+        "stakeCapAmount": "1356131860",
+        "fees": "145178",
+        "refereeFees": "0"
+      }
+    },
+    {
+      "address": "0xfC433E52b109b00c9e9f9532Da4a1B94a873A3a8",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "276188",
+        "stakeCapAmount": "415825352",
+        "fees": "0",
+        "refereeFees": "61869"
+      }
+    },
+    {
+      "address": "0x1C0357bBaeC65A3f909490A8b2150323710a3d81",
+      "reward": "8079488",
+      "metadata": {
+        "uncappedAmount": "36067500",
+        "stakeCapAmount": "1538676673",
+        "fees": "8079488",
+        "refereeFees": "0"
+      }
+    },
+    {
+      "address": "0xf0a8596541F839EBcC9f0A9d1442c15f43A2836E",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "36067500",
+        "stakeCapAmount": "1159903",
+        "fees": "0",
+        "refereeFees": "8079488"
+      }
+    },
+    {
+      "address": "0xaB851DBd7b470252D76C725411143d12aCd2adCB",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "290571",
+        "stakeCapAmount": "119399493",
+        "fees": "0",
+        "refereeFees": "65091"
+      }
+    },
+    {
+      "address": "0x82983a034CD8811b62fbdEcDEb300b46947fCC45",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "141779",
+        "stakeCapAmount": "0",
+        "fees": "31760",
+        "refereeFees": "0"
+      }
+    },
+    {
+      "address": "0x856D87821a75300c8e5e61fAa718065aEe7FE719",
+      "reward": "1918076",
+      "metadata": {
+        "uncappedAmount": "8562449",
+        "stakeCapAmount": "1143543029",
+        "fees": "1918076",
+        "refereeFees": "0"
+      }
+    },
+    {
+      "address": "0x27dF802924227b28Ad0Bec076Bd7f1D223441bF5",
+      "reward": "63845",
+      "metadata": {
+        "uncappedAmount": "285009",
+        "stakeCapAmount": "504767397",
+        "fees": "63845",
+        "refereeFees": "0"
+      }
+    },
+    {
+      "address": "0x2e9Ba451A457f10c4737C4d3B2a16db225153B84",
+      "reward": "37367",
+      "metadata": {
+        "uncappedAmount": "166809",
+        "stakeCapAmount": "26924528",
+        "fees": "37367",
+        "refereeFees": "0"
+      }
+    },
+    {
+      "address": "0x53C6e0a07c85E770DF8096cd983622E615D49aE8",
+      "reward": "30543",
+      "metadata": {
+        "uncappedAmount": "136346",
+        "stakeCapAmount": "58537884",
+        "fees": "30543",
+        "refereeFees": "0"
+      }
+    },
+    {
+      "address": "0xd9C0e53199290dF3BFB223033f3eb6C16429af0e",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "2230782",
+        "stakeCapAmount": "471564146",
+        "fees": "0",
+        "refereeFees": "499718"
+      }
+    },
+    {
+      "address": "0x504F50c26c0012C07D2aa3Eb94DFDAADed6fAFCd",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "10937002",
+        "stakeCapAmount": "0",
+        "fees": "2450000",
+        "refereeFees": "0"
+      }
+    },
+    {
+      "address": "0xbdAb516d352Adf142207EA2F7749c4a7e0543a55",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "10937002",
+        "stakeCapAmount": "981966260",
+        "fees": "0",
+        "refereeFees": "2450000"
+      }
+    },
+    {
+      "address": "0x18fc6c299B7aA35C8f59537b4b67c23D93E782ea",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "2439924",
+        "stakeCapAmount": "2871405736",
+        "fees": "0",
+        "refereeFees": "546568"
+      }
+    },
+    {
+      "address": "0x8fa6e6dB6B86d0Cad2fa8DeEb737BC1cB97a2bE1",
+      "reward": "19133",
+      "metadata": {
+        "uncappedAmount": "85411",
+        "stakeCapAmount": "58333126",
+        "fees": "19133",
+        "refereeFees": "0"
+      }
+    },
+    {
+      "address": "0x8364044ee8062F0F6C9835f7dfC26da4CE433BB8",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "713771",
+        "stakeCapAmount": "583472777",
+        "fees": "0",
+        "refereeFees": "159892"
+      }
+    },
+    {
+      "address": "0x9C0557216e919eDaCCc56037c66A5fAC1D41D82a",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "142212",
+        "stakeCapAmount": "12129986",
+        "fees": "0",
+        "refereeFees": "31857"
+      }
+    },
+    {
+      "address": "0x9342fD3f10101019Cf9e6774640957fa1d7A78B2",
+      "reward": "287367",
+      "metadata": {
+        "uncappedAmount": "1282829",
+        "stakeCapAmount": "2793427747",
+        "fees": "287367",
+        "refereeFees": "0"
+      }
+    },
+    {
+      "address": "0x94B72396b6B40e19C2a04c28c8aE93dE08b12733",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "9914481",
+        "stakeCapAmount": "0",
+        "fees": "0",
+        "refereeFees": "2220945"
+      }
+    },
+    {
+      "address": "0x7011467e458B4cEEED928bac3E178Ce7EB892F2d",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "19201523",
+        "stakeCapAmount": "481762118",
+        "fees": "0",
+        "refereeFees": "4301337"
+      }
+    },
+    {
+      "address": "0x9D89f9451C4B7e04bd58616dbC72e924088AFF21",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "501990",
+        "stakeCapAmount": "86584464",
+        "fees": "0",
+        "refereeFees": "112451"
+      }
+    },
+    {
+      "address": "0x47502539673c93B2ACDC9059B36360f76D3548BB",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "5694959",
+        "stakeCapAmount": "172696518",
+        "fees": "0",
+        "refereeFees": "1275729"
+      }
+    },
+    {
+      "address": "0x99D5f1d103A892A191aCF6897CE4b65f2F627a28",
+      "reward": "140759",
+      "metadata": {
+        "uncappedAmount": "628359",
+        "stakeCapAmount": "1498002873",
+        "fees": "140759",
+        "refereeFees": "0"
+      }
+    },
+    {
+      "address": "0xeBcbB6cA583C59957535F65E1410b6779A204123",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "16007204",
+        "stakeCapAmount": "2500000",
+        "fees": "0",
+        "refereeFees": "3585777"
+      }
+    },
+    {
+      "address": "0xF1ea664AbbA3452bc6cA6B289a6059613855805B",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "648086",
+        "stakeCapAmount": "571839410",
+        "fees": "0",
+        "refereeFees": "145178"
+      }
+    },
+    {
+      "address": "0x5Fc4faF3934548c57d66f1179C2991cEd028E61F",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "862215",
+        "stakeCapAmount": "86437753",
+        "fees": "0",
+        "refereeFees": "193145"
+      }
+    },
+    {
+      "address": "0xcC333A0d55395f7cABD42793850D4ea5B32E1D78",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "3443173",
+        "stakeCapAmount": "2373179031",
+        "fees": "0",
+        "refereeFees": "771306"
+      }
+    },
+    {
+      "address": "0xbc033B95321dBe1183817F73012Ff4c0091E125d",
+      "reward": "29892",
+      "metadata": {
+        "uncappedAmount": "133440",
+        "stakeCapAmount": "113422",
+        "fees": "29892",
+        "refereeFees": "0"
+      }
+    },
+    {
+      "address": "0xeBB36F543A6c3E09a06c937E86fB0930a6EdA151",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "126971",
+        "stakeCapAmount": "3305160692",
+        "fees": "0",
+        "refereeFees": "28443"
+      }
+    },
+    {
+      "address": "0xd2938A7fCa560A5b6630aaf12d817E5f146cddA4",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "576821",
+        "stakeCapAmount": "337608221",
+        "fees": "0",
+        "refereeFees": "129214"
+      }
+    },
+    {
+      "address": "0xA271d7ad0ce0b28cdc464dfD5F3A66B4d55B5Acc",
+      "reward": "97949",
+      "metadata": {
+        "uncappedAmount": "437252",
+        "stakeCapAmount": "9287964",
+        "fees": "97949",
+        "refereeFees": "0"
+      }
+    },
+    {
+      "address": "0xE3c3CD768EF78506A37144Ce83b1f34af56A89D5",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "437252",
+        "stakeCapAmount": "9569397",
+        "fees": "0",
+        "refereeFees": "97949"
+      }
+    },
+    {
+      "address": "0x77940861e000BfC8A8f67440ad21656B9e7dbA04",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "268594",
+        "stakeCapAmount": "0",
+        "fees": "0",
+        "refereeFees": "60168"
+      }
+    },
+    {
+      "address": "0x672D0521540968C1915bD2f7eFb9de940b544D29",
+      "reward": "57016",
+      "metadata": {
+        "uncappedAmount": "254524",
+        "stakeCapAmount": "2498918906",
+        "fees": "57016",
+        "refereeFees": "0"
+      }
+    },
+    {
+      "address": "0x430cB4360cE341a6Ad0Dfa18b9aD1Ae2cFa9AD18",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "254524",
+        "stakeCapAmount": "43119922",
+        "fees": "0",
+        "refereeFees": "57016"
+      }
+    },
+    {
+      "address": "0x44dDf2A9375EF552A77973588E3964b9BBBe8191",
+      "reward": "1516525",
+      "metadata": {
+        "uncappedAmount": "6769892",
+        "stakeCapAmount": "38267887",
+        "fees": "1516525",
+        "refereeFees": "0"
+      }
+    },
+    {
+      "address": "0x681ee9C08368ED5e30519f146cF3A27b24471Dc6",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "6769892",
+        "stakeCapAmount": "0",
+        "fees": "0",
+        "refereeFees": "1516525"
+      }
+    },
+    {
+      "address": "0x51736C7E9588A135E2b3BaC0338F3c4a0253b6e9",
+      "reward": "31867",
+      "metadata": {
+        "uncappedAmount": "142256",
+        "stakeCapAmount": "99862422",
+        "fees": "31867",
+        "refereeFees": "0"
+      }
+    },
+    {
+      "address": "0x26763e975D773f46E8bA6AF80C09D9C90A07E14D",
+      "reward": "50376",
+      "metadata": {
+        "uncappedAmount": "788990",
+        "stakeCapAmount": "496864837",
+        "fees": "50376",
+        "refereeFees": "126366"
+      }
+    },
+    {
+      "address": "0x71c951E44E3D907dfa99D590cd7e6A235190dff4",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "224882",
+        "stakeCapAmount": "898513934",
+        "fees": "0",
+        "refereeFees": "50376"
+      }
+    },
+    {
+      "address": "0xDd7e4E36199cC322cb61758F13708b3bC95A688c",
+      "reward": "30904",
+      "metadata": {
+        "uncappedAmount": "137958",
+        "stakeCapAmount": "98701441",
+        "fees": "30904",
+        "refereeFees": "0"
+      }
+    },
+    {
+      "address": "0x4CaFc8E23616346de04DE62174B1e615D8E80c70",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "14806616",
+        "stakeCapAmount": "40477360",
+        "fees": "0",
+        "refereeFees": "3316833"
+      }
+    },
+    {
+      "address": "0x46d47D232d27bdF83FEA707ffd9Ce3e175B2D1dE",
+      "reward": "15832",
+      "metadata": {
+        "uncappedAmount": "70675",
+        "stakeCapAmount": "86417504",
+        "fees": "15832",
+        "refereeFees": "0"
+      }
+    },
+    {
+      "address": "0x48A7209DD07Bc7409bF3f61820E1Ee9409F462e9",
+      "reward": "19285",
+      "metadata": {
+        "uncappedAmount": "86089",
+        "stakeCapAmount": "38461855",
+        "fees": "19285",
+        "refereeFees": "0"
+      }
+    },
+    {
+      "address": "0xCdDca3b68166cB76442B5D69cB6B800fD7fc67c0",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "774174",
+        "stakeCapAmount": "1384940127",
+        "fees": "0",
+        "refereeFees": "173423"
+      }
+    },
+    {
+      "address": "0xc45baFB9E7C0e99dE9eD0383470254056a0AE21e",
+      "reward": "126366",
+      "metadata": {
+        "uncappedAmount": "564108",
+        "stakeCapAmount": "59728432",
+        "fees": "126366",
+        "refereeFees": "0"
+      }
+    },
+    {
+      "address": "0xb9311fa41ABE8b7eb4c962113664749CED864748",
+      "reward": "158459",
+      "metadata": {
+        "uncappedAmount": "707374",
+        "stakeCapAmount": "99221785",
+        "fees": "158459",
+        "refereeFees": "0"
+      }
+    },
+    {
+      "address": "0x62Ff55e86d95A460a661929d6D125139bB7DCF7b",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "1412315",
+        "stakeCapAmount": "83422132",
+        "fees": "0",
+        "refereeFees": "316373"
+      }
+    },
+    {
+      "address": "0x0D9692C297c0C72dD94a8614141B4bF8A2398d3E",
+      "reward": "157914",
+      "metadata": {
+        "uncappedAmount": "704941",
+        "stakeCapAmount": "97096125",
+        "fees": "157914",
+        "refereeFees": "0"
+      }
+    },
+    {
+      "address": "0xd19d505d3618A142E85bd1A2A8C0878cD2b1089d",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "40926",
+        "stakeCapAmount": "0",
+        "fees": "0",
+        "refereeFees": "9168"
+      }
+    },
+    {
+      "address": "0x3E19a28308585b842974317f2198A1f4f720EF85",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "279924",
+        "stakeCapAmount": "994415075",
+        "fees": "0",
+        "refereeFees": "62706"
+      }
+    },
+    {
+      "address": "0x746F83FF7eAdA9d0fB03DbAbcAF2600ee513DCDB",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "2583993",
+        "stakeCapAmount": "484582913",
+        "fees": "0",
+        "refereeFees": "578841"
+      }
+    },
+    {
+      "address": "0xe9052daAC8667a27B38369aD37BEE63A8CD80Fc7",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "849706",
+        "stakeCapAmount": "236480612",
+        "fees": "0",
+        "refereeFees": "190343"
+      }
+    },
+    {
+      "address": "0x11C3498d0D70BBfCdAa8dA275d7dDEb7BF977137",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "285009",
+        "stakeCapAmount": "135454191",
+        "fees": "0",
+        "refereeFees": "63845"
+      }
+    },
+    {
+      "address": "0x6125f56E1a0939B72eC7D78791F7939E0faC5CA9",
+      "reward": "31640",
+      "metadata": {
+        "uncappedAmount": "141243",
+        "stakeCapAmount": "2495431578",
+        "fees": "31640",
+        "refereeFees": "0"
+      }
+    },
+    {
+      "address": "0x2c7771aCC47795D2F05Ed29C8c17e8887e49fda7",
+      "reward": "30542",
+      "metadata": {
+        "uncappedAmount": "136342",
+        "stakeCapAmount": "129694332",
+        "fees": "30542",
+        "refereeFees": "0"
+      }
+    },
+    {
+      "address": "0x23ac940D8098674DE7D2d86B4264C1eB892Fe4AD",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "136342",
+        "stakeCapAmount": "108938936",
+        "fees": "0",
+        "refereeFees": "30542"
+      }
+    },
+    {
+      "address": "0x84E4F13636D3D15e79CCCC6d7daC2d71eE3503bF",
+      "reward": "870",
+      "metadata": {
+        "uncappedAmount": "3883",
+        "stakeCapAmount": "24627604",
+        "fees": "870",
+        "refereeFees": "0"
+      }
+    },
+    {
+      "address": "0xa63C9B5F146391A5572d2445a4dEFd67554ce7d5",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "3883",
+        "stakeCapAmount": "149070963",
+        "fees": "0",
+        "refereeFees": "870"
+      }
+    },
+    {
+      "address": "0xA2cfCc9E68d9138ED4eacF9b7E2141D9B41C6eCF",
+      "reward": "1778",
+      "metadata": {
+        "uncappedAmount": "7937",
+        "stakeCapAmount": "199841830",
+        "fees": "1778",
+        "refereeFees": "0"
+      }
+    },
+    {
+      "address": "0x48f5880a56dC2b8e123aB8CddD58521631332e36",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "7937",
+        "stakeCapAmount": "999505706",
+        "fees": "0",
+        "refereeFees": "1778"
+      }
+    },
+    {
+      "address": "0x02CEc8b3E5DB75907C2DeE0E7d77C2304F76F55f",
+      "reward": "9566",
+      "metadata": {
+        "uncappedAmount": "42703",
+        "stakeCapAmount": "2373560",
+        "fees": "9566",
+        "refereeFees": "0"
+      }
+    },
+    {
+      "address": "0x7223B8615036db8C2A959af80bcB41E5C2f42a65",
+      "reward": "32147",
+      "metadata": {
+        "uncappedAmount": "143506",
+        "stakeCapAmount": "499635044",
+        "fees": "32147",
+        "refereeFees": "0"
+      }
+    },
+    {
+      "address": "0xc3480a870be941D8C3e1889df7bB085F7dF6DddD",
+      "reward": "675188",
+      "metadata": {
+        "uncappedAmount": "3014094",
+        "stakeCapAmount": "21506042",
+        "fees": "675188",
+        "refereeFees": "0"
+      }
+    },
+    {
+      "address": "0x231E89f21Da8d752262D42ad835B30D0Ee0aF8c5",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "36520",
+        "stakeCapAmount": "100314639",
+        "fees": "0",
+        "refereeFees": "8181"
+      }
+    },
+    {
+      "address": "0x9b771aB7e36Df66255bCfe56b56243AF1DAAEfB9",
+      "reward": "9901",
+      "metadata": {
+        "uncappedAmount": "44198",
+        "stakeCapAmount": "54804031",
+        "fees": "9901",
+        "refereeFees": "0"
+      }
+    },
+    {
+      "address": "0x5E914AF37Df5FdB017E5C33269D7c7a5CDdf539F",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "44198",
+        "stakeCapAmount": "99831331",
+        "fees": "0",
+        "refereeFees": "9901"
+      }
+    },
+    {
+      "address": "0x842f7174e906254a2b86a645DE939544c5FE4B50",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "147475",
+        "stakeCapAmount": "0",
+        "fees": "33036",
+        "refereeFees": "0"
+      }
+    },
+    {
+      "address": "0x0603709F92A47D5367Cc93f5b587A29fA286ADbB",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "147475",
+        "stakeCapAmount": "249954561",
+        "fees": "0",
+        "refereeFees": "33036"
+      }
+    },
+    {
+      "address": "0xdC2F100fCabBa1660d8714E2F15664488Ab4F25D",
+      "reward": "4206",
+      "metadata": {
+        "uncappedAmount": "18775",
+        "stakeCapAmount": "9531421",
+        "fees": "4206",
+        "refereeFees": "0"
+      }
+    },
+    {
+      "address": "0xe18eb23E296fe750c83a4c94F86D98B28Ed4E619",
+      "reward": "0",
+      "metadata": {
+        "uncappedAmount": "375246",
+        "stakeCapAmount": "1000000",
+        "fees": "0",
+        "refereeFees": "84059"
+      }
+    }
+  ]
+}
