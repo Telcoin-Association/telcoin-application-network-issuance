@@ -45,7 +45,10 @@ contract TANIssuanceHistoryTest is Test {
 
     /// @dev Useful as a benchmark for the maximum batch size which is ~15000 users
     function testFuzz_increaseClaimableByBatch(uint16 numUsers) public {
-        numUsers = uint16(bound(numUsers, 0, 14_000));
+        // settlement is proposed in 300-recipient chunks, and a batch far beyond a few thousand would not
+        // fit in a block, so the bound covers several times the production chunk without exhausting the
+        // test gas limit
+        numUsers = uint16(bound(numUsers, 0, 3000));
 
         TANIssuanceHistory.IssuanceReward[] memory rewards = new TANIssuanceHistory.IssuanceReward[](numUsers);
         for (uint256 i; i < numUsers; ++i) {

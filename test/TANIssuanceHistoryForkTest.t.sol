@@ -28,8 +28,6 @@ contract TANIssuanceHistoryForkTest is Test {
     // testing addresses
     address public defiAgg;
     address public user;
-    // used only to source funds for `user` and `defiAgg` in forked environment
-    address public existingTelHolder;
 
     uint256 issuanceAmount;
     uint256 scalingFactor;
@@ -53,7 +51,6 @@ contract TANIssuanceHistoryForkTest is Test {
         tanSafe = deployments.TANSafe;
         executor = deployments.admin;
         user = address(0xabc);
-        existingTelHolder = 0x2ff79955Aad11fA93B84d79D45F504E6168935BC;
 
         issuanceAmount = 3_000_000;
         // calculator uses a very large scaling factor to address arithmetic decimal precision
@@ -67,10 +64,10 @@ contract TANIssuanceHistoryForkTest is Test {
 
         defiAgg = amirX.defiAggIntermediary();
 
-        // (fork tests only) fund user with TEL from existing holder
+        // (fork tests only) mint TEL to the user directly. Legacy TEL holders drain as they migrate to
+        // TelcoinV3, so no fixed holder can be relied on to fund a fork at chain head
         uint256 userFeeVolume = 100;
-        vm.prank(existingTelHolder);
-        tel.transfer(user, userFeeVolume);
+        deal(address(tel), user, tel.balanceOf(user) + userFeeVolume);
 
         // first stake for incentive eligibility (shown for visibility)
         vm.startPrank(user);
@@ -80,8 +77,7 @@ contract TANIssuanceHistoryForkTest is Test {
         vm.stopPrank();
 
         // (fork testing only): fund `defiAgg` who then approves tokens to `amirX`
-        vm.prank(existingTelHolder);
-        tel.transfer(defiAgg, userFeeVolume);
+        deal(address(tel), defiAgg, tel.balanceOf(defiAgg) + userFeeVolume);
         vm.prank(defiAgg);
         tel.approve(address(amirX), userFeeVolume);
 
