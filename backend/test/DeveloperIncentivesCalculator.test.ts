@@ -182,19 +182,18 @@ describe("DeveloperIncentivesCalculator", () => {
         simplePlugins,
         referralsPerDeveloper,
       } = await generateFakeData(10, 10, 10, 10);
+      // the fixture builds one block database per TEL chain, and the calculator requires a block
+      // bound for each, so derive both maps from the same list rather than naming chains here
+      const blockBounds = Object.fromEntries(
+        telChains.map((chain) => [chain, 1n])
+      ) as Partial<Record<ChainId, bigint>>;
       const calculator = new DeveloperIncentivesCalculator(
         blocksDbs,
         simplePlugins,
         executorRegistry,
         1_000_000n,
-        {
-          [ChainId.Polygon]: 1n,
-          [ChainId.Mainnet]: 1n,
-        },
-        {
-          [ChainId.Polygon]: 1n,
-          [ChainId.Mainnet]: 1n,
-        }
+        blockBounds,
+        blockBounds
       );
       const calculatedReferralsPerDeveloper =
         await calculator.calculateReferralsPerDeveloper();

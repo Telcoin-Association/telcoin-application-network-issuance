@@ -8,9 +8,9 @@ import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
  * @notice The subset of the V3 `SimplePlugin` surface that `TANIssuanceHistory` depends on.
  *
  * @dev `increaseClaimableBy` and `increaseClaimableByBatch` are `payable` because a plugin may pay
- * rewards in the chain's native asset, in which case it is funded through `msg.value`. TAN issuance
- * settles in TEL, so every call this repo makes passes zero value; `TANIssuanceHistory` rejects a
- * native-reward plugin outright.
+ * rewards in the chain's native asset, in which case it is funded through `msg.value` rather than by
+ * an approval the plugin pulls against. `TANIssuanceHistory` supports both rails and picks between
+ * them from `rewardToken()`.
  *
  * `rewardToken()` returns either an ERC-20 address or the native sentinel
  * `0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE`.

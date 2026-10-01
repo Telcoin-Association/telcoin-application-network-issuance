@@ -11,14 +11,26 @@ script = "script"
 solc = "0.8.26"
 src = "src"
 test = "test"
-libs = ["node_modules"]
+libs = ["node_modules", "lib"]
 fs_permissions = [
     { access = "read-write", path = "./deployments/deployments.json" },
+    { access = "read-write", path = "./deployments/eth-sepolia.json" },
+    # Safe parameter chunks emitted by `backend/buildBackfill.ts` and `backend/safeTxArrayBuilder.ts`,
+    # which the Safe operation scripts propose from
+    { access = "read", path = "./backend/temp" },
+    { access = "read", path = "./test/fixtures" },
 ]
 
 [profile.ci]
 fuzz = { runs = 10_000 }
 verbosity = 4
+
+# The live V3 staking contracts on Ethereum Sepolia were compiled for a post-Cancun target, so their
+# deployed bytecode carries Cancun opcodes (MCOPY in particular). Executing that bytecode against the
+# default shanghai target fails on an invalid opcode, so the Sepolia rehearsal tests and scripts run
+# under this profile instead. Cancun is the newest target solc 0.8.26 emits.
+[profile.sepolia]
+evm_version = "cancun"
 
 [fmt]
 bracket_spacing = true

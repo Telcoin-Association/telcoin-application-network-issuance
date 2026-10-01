@@ -7,7 +7,12 @@ import path, { join } from "path";
 import * as viem from "viem";
 import * as cliProgress from "cli-progress";
 import { readFile, writeFile } from "fs/promises";
-import { ChainId, config } from "./config";
+import {
+  chainIdForNetwork,
+  ChainId,
+  config,
+  period0StartBlocks,
+} from "./config";
 import { Address, getContract, PublicClient, zeroAddress } from "viem";
 import { tanIssuanceHistories } from "./data/tanIssuanceHistories";
 import { createHash, randomInt } from "crypto";
@@ -161,18 +166,20 @@ export interface NetworkConfig {
 export function parseAndSanitizeCLIArgs(
   networkArgs: string[],
 ): NetworkConfig[] {
-  const validNetworks: string[] = config.chains.map((chain) =>
-    chain.name.toLowerCase(),
-  );
-
   const networkConfigs: NetworkConfig[] = [];
 
   networkArgs.forEach((arg) => {
     const [network, blockRange] = arg.split("=");
     const networkLowerCase = network.toLowerCase();
 
-    if (!validNetworks.includes(networkLowerCase)) {
-      console.error(`Invalid network specified: ${network}`);
+    // resolving here rather than matching a name list keeps the accepted spellings identical to the
+    // ones every downstream lookup understands, aliases included
+    if (chainIdForNetwork(networkLowerCase) === undefined) {
+      console.error(
+        `Invalid network specified: ${network}. Supported: ${config.chains
+          .map((chain) => chain.name.toLowerCase())
+          .join(", ")}`,
+      );
       process.exit(1);
     }
     if (!blockRange) {
@@ -221,18 +228,18 @@ export async function validateStartAndEndBlocks(
   networkConfigs: NetworkConfig[],
 ) {
   for (const networkConfig of networkConfigs) {
-    let chainId;
-    let period0StartBlock;
-
-    if (networkConfig.network === "polygon") {
-      chainId = ChainId.Polygon;
-      period0StartBlock = 68093124n;
-    } else if (networkConfig.network === "mainnet") {
-      chainId = ChainId.Mainnet;
-      // TANIP-1 is not currently live on mainnet
-      period0StartBlock = 0n;
-    } else {
+    const chainId = chainIdForNetwork(networkConfig.network);
+    if (chainId === undefined) {
       console.error(`Unsupported network: ${networkConfig.network}`);
+      process.exit(1);
+    }
+
+    const period0StartBlock = period0StartBlocks[chainId];
+    if (period0StartBlock === undefined) {
+      console.error(
+        `No period 0 start block is configured for ${networkConfig.network}. ` +
+          `Add one to period0StartBlocks in backend/config.ts.`,
+      );
       process.exit(1);
     }
 
@@ -252,7 +259,7 @@ export async function validateStartAndEndBlocks(
     }
     // endBlock must be deeper than reorgSafeDepth
     if (networkConfig.endBlock > latestBlock - config.reorgSafeDepth[chainId]) {
-      console.error("Polygon endBlock must be reorg safe");
+      console.error(`${networkConfig.network} endBlock must be reorg safe`);
       process.exit(1);
     }
   }

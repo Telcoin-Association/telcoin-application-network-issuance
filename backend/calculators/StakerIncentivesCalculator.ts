@@ -69,19 +69,34 @@ export class StakerIncentivesCalculator implements ICalculator<UserRewardEntry> 
     private readonly _startBlocks: Partial<{ [chain in ChainId]: bigint }>,
     private readonly _endBlocks: Partial<{ [chain in ChainId]: bigint }>,
   ) {
-    // arity checks for initialization in multichain context
+    // The address books under `data/` are global registries spanning every chain this repo knows
+    // about, while a run covers only the chains its transfer histories cover. Narrow the books to
+    // that set so an entry for an unrelated chain neither widens the run nor is mistaken for a
+    // misconfiguration.
     const transfersChains = _tokenTransferHistories.map((db) => db.token.chain);
-    const stakingModulesChains = _stakingModules.map(
-      (stakingModule) => stakingModule.chain,
+    this._stakingModules = _stakingModules.filter((stakingModule) =>
+      transfersChains.includes(stakingModule.chain),
     );
-    const amirXsChains = _amirXs.map((amirX) => amirX.chain);
-    const arrays = [transfersChains, stakingModulesChains, amirXsChains];
-    if (
-      !arrays.every((chains) =>
-        chains.every((chain) => transfersChains.includes(chain)),
-      )
-    ) {
-      throw new Error("All input arrays must have the same chains.");
+    this._tanIssuanceHistories = _tanIssuanceHistories.filter((history) =>
+      transfersChains.includes(history.chain),
+    );
+    this._amirXs = _amirXs.filter((amirX) =>
+      transfersChains.includes(amirX.chain),
+    );
+
+    // the reward cap is read from both contracts, so a chain missing either would silently cap
+    // every account on it at zero
+    for (const chain of transfersChains) {
+      if (!this._stakingModules.some((module) => module.chain === chain)) {
+        throw new Error(
+          `No StakingModule is configured for chain ${chain}, update backend/data/stakingModules.ts`,
+        );
+      }
+      if (!this._tanIssuanceHistories.some((h) => h.chain === chain)) {
+        throw new Error(
+          `No TanIssuanceHistory is configured for chain ${chain}, update backend/data/tanIssuanceHistories.ts`,
+        );
+      }
     }
 
     // Ensure start and end blocks are specified for each chain
@@ -150,12 +165,12 @@ export class StakerIncentivesCalculator implements ICalculator<UserRewardEntry> 
     const userFeeTransfers = await this.fetchUserFeeTransfers();
 
     // A settled period always has user fees. Finding none means the inputs are wrong rather than
-    // the week being quiet: the wrong TEL token is configured for the chain, the AmirX set is
+    // the week being quiet: the wrong fee token is configured for the chain, the AmirX set is
     // stale, or the block range is. Left unchecked this publishes an empty reward file with no
     // error, so refuse to produce a distribution off it.
     if (userFeeTransfers.length === 0) {
       throw new Error(
-        "No user fee transfers found for this period. Check that config.telToken matches the token " +
+        "No user fee transfers found for this period. Check that config.feeToken matches the token " +
           "AmirX actually collects fees in, that data/amirXs.ts is current, and that the block range " +
           "is correct.",
       );
