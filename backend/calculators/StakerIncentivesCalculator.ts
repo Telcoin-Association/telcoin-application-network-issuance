@@ -7,7 +7,8 @@ import {
 } from "viem";
 import { ICalculator, UserMetadata, UserRewardEntry } from "./ICalculator";
 import { BaseExecutorRegistry } from "../datasources/ExecutorRegistry";
-import { ChainId } from "../config";
+import { ChainId, telTokenFor } from "../config";
+import { scaleDecimals } from "../helpers";
 import {
   TokenTransfer,
   TokenTransferHistory,
@@ -583,18 +584,27 @@ export class StakerIncentivesCalculator implements ICalculator<UserRewardEntry> 
         });
         const defiSwap = args[1] as { referrer: `0x${string}` };
 
+        // Fees are compared directly against rewards by the rebate cap, so carry them in reward-token
+        // units. The fee token can differ from the reward token, with different decimals, while AmirX
+        // collects a token other than the one rewards settle in.
+        const userFee = scaleDecimals(
+          transfer.amount,
+          transfer.token.decimals,
+          telTokenFor(transfer.token.chain).decimals,
+        );
+
         // return populated UserFeeSwaps
         return [
           {
             txHash: transfer.txHash,
             userAddress: args[0]!,
-            userFee: transfer.amount,
+            userFee,
             isRefereeSwap: false,
           },
           {
             txHash: transfer.txHash,
             userAddress: defiSwap.referrer,
-            userFee: transfer.amount,
+            userFee,
             isRefereeSwap: true,
           },
         ];

@@ -11,18 +11,18 @@ import {
   feeTokenFor,
 } from "./config";
 import {
+  assertHistorySettlesInRewardToken,
   parseAndSanitizeCLIArgs,
   validateStartAndEndBlocks,
   writeIncentivesToExcel,
   writeIncentivesToFile,
 } from "./helpers";
-import { SimplePlugin } from "./datasources/SimplePlugin";
 import { TokenTransferHistory } from "./datasources/TokenTransferHistory";
 import { StakerIncentivesCalculator } from "./calculators/StakerIncentivesCalculator";
 import { amirXs } from "./data/amirXs";
 import { stakingModules } from "./data/stakingModules";
 import { tanIssuanceHistories } from "./data/tanIssuanceHistories";
-import { Address, createPublicClient, http, PublicClient } from "viem";
+import { createPublicClient, http, PublicClient } from "viem";
 import { UserRewardEntry } from "calculators/ICalculator";
 
 // Track active database connections
@@ -75,6 +75,8 @@ async function main() {
   // fail before any RPC work if the reward token address is still unpopulated, since an unset
   // address would match no transfers and quietly yield an empty reward set
   assertTelTokensConfigured([targetChain]);
+  // and fail before any RPC-heavy work if the history would read caps in a different token
+  await assertHistorySettlesInRewardToken(targetChain);
 
   await validateStartAndEndBlocks(networks);
 
@@ -111,21 +113,6 @@ async function main() {
 
   console.log("Fetching token transfers...");
   await tokenTransferHistory.init();
-
-  // SimplePlugin fetches claimableIncreased events from a SimplePlugin contract for the referral calculator
-  console.log("Initializing simple plugins...");
-  const simplePlugins = (config.simplePlugins[
-    targetChain as keyof typeof config.simplePlugins
-  ] ?? []).map(
-    (address: Address) =>
-      new SimplePlugin(
-        targetChain,
-        address,
-        targetNetwork.startBlock,
-        targetNetwork.endBlock
-      )
-  );
-  await Promise.all(simplePlugins.map((plugin) => plugin.init()));
 
   /**
    * @dev Initialize Calculators

@@ -236,3 +236,10 @@ export const period0StartBlocks: Partial<Record<ChainId, bigint>> = {
   // the Sepolia rehearsal history is deployed fresh, so its first period opens wherever we choose
   [ChainId.EthSepolia]: 0n,
 };
+
+/**
+ * Chains whose `TANIssuanceHistory` replaced a predecessor and must carry its reward history over.
+ *
+ * A period run on one of these refuses to start until the history's backfill is sealed.
+ */
+export const chainsWithPredecessor: ChainId[] = [ChainId.Polygon];

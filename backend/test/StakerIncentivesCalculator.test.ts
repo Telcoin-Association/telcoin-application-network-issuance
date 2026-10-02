@@ -35,7 +35,8 @@ import {
   Transaction,
   zeroAddress,
 } from "viem";
-import { tanIssuanceHistories } from "../data/tanIssuanceHistories";
+import { TanIssuanceHistory } from "../data/tanIssuanceHistories";
+import { TanIssuanceHistoryAbi } from "../abi/abi";
 import AmirXAbi from "../abi/AmirXAbi";
 import {
   mockDefiSwap,
@@ -61,6 +62,19 @@ const executor1 = executors[0].address;
 // signals for simplified asserts
 const stakerSignal = "0x11111111";
 const nonstakerSignal = "0x00000000";
+
+/**
+ * A Polygon history for the calculator to bind to. The production book only lists the V3 history once
+ * it is deployed, and every onchain read these tests depend on is stubbed, so the address is a
+ * placeholder rather than a live contract.
+ */
+const testTanIssuanceHistories: TanIssuanceHistory[] = [
+  {
+    chain: ChainId.Polygon,
+    address: getAddress("0x00000000000000000000000000000000000071a5"),
+    abi: TanIssuanceHistoryAbi,
+  },
+];
 
 /**
  * Helpers
@@ -159,7 +173,7 @@ describe("StakerIncentivesCalculator", () => {
     calculator = new StakerIncentivesCalculator(
       mockTokenTransferHistorys,
       stakingModules,
-      tanIssuanceHistories,
+      testTanIssuanceHistories,
       amirXs,
       executorRegistry,
       1000n,
@@ -254,7 +268,7 @@ describe("StakerIncentivesCalculator", () => {
     const impossibleCalculator = new StakerIncentivesCalculator(
       mockTokenTransferHistorys,
       stakingModules,
-      tanIssuanceHistories,
+      testTanIssuanceHistories,
       amirXs,
       impossibleExecutorRegistry,
       1000n,
@@ -864,6 +878,79 @@ describe("StakerIncentivesCalculator", () => {
         fees: 150n,
         refereeFees: 850n,
       });
+    });
+  });
+
+  /**
+   * The rebate cap compares a reward against the wallet's own fees, so both have to be in one unit even
+   * when AmirX collects a 2-decimal token and rewards settle in an 18-decimal one.
+   */
+  describe("fee and reward tokens with different decimals", () => {
+    const payer = getAddress("0x1111111111111111111111111111111111111aaa");
+    const referrer = getAddress("0x0000000000000000000000000000000000000bbb");
+    // 5,000.00 legacy TEL in 2-decimal base units
+    const legacyFee = 500_000n;
+    const scaledFee = 5_000n * 10n ** 18n;
+
+    it("scales each fee into reward-token units when parsing swaps", () => {
+      const transfer = {
+        ...generateTestTokenTransfer(0, referrer, payer),
+        amount: legacyFee,
+      };
+      expect(transfer.token.decimals).toBe(2n);
+
+      const swaps = calculator["parseToUserFeeSwaps"]([transfer]);
+
+      expect(swaps).toHaveLength(2);
+      for (const swap of swaps) expect(swap.userFee).toBe(scaledFee);
+    });
+
+    it("caps an 18-decimal reward at the wallet's real fees rather than at its 2-decimal base units", async () => {
+      // the production incentive: 3,205,128.20 TEL in 18 decimals
+      const incentive = 320512820n * 10n ** 16n;
+      const v3Calculator = new StakerIncentivesCalculator(
+        mockTokenTransferHistorys,
+        stakingModules,
+        testTanIssuanceHistories,
+        amirXs,
+        executorRegistry,
+        incentive,
+        { [ChainId.Polygon]: arbitraryStartBlock },
+        { [ChainId.Polygon]: arbitraryEndBlock },
+      );
+
+      const transfer = {
+        ...generateTestTokenTransfer(0, referrer, payer),
+        amount: legacyFee,
+      };
+      jest
+        .spyOn(v3Calculator, "fetchUserFeeTransfers")
+        .mockResolvedValue([transfer]);
+      // the payer holds 1,000,000 sTEL for the whole period; the referrer never staked
+      jest
+        .spyOn(v3Calculator, "fetchVoteCheckpoints")
+        .mockImplementation(async (_client, account) =>
+          account === payer
+            ? [
+                {
+                  blockNumber: arbitraryStartBlock - 1n,
+                  votes: 1_000_000n * 10n ** 18n,
+                },
+              ]
+            : [],
+        );
+      jest
+        .spyOn(v3Calculator, "fetchCumulativeRewardsAtBlock")
+        .mockResolvedValue(0n);
+
+      const result = await v3Calculator.calculateRewardsPerStaker();
+      const entry = result.get(payer);
+
+      // the sole payer earns the whole incentive uncapped, the stake cap is 1,000,000 TEL, and the
+      // rebate cap is the 5,000 TEL actually paid, which binds
+      expect(entry).toBeDefined();
+      expect(entry!.metadata.fees).toBe(scaledFee);
+      expect(entry!.reward).toBe(scaledFee);
     });
   });
 });

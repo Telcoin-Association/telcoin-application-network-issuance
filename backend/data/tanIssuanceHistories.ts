@@ -2,7 +2,11 @@ import { Address } from "abitype";
 import { ChainId } from "../config";
 import { Abi, getAddress } from "viem";
 import { TanIssuanceHistoryAbi } from "../abi/abi";
-import { isDeployed, sepoliaDeployments } from "./sepoliaDeployments";
+import {
+  isDeployed,
+  polygonDeployments,
+  sepoliaDeployments,
+} from "./addressBooks";
 
 export type TanIssuanceHistory = {
   chain: ChainId;
@@ -11,11 +15,18 @@ export type TanIssuanceHistory = {
 };
 
 export const tanIssuanceHistories = [
-  {
-    chain: ChainId.Polygon,
-    address: "0xE533911F00f1C3B58BB8D821131C9B6E2452Fc27",
-    abi: TanIssuanceHistoryAbi,
-  },
+  // V3 Polygon history, absent from this list until the deploy script fills its slot in. Until then a
+  // Polygon run fails with no history configured, rather than reading caps from the V2 predecessor,
+  // which settles in a different token at different decimals.
+  ...(isDeployed(polygonDeployments.TANIssuanceHistory)
+    ? [
+        {
+          chain: ChainId.Polygon,
+          address: polygonDeployments.TANIssuanceHistory,
+          abi: TanIssuanceHistoryAbi,
+        },
+      ]
+    : []),
   // Sepolia rehearsal history, absent from this list until the deploy script fills its slot in
   ...(isDeployed(sepoliaDeployments.TANIssuanceHistory)
     ? [

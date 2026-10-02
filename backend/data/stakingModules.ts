@@ -2,7 +2,11 @@ import { Abi, Address } from "abitype";
 import { ChainId } from "../config";
 import { getAddress } from "viem";
 import { StakingModuleAbi } from "../abi/abi";
-import { isDeployed, sepoliaDeployments } from "./sepoliaDeployments";
+import {
+  isDeployed,
+  polygonDeployments,
+  sepoliaDeployments,
+} from "./addressBooks";
 
 export type StakingModule = {
   chain: ChainId;
@@ -12,10 +16,9 @@ export type StakingModule = {
 
 export const stakingModules = [
   {
-    // prod polygon V3 StakingModule proxy, the sTEL ERC20 whose vote checkpoints carry stake history.
-    // See `deployments/polygon.json` in tel-v3-staking.
+    // prod polygon V3 StakingModule proxy, the sTEL ERC20 whose vote checkpoints carry stake history
     chain: ChainId.Polygon,
-    address: "0x573105BE2148B8621F202a6d510016a2Aa825731",
+    address: polygonDeployments.StakingModule,
     abi: StakingModuleAbi,
   },
   // V3 StakingModule on Ethereum Sepolia. It is itself the sTEL ERC20, so per-account stake history

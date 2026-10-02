@@ -11,7 +11,9 @@ import {
   chainIdForNetwork,
   ChainId,
   config,
+  chainsWithPredecessor,
   period0StartBlocks,
+  telTokenFor,
 } from "./config";
 import { Address, getContract, PublicClient, zeroAddress } from "viem";
 import { tanIssuanceHistories } from "./data/tanIssuanceHistories";
@@ -243,20 +245,45 @@ export async function validateStartAndEndBlocks(
       process.exit(1);
     }
 
+    if (networkConfig.startBlock > networkConfig.endBlock) {
+      console.error(
+        `${networkConfig.network} startBlock ${networkConfig.startBlock} is after endBlock ${networkConfig.endBlock}`,
+      );
+      process.exit(1);
+    }
+
     const [lastSettlementBlock, latestBlock] =
       await getLastSettlementBlockAndLatestBlock(chainId);
 
-    // startBlock must match history contract's lastSettlementBlock + 1 or period 0 startBlock
-    if (
-      networkConfig.startBlock !== lastSettlementBlock + 1n &&
-      networkConfig.startBlock !== period0StartBlock
-    ) {
+    // A period continues from the history's last settlement. The period-0 start is only valid for a
+    // history that has never settled or been backfilled, since starting there again would re-reward
+    // every period already paid.
+    const continuesHistory = networkConfig.startBlock === lastSettlementBlock + 1n;
+    const startsFresh =
+      lastSettlementBlock === 0n &&
+      networkConfig.startBlock === period0StartBlock;
+    if (!continuesHistory && !startsFresh) {
       console.error(
-        `${networkConfig.network} startBlock ${networkConfig.network} must be last settlement block + 1 or period 0 block`,
+        `${networkConfig.network} startBlock ${networkConfig.startBlock} must be last settlement block + 1, ` +
+          `or the period 0 block on a history that has never settled`,
       );
       console.log(`last settlement block: ${lastSettlementBlock}`);
       process.exit(1);
     }
+
+    // a chain with a predecessor must carry its history over before any period runs, or every
+    // carried-over wallet's cap reads as its full stake
+    if (chainsWithPredecessor.includes(chainId)) {
+      const sealed = await isBackfillSealed(chainId);
+      if (!sealed) {
+        console.error(
+          `${networkConfig.network} TANIssuanceHistory has not sealed its backfill. ` +
+            `Backfill, verify, and seal before running a period. See docs/TAN_V3_CUTOVER.md.`,
+        );
+        process.exit(1);
+      }
+    }
+
     // endBlock must be deeper than reorgSafeDepth
     if (networkConfig.endBlock > latestBlock - config.reorgSafeDepth[chainId]) {
       console.error(`${networkConfig.network} endBlock must be reorg safe`);
@@ -265,24 +292,65 @@ export async function validateStartAndEndBlocks(
   }
 }
 
+function historyFor(chain: ChainId) {
+  const history = tanIssuanceHistories.find((entry) => entry.chain === chain);
+  if (!history) {
+    throw new Error(
+      `No TanIssuanceHistory is configured for chain ${chain}, update backend/data/tanIssuanceHistories.ts`,
+    );
+  }
+
+  return history;
+}
+
+/**
+ * Throws unless the chain's `TANIssuanceHistory` settles in the reward token `config.telToken` names.
+ *
+ * Reward caps subtract the history's cumulative rewards from sTEL stake, so both must be in the same
+ * token at the same decimals. A history bound to another token, such as the V2 predecessor's legacy
+ * TEL, would make prior rewards vanish from every cap.
+ */
+export async function assertHistorySettlesInRewardToken(
+  chain: ChainId,
+): Promise<void> {
+  const history = historyFor(chain);
+  const historyTel = await createRpcClient(chain).readContract({
+    address: history.address,
+    abi: history.abi,
+    functionName: "tel",
+  });
+
+  const expected = telTokenFor(chain).address;
+  if (viem.getAddress(historyTel as Address) !== expected) {
+    throw new Error(
+      `TANIssuanceHistory ${history.address} settles in ${historyTel}, but config.telToken expects ` +
+        `${expected} on chain ${chain}`,
+    );
+  }
+}
+
+/** Whether the chain's `TANIssuanceHistory` has closed its backfill path. */
+export async function isBackfillSealed(chain: ChainId): Promise<boolean> {
+  const history = historyFor(chain);
+
+  return (await createRpcClient(chain).readContract({
+    address: history.address,
+    abi: history.abi,
+    functionName: "backfillSealed",
+  })) as boolean;
+}
+
 export async function getLastSettlementBlockAndLatestBlock(
   chain: ChainId,
 ): Promise<[bigint, bigint]> {
   const client = createRpcClient(chain);
-  const matchingChainTanIssuanceHistory = tanIssuanceHistories.find(
-    (history) => history.chain === chain,
-  );
+  const history = historyFor(chain);
 
-  if (!matchingChainTanIssuanceHistory)
-    throw new Error(
-      "No TanIssuanceHistory was found for the specified chain, update config in src/data/tanIssuanceHistories.ts",
-    );
-
-  const lastSettlementBlock = await client.readContract({
-    address: matchingChainTanIssuanceHistory!.address,
-    abi: matchingChainTanIssuanceHistory!.abi,
+  const lastSettlementBlock = (await client.readContract({
+    address: history.address,
+    abi: history.abi,
     functionName: "lastSettlementBlock",
-  });
+  })) as bigint;
   const latestBlock = await client.getBlockNumber();
 
   return [lastSettlementBlock, latestBlock];
@@ -365,25 +433,28 @@ export function writeIncentivesToExcel(
   blockRanges: NetworkConfig[],
   filePath: string,
 ) {
+  // every amount on a reward entry, fees included, is denominated in the run chain's reward token
+  const chainId = chainIdForNetwork(blockRanges[0]!.network);
+  if (chainId === undefined) {
+    throw new Error(`Unsupported network: ${blockRanges[0]!.network}`);
+  }
+  const decimals = Number(telTokenFor(chainId).decimals);
+  const toTel = (amount: bigint) =>
+    Number(viem.formatUnits(amount, decimals)).toLocaleString();
+
   // Process data to include the new column with formatted values
   const data = Array.from(stakerIncentives.entries()).map(
     ([address, userRewardEntry]) => ({
       "Staker Address": address,
-      "Reward (ERC20 TEL)": (
-        Number(userRewardEntry.reward) / 100
-      ).toLocaleString(),
-      "Uncapped Reward (ERC20 TEL)": (
-        Number(userRewardEntry.metadata.uncappedAmount) / 100
-      ).toLocaleString(),
-      "Stake Cap Amount (ERC20 TEL)": (
-        Number(userRewardEntry.metadata.stakeCapAmount ?? 0) / 100
-      ).toLocaleString(),
-      "Staker Fees": (
-        Number(userRewardEntry.metadata.fees) / 100
-      ).toLocaleString(),
-      "Referee Fees": (
-        Number(userRewardEntry.metadata.refereeFees) / 100
-      ).toLocaleString(),
+      "Reward (ERC20 TEL)": toTel(userRewardEntry.reward),
+      "Uncapped Reward (ERC20 TEL)": toTel(
+        userRewardEntry.metadata.uncappedAmount ?? 0n,
+      ),
+      "Stake Cap Amount (ERC20 TEL)": toTel(
+        userRewardEntry.metadata.stakeCapAmount ?? 0n,
+      ),
+      "Staker Fees": toTel(userRewardEntry.metadata.fees),
+      "Referee Fees": toTel(userRewardEntry.metadata.refereeFees),
     }),
   );
 

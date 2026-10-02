@@ -1,7 +1,7 @@
 import { Address } from "abitype";
 import { ChainId } from "../config";
 import { getAddress } from "viem";
-import { isDeployed, sepoliaDeployments } from "./sepoliaDeployments";
+import { isDeployed, sepoliaDeployments } from "./addressBooks";
 
 export type AmirX = {
   chain: ChainId;

@@ -12,7 +12,7 @@ import {
   VoteCheckpoint,
 } from "../calculators/StakerIncentivesCalculator";
 import StakingModuleAbi from "../abi/StakingModuleAbi";
-import { sepoliaDeployments } from "../data/sepoliaDeployments";
+import { sepoliaDeployments } from "../data/addressBooks";
 
 /**
  * Exercises the V3 stake reader against the live StakingModule on Ethereum Sepolia.
