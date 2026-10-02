@@ -5,6 +5,7 @@ import { console2 } from "forge-std/console2.sol";
 import { SafeScriptBase } from "@safe-utils/SafeScriptBase.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SepoliaDeployments } from "../../deployments/SepoliaDeployments.sol";
+import { PolygonDeployments } from "../../deployments/PolygonDeployments.sol";
 import { TANIssuanceHistory } from "../../src/issuance/TANIssuanceHistory.sol";
 import { ISimplePlugin } from "../../src/interfaces/ISimplePlugin.sol";
 import { SafeChunkReader } from "./SafeChunkReader.sol";
@@ -25,11 +26,16 @@ interface ISimplePluginAdmin {
  * can be sent directly, so each one is either simulated against a fork or signed and posted to the
  * Safe Transaction Service, depending on whether `--broadcast` is present.
  *
+ * Addresses come from `deployments/polygon.json` on Polygon and `deployments/eth-sepolia.json` on
+ * Ethereum Sepolia. On Polygon the plugin and the history are owned by two different Safes, so
+ * `setIncreaser` is proposed with `DEPLOYER_SAFE_ADDRESS` set to the plugin owner Safe, and every other
+ * entrypoint with it set to the TAN Safe. Each entrypoint checks it is talking to the right one.
+ *
  * Simulation needs no hardware wallet, which is what makes it the way to check a batch before asking
  * signers to look at it:
  *
- *   FOUNDRY_PROFILE=sepolia forge script script/safe/TANIssuanceSafeOps.s.sol \
- *     --sig "<entrypoint>" --rpc-url $ETH_SEPOLIA_RPC_URL --ffi -vvvv
+ *   FOUNDRY_PROFILE=cancun forge script script/safe/TANIssuanceSafeOps.s.sol \
+ *     --sig "<entrypoint>" --rpc-url $POLYGON_RPC_URL --ffi -vvvv
  *
  * Adding `--broadcast` signs with the configured hardware wallet and proposes instead. Note that a
  * proposal carrying large calldata can exceed the Windows command-line length limit through the FFI
@@ -43,6 +49,10 @@ contract TANIssuanceSafeOps is SafeScriptBase {
     using SafeChunkReader for uint256[];
 
     uint256 constant ETH_SEPOLIA_CHAIN_ID = 11_155_111;
+    uint256 constant POLYGON_CHAIN_ID = 137;
+
+    /// @dev Written by `backend/buildBackfill.ts` next to the chunks it describes
+    string constant BACKFILL_MANIFEST = "safe_param_backfill_manifest.json";
 
     TANIssuanceHistory history;
     ISimplePlugin plugin;
@@ -62,7 +72,8 @@ contract TANIssuanceSafeOps is SafeScriptBase {
     /// @notice Points the plugin's `increaser` at the deployed history, which is what unblocks
     /// settlement after a fresh deploy.
     function setIncreaser() public {
-        require(pluginAdmin.owner() == getSafeAddress(), "plugin owner is not the configured Safe");
+        require(getSafeAddress() == pluginOwner, "configured Safe is not the plugin owner in the address book");
+        require(pluginAdmin.owner() == pluginOwner, "plugin owner onchain differs from the address book");
 
         address current = pluginAdmin.increaser();
         if (current == address(history)) {
@@ -84,19 +95,26 @@ contract TANIssuanceSafeOps is SafeScriptBase {
 
     /// @notice Proposes one backfill chunk emitted by `backend/buildBackfill.ts`.
     ///
-    /// @dev Chunks are order independent and safe to re-propose: the contract skips any account that
-    /// already carries history. `atBlock` must be the same cutover block for every chunk, because all
-    /// entries are keyed at it and it becomes the new `lastSettlementBlock`.
+    /// @dev Chunks are order independent and safe to re-propose: re-setting a seed to the value it
+    /// already holds is a no-op. The key block comes from the builder's manifest rather than from the
+    /// operator, and the chunk must match the manifest's record of it, so every chunk lands at the
+    /// same `atBlock` with the contents the builder reconciled.
     ///
     /// @param chunkFile Path under `backend/temp`, e.g. `safe_param_backfill_chunk_0.json`
-    /// @param atBlock Cutover block the seeded checkpoints are keyed at
-    function backfillChunk(string memory chunkFile, uint256 atBlock) public {
+    function backfillChunk(string memory chunkFile) public {
         _requireSafeOwnsHistory();
         require(!history.backfillSealed(), "backfill is already sealed");
 
         (address[] memory accounts, uint256[] memory amounts) = SafeChunkReader.readColumns(_chunkPath(chunkFile));
+        (uint256 atBlock, uint256 expectedAccounts, uint256 expectedTotal) = _manifestEntry(chunkFile);
+
+        require(accounts.length == expectedAccounts, "chunk account count differs from the manifest");
+        require(amounts.totalOf() == expectedTotal, "chunk total differs from the manifest");
+        uint256 seededAt = history.backfillBlock();
+        require(seededAt == 0 || seededAt == atBlock, "history is already keyed at a different block");
 
         console2.log("chunk %s: %d accounts totalling %d", chunkFile, accounts.length, amounts.totalOf());
+        console2.log("atBlock %d", atBlock);
 
         _proposeTransaction(
             address(history),
@@ -138,6 +156,8 @@ contract TANIssuanceSafeOps is SafeScriptBase {
     /// @param endBlock Last block of the period being settled
     function settleChunk(string memory chunkFile, uint256 endBlock) public {
         _requireSafeOwnsHistory();
+        // funding is a token transfer, which has no meaning for a history paying native TEL
+        require(!history.telIsNative(), "native reward rail is not supported by this script");
         require(endBlock >= history.lastSettlementBlock(), "endBlock precedes lastSettlementBlock");
         require(endBlock <= block.number, "endBlock is in the future");
 
@@ -196,6 +216,7 @@ contract TANIssuanceSafeOps is SafeScriptBase {
         console2.log("  tel              :", history.tel());
         console2.log("  telIsNative      :", history.telIsNative());
         console2.log("  lastSettlement   :", history.lastSettlementBlock());
+        console2.log("  backfillBlock    :", history.backfillBlock());
         console2.log("  backfillSealed   :", history.backfillSealed());
         console2.log("  TEL balance      :", tel.balanceOf(address(history)));
         console2.log("SimplePlugin       :", address(plugin));
@@ -219,18 +240,35 @@ contract TANIssuanceSafeOps is SafeScriptBase {
      */
 
     function _loadDeployments() internal {
-        require(block.chainid == ETH_SEPOLIA_CHAIN_ID, "no address book for this chain; add a branch here");
+        address historyAddress;
+        if (block.chainid == POLYGON_CHAIN_ID) {
+            string memory json = vm.readFile(string.concat(vm.projectRoot(), "/deployments/polygon.json"));
+            PolygonDeployments memory deployments = abi.decode(vm.parseJson(json), (PolygonDeployments));
 
-        string memory json = vm.readFile(string.concat(vm.projectRoot(), "/deployments/eth-sepolia.json"));
-        SepoliaDeployments memory deployments = abi.decode(vm.parseJson(json), (SepoliaDeployments));
+            historyAddress = deployments.TANIssuanceHistory;
+            plugin = ISimplePlugin(deployments.SimplePlugin);
+            tel = IERC20(deployments.TelV3);
+            pluginOwner = deployments.pluginOwner;
+        } else if (block.chainid == ETH_SEPOLIA_CHAIN_ID) {
+            string memory json = vm.readFile(string.concat(vm.projectRoot(), "/deployments/eth-sepolia.json"));
+            SepoliaDeployments memory deployments = abi.decode(vm.parseJson(json), (SepoliaDeployments));
 
-        require(deployments.TANIssuanceHistory != address(0), "TANIssuanceHistory is not deployed yet");
+            historyAddress = deployments.TANIssuanceHistory;
+            plugin = ISimplePlugin(deployments.SimplePlugin);
+            tel = IERC20(deployments.TelV3);
+            pluginOwner = deployments.pluginOwner;
+        } else {
+            revert("no address book for this chain; add a branch here");
+        }
 
-        history = TANIssuanceHistory(payable(deployments.TANIssuanceHistory));
-        plugin = ISimplePlugin(deployments.SimplePlugin);
-        pluginAdmin = ISimplePluginAdmin(deployments.SimplePlugin);
-        tel = IERC20(deployments.TelV3);
-        pluginOwner = deployments.pluginOwner;
+        require(historyAddress != address(0), "TANIssuanceHistory is not deployed yet");
+
+        history = TANIssuanceHistory(payable(historyAddress));
+        pluginAdmin = ISimplePluginAdmin(address(plugin));
+
+        // every amount this script moves or checks is in `tel`, so the history must settle in it too
+        require(history.tel() == address(tel), "history settles in a different token than the address book");
+        require(history.tanIssuancePlugin() == plugin, "history points at a different plugin than the address book");
     }
 
     function _requireSafeOwnsHistory() internal view {
@@ -240,5 +278,34 @@ contract TANIssuanceSafeOps is SafeScriptBase {
     /// @dev Chunk files land in `backend/temp`, where both emitters write them.
     function _chunkPath(string memory chunkFile) internal view returns (string memory) {
         return string.concat(vm.projectRoot(), "/backend/temp/", chunkFile);
+    }
+
+    /// @dev Looks `chunkFile` up in the backfill manifest, returning the key block and the account
+    /// count and total the builder recorded for it. Amounts are strings in the manifest, as in the
+    /// chunks, since they exceed what a JSON number holds exactly.
+    function _manifestEntry(string memory chunkFile)
+        internal
+        view
+        returns (uint256 atBlock, uint256 accounts, uint256 total)
+    {
+        string memory json = vm.readFile(_chunkPath(BACKFILL_MANIFEST));
+        atBlock = vm.parseUint(vm.parseJsonString(json, ".atBlock"));
+
+        for (uint256 i; vm.keyExistsJson(json, _chunkKey(i)); ++i) {
+            string memory key = _chunkKey(i);
+            if (keccak256(bytes(vm.parseJsonString(json, string.concat(key, ".file")))) != keccak256(bytes(chunkFile))) {
+                continue;
+            }
+
+            accounts = vm.parseJsonUint(json, string.concat(key, ".accounts"));
+            total = vm.parseUint(vm.parseJsonString(json, string.concat(key, ".total")));
+            return (atBlock, accounts, total);
+        }
+
+        revert("chunk is not listed in the backfill manifest");
+    }
+
+    function _chunkKey(uint256 i) internal pure returns (string memory) {
+        return string.concat(".chunks[", vm.toString(i), "]");
     }
 }

@@ -108,8 +108,7 @@ contract SafeChunkReaderTest is Test {
         assertEq(SafeChunkReader.totalOf(rewards), 1e18 + 25.5e18 + 3);
     }
 
-    /// @dev The row count comes from walking until a read fails, so a file whose rows carry an extra
-    /// field still counts correctly and has to be caught on shape instead.
+    /// @dev A row with an extra field still exists as an index, so it is counted and caught on shape.
     function testRejectsMalformedSettlementRow() public {
         vm.expectRevert(
             abi.encodeWithSelector(SafeChunkReader.ChunkRowMalformed.selector, _fixture("settle_malformed.json"), 0, 3)
@@ -122,7 +121,36 @@ contract SafeChunkReaderTest is Test {
         harness.readRewards(_fixture("settle_empty.json"));
     }
 
-    /// @dev The walk is bounded, so an oversize file is rejected rather than counted forever.
+    /// @dev A malformed row in the middle of a chunk is counted like any other, so it fails the read
+    /// rather than ending the chunk early and leaving the rows after it unpaid.
+    function testRejectsMalformedMiddleSettlementRow() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                SafeChunkReader.ChunkRowMalformed.selector, _fixture("settle_malformed_middle.json"), 1, 0
+            )
+        );
+        harness.readRewards(_fixture("settle_malformed_middle.json"));
+    }
+
+    /// @dev Both emitters aggregate per account, so a repeated account means the file was edited.
+    function testRejectsDuplicateSettlementAccount() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                SafeChunkReader.ChunkDuplicateAccount.selector, _fixture("settle_duplicate.json"), ACCOUNT_A
+            )
+        );
+        harness.readRewards(_fixture("settle_duplicate.json"));
+    }
+
+    function testRejectsDuplicateBackfillAccount() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                SafeChunkReader.ChunkDuplicateAccount.selector, _fixture("backfill_duplicate.json"), ACCOUNT_A
+            )
+        );
+        harness.readColumns(_fixture("backfill_duplicate.json"));
+    }
+
     function testRejectsOversizeSettlementChunk() public {
         vm.expectRevert(
             abi.encodeWithSelector(SafeChunkReader.ChunkTooLarge.selector, _fixture("settle_oversize.json"), 301)
@@ -131,7 +159,20 @@ contract SafeChunkReaderTest is Test {
     }
 
     /// @dev A full chunk is the normal case, and it sits exactly on the ceiling, so it must pass.
-    function testAcceptsChunkAtTheSizeLimit() public view {
-        assertEq(SafeChunkReader.MAX_CHUNK, 300);
+    function testAcceptsSettlementChunkAtTheSizeLimit() public view {
+        TANIssuanceHistory.IssuanceReward[] memory rewards = SafeChunkReader.readRewards(_fixture("settle_full.json"));
+
+        assertEq(rewards.length, SafeChunkReader.MAX_SETTLE_CHUNK);
+        assertEq(rewards[199].account, address(uint160(0x1000 + 199)));
+        assertEq(rewards[199].amount, 200e18);
+    }
+
+    function testAcceptsBackfillChunkAtTheSizeLimit() public view {
+        (address[] memory accounts, uint256[] memory amounts) =
+            SafeChunkReader.readColumns(_fixture("backfill_full.json"));
+
+        assertEq(accounts.length, SafeChunkReader.MAX_BACKFILL_CHUNK);
+        assertEq(accounts[299], address(uint160(0x1000 + 299)));
+        assertEq(amounts[299], 300e18);
     }
 }

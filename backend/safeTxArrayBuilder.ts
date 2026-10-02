@@ -2,7 +2,8 @@ import { Address } from "viem";
 import * as fs from "fs/promises";
 import * as path from "path";
 import { NetworkConfig } from "./helpers";
-import { ChainId, config } from "./config";
+import { ChainId, telTokenFor } from "./config";
+import { tanIssuanceHistories } from "./data/tanIssuanceHistories";
 import { UserMetadata } from "./calculators/ICalculator";
 import { PERIODS, POOLS } from "./calculators/TELxRewardsCalculator";
 
@@ -42,7 +43,14 @@ type TelxOutput = {
   amounts: string[];
 };
 
-const TEL_DECIMALS = 10n ** config.telToken[ChainId.Polygon].decimals;
+/// TAN settles in the Polygon reward token, TelcoinV3
+const TAN_TEL_DECIMALS = 10n ** telTokenFor(ChainId.Polygon).decimals;
+/// TELx distributes the legacy 2-decimal TEL its PositionRegistry holds
+const TELX_TEL_DECIMALS = 10n ** 2n;
+
+/// A 200-recipient settlement chunk of first-time recipients costs about 19M gas against the live V3
+/// plugin, leaving headroom under Polygon's 32M per-transaction cap once wrapped in a Safe transaction
+const TAN_CHUNK_SIZE = 200;
 
 // usage example: `yarn ts-node backend/safeTxArrayBuilder.ts --period 0 --telx`
 async function main() {
@@ -163,7 +171,7 @@ function processTelxRewards(jsonData: TelxIncentivesJson): TelxOutput {
 
   console.log(
     `\nTotal TELx amount to distribute via PositionRegistry:
-    - ${totalAmount / TEL_DECIMALS} ERC20 TEL (decimals applied)
+    - ${totalAmount / TELX_TEL_DECIMALS} ERC20 TEL (decimals applied)
     - ${totalAmount} native/wrapped TEL (no decimals)`
   );
   console.log(
@@ -197,18 +205,24 @@ function processTanRewards(jsonData: IncentivesJson): TanOutput {
 
   console.log(
     `\nTotal TAN amount to transfer to TANIssuanceHistory:
-    - ${totalAmount / TEL_DECIMALS} ERC20 TEL (decimals applied)
-    - ${totalAmount} native/wrapped TEL (no decimals)`
+    - ${totalAmount / TAN_TEL_DECIMALS} ERC20 TEL (decimals applied)
+    - ${totalAmount} base units`
+  );
+  const history = tanIssuanceHistories.find(
+    (entry) => entry.chain === ChainId.Polygon
   );
   console.log(
-    "Polygon TEL Token address: 0xdF7837DE1F2Fa4631D716CF2502f8b230F1dcc32"
+    `Polygon reward token (TelcoinV3): ${telTokenFor(ChainId.Polygon).address}`
   );
   console.log(
-    "Polygon TANIssuanceHistory address: 0xe533911f00f1c3b58bb8d821131c9b6e2452fc27\n"
+    `Polygon TANIssuanceHistory: ${
+      history?.address ?? "not deployed; fill in deployments/polygon.json"
+    }\n`
   );
   // relevant endBlock must be used in settlement transaction on the settlement chain
   console.log(
-    "Select the `endBlock` for the settlement chain and pass to TANIssuanceHistory::increaseClaimableByBatched()"
+    "Propose each chunk with TANIssuanceSafeOps.settleChunk, which funds and settles atomically,\n" +
+      "passing the `endBlock` below to TANIssuanceHistory::increaseClaimableByBatch()"
   );
   jsonData.blockRanges.forEach((config) => {
     console.log(`  - ${config.network} endBlock: ${config.endBlock}`);
@@ -235,7 +249,7 @@ async function writeOutputFiles(
 
   let chunkSize: number;
   if (project === "tan") {
-    chunkSize = 300;
+    chunkSize = TAN_CHUNK_SIZE;
     const chunks = chunkArray(data as TanOutput, chunkSize);
     for (let i = 0; i < chunks.length; i++) {
       const outputFilePath = path.join(
