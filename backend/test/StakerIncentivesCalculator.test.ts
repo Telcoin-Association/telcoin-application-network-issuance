@@ -11,7 +11,7 @@ import { executors } from "../data/executors";
 import { amirXs } from "../data/amirXs";
 import { stakingModules } from "../data/stakingModules";
 import {
-  StakeChangedEvent,
+  VoteCheckpoint,
   StakerIncentivesCalculator,
 } from "../calculators/StakerIncentivesCalculator";
 import {
@@ -35,7 +35,8 @@ import {
   Transaction,
   zeroAddress,
 } from "viem";
-import { tanIssuanceHistories } from "../data/tanIssuanceHistories";
+import { TanIssuanceHistory } from "../data/tanIssuanceHistories";
+import { TanIssuanceHistoryAbi } from "../abi/abi";
 import AmirXAbi from "../abi/AmirXAbi";
 import {
   mockDefiSwap,
@@ -61,6 +62,19 @@ const executor1 = executors[0].address;
 // signals for simplified asserts
 const stakerSignal = "0x11111111";
 const nonstakerSignal = "0x00000000";
+
+/**
+ * A Polygon history for the calculator to bind to. The production book only lists the V3 history once
+ * it is deployed, and every onchain read these tests depend on is stubbed, so the address is a
+ * placeholder rather than a live contract.
+ */
+const testTanIssuanceHistories: TanIssuanceHistory[] = [
+  {
+    chain: ChainId.Polygon,
+    address: getAddress("0x00000000000000000000000000000000000071a5"),
+    abi: TanIssuanceHistoryAbi,
+  },
+];
 
 /**
  * Helpers
@@ -159,7 +173,7 @@ describe("StakerIncentivesCalculator", () => {
     calculator = new StakerIncentivesCalculator(
       mockTokenTransferHistorys,
       stakingModules,
-      tanIssuanceHistories,
+      testTanIssuanceHistories,
       amirXs,
       executorRegistry,
       1000n,
@@ -168,19 +182,26 @@ describe("StakerIncentivesCalculator", () => {
     );
 
     jest
-      .spyOn(calculator, "fetchStake")
+      .spyOn(calculator, "fetchVoteCheckpoints")
       .mockImplementation(
         async (
           client: PublicClient,
-          userAddress: Address,
-          endBlock: bigint,
-          stakingModuleContract: Address,
-        ): Promise<bigint> => {
-          if (userAddress.toString().startsWith(stakerSignal))
-            return Promise.resolve(getRandomBigInt(1, 2 ** 32));
-          else if (userAddress.toString().startsWith(nonstakerSignal))
-            return Promise.resolve(0n);
-          else throw new Error("Invalid test data for fetchStake");
+          account: Address,
+          stakingModule: Address,
+        ): Promise<VoteCheckpoint[]> => {
+          // a single checkpoint before the period means the stake was held for its entire
+          // duration, so the duration-weighted average is exactly that amount
+          if (account.toString().startsWith(stakerSignal))
+            return Promise.resolve([
+              {
+                blockNumber: arbitraryStartBlock - 1n,
+                votes: getRandomBigInt(1, 2 ** 32),
+              },
+            ]);
+          // an account that never staked has no checkpoints at all
+          else if (account.toString().startsWith(nonstakerSignal))
+            return Promise.resolve([]);
+          else throw new Error("Invalid test data for fetchVoteCheckpoints");
         },
       );
 
@@ -247,7 +268,7 @@ describe("StakerIncentivesCalculator", () => {
     const impossibleCalculator = new StakerIncentivesCalculator(
       mockTokenTransferHistorys,
       stakingModules,
-      tanIssuanceHistories,
+      testTanIssuanceHistories,
       amirXs,
       impossibleExecutorRegistry,
       1000n,
@@ -383,153 +404,119 @@ describe("StakerIncentivesCalculator", () => {
     }
   });
 
-  it("should return the correct average staked amount from a given set of events", async () => {
+  it("should compute the duration-weighted average stake from a checkpoint history", () => {
     const startBlock = 10n;
     const endBlock = 30n;
-    const accounts = [
-      getAddress("0x1111111111111111111111111111111111111111"),
-      getAddress("0x2222222222222222222222222222222222222222"),
-      getAddress("0x3333333333333333333333333333333333333333"),
-      getAddress("0x4444444444444444444444444444444444444444"),
-    ];
-    const accountsMap = new Map<
-      Address,
+
+    // A checkpoint at block `k` with value `v` means the account held `v` from `k` onward. The
+    // opening entry sits before `startBlock` and stands for stake carried into the period.
+    const cases: Array<{
+      name: string;
+      checkpoints: VoteCheckpoint[];
+      expectedAverageStakedAmount: bigint;
+    }> = [
       {
-        initialStakeAmount: bigint;
-        events: StakeChangedEvent[];
-        expectedAverageStakedAmount: bigint;
-      }
-    >([
-      //Even increasing stake
-      [
-        accounts[0],
-        {
-          initialStakeAmount: 500n,
-          events: [
-            {
-              account: accounts[0],
-              blockNumber: startBlock + 5n,
-              oldStake: 500n,
-              newStake: 1000n,
-            },
-            {
-              account: accounts[0],
-              blockNumber: startBlock + 10n,
-              oldStake: 1000n,
-              newStake: 1500n,
-            },
-            {
-              account: accounts[0],
-              blockNumber: startBlock + 15n,
-              oldStake: 1500n,
-              newStake: 2000n,
-            },
-          ],
-          expectedAverageStakedAmount: 1250n,
-        },
-      ],
-      //Uneven increasing stake
-      [
-        accounts[1],
-        {
-          initialStakeAmount: 800n,
-          events: [
-            {
-              account: accounts[1],
-              blockNumber: startBlock + 3n,
-              oldStake: 800n,
-              newStake: 1200n,
-            },
-            {
-              account: accounts[1],
-              blockNumber: startBlock + 8n,
-              oldStake: 1200n,
-              newStake: 1600n,
-            },
-            {
-              account: accounts[1],
-              blockNumber: startBlock + 12n,
-              oldStake: 1600n,
-              newStake: 2000n,
-            },
-          ],
-          expectedAverageStakedAmount: 1540n,
-        },
-      ],
-      //Even decreasing stake
-      [
-        accounts[2],
-        {
-          initialStakeAmount: 2000n,
-          events: [
-            {
-              account: accounts[2],
-              blockNumber: startBlock + 5n,
-              oldStake: 2000n,
-              newStake: 1500n,
-            },
-            {
-              account: accounts[2],
-              blockNumber: startBlock + 10n,
-              oldStake: 1500n,
-              newStake: 1000n,
-            },
-            {
-              account: accounts[2],
-              blockNumber: startBlock + 15n,
-              oldStake: 1000n,
-              newStake: 500n,
-            },
-          ],
-          expectedAverageStakedAmount: 1250n,
-        },
-      ],
-      //Uneven decreasing stake
-      [
-        accounts[3],
-        {
-          initialStakeAmount: 2000n,
-          events: [
-            {
-              account: accounts[3],
-              blockNumber: startBlock + 3n,
-              oldStake: 2000n,
-              newStake: 1600n,
-            },
-            {
-              account: accounts[3],
-              blockNumber: startBlock + 8n,
-              oldStake: 1600n,
-              newStake: 1200n,
-            },
-            {
-              account: accounts[3],
-              blockNumber: startBlock + 12n,
-              oldStake: 1200n,
-              newStake: 800n,
-            },
-          ],
-          expectedAverageStakedAmount: 1260n,
-        },
-      ],
-    ]);
+        name: "even increasing stake",
+        checkpoints: [
+          { blockNumber: startBlock - 9n, votes: 500n },
+          { blockNumber: startBlock + 5n, votes: 1000n },
+          { blockNumber: startBlock + 10n, votes: 1500n },
+          { blockNumber: startBlock + 15n, votes: 2000n },
+        ],
+        expectedAverageStakedAmount: 1250n,
+      },
+      {
+        name: "uneven increasing stake",
+        checkpoints: [
+          { blockNumber: startBlock - 9n, votes: 800n },
+          { blockNumber: startBlock + 3n, votes: 1200n },
+          { blockNumber: startBlock + 8n, votes: 1600n },
+          { blockNumber: startBlock + 12n, votes: 2000n },
+        ],
+        expectedAverageStakedAmount: 1540n,
+      },
+      {
+        name: "even decreasing stake",
+        checkpoints: [
+          { blockNumber: startBlock - 9n, votes: 2000n },
+          { blockNumber: startBlock + 5n, votes: 1500n },
+          { blockNumber: startBlock + 10n, votes: 1000n },
+          { blockNumber: startBlock + 15n, votes: 500n },
+        ],
+        expectedAverageStakedAmount: 1250n,
+      },
+      {
+        name: "uneven decreasing stake",
+        checkpoints: [
+          { blockNumber: startBlock - 9n, votes: 2000n },
+          { blockNumber: startBlock + 3n, votes: 1600n },
+          { blockNumber: startBlock + 8n, votes: 1200n },
+          { blockNumber: startBlock + 12n, votes: 800n },
+        ],
+        expectedAverageStakedAmount: 1260n,
+      },
+    ];
 
-    const allEvents = [...accountsMap.values()].flatMap(
-      (entry) => entry.events,
-    );
-
-    const result = await calculator.CalculateAvgStakedAmountsPerAccount(
-      allEvents,
-      startBlock,
-      endBlock,
-    );
-
-    for (const [
-      account,
-      { expectedAverageStakedAmount },
-    ] of accountsMap.entries()) {
-      expect(result.get(account)).toEqual(expectedAverageStakedAmount);
+    for (const { checkpoints, expectedAverageStakedAmount } of cases) {
+      expect(
+        calculator.durationWeightedStake(checkpoints, startBlock, endBlock),
+      ).toEqual(expectedAverageStakedAmount);
     }
+  });
+
+  it("should weight stake held for only part of the period", () => {
+    const startBlock = 100n;
+    const endBlock = 200n;
+
+    // no history at all: never staked
+    expect(calculator.durationWeightedStake([], startBlock, endBlock)).toEqual(
+      0n,
+    );
+
+    // staked at the halfway point and held to the end
+    expect(
+      calculator.durationWeightedStake(
+        [{ blockNumber: 150n, votes: 1000n }],
+        startBlock,
+        endBlock,
+      ),
+    ).toEqual(500n);
+
+    // held from before the period and fully unstaked at the halfway point
+    expect(
+      calculator.durationWeightedStake(
+        [
+          { blockNumber: 50n, votes: 1000n },
+          { blockNumber: 150n, votes: 0n },
+        ],
+        startBlock,
+        endBlock,
+      ),
+    ).toEqual(500n);
+
+    // checkpoints after the period are not in scope
+    expect(
+      calculator.durationWeightedStake(
+        [
+          { blockNumber: 50n, votes: 1000n },
+          { blockNumber: 500n, votes: 9999n },
+        ],
+        startBlock,
+        endBlock,
+      ),
+    ).toEqual(1000n);
+
+    // out-of-order input is normalized before weighting
+    expect(
+      calculator.durationWeightedStake(
+        [
+          { blockNumber: 150n, votes: 0n },
+          { blockNumber: 50n, votes: 1000n },
+        ],
+        startBlock,
+        endBlock,
+      ),
+    ).toEqual(500n);
   });
 
   describe("calculateRewardsPerStaker - fee rebate cap", () => {
@@ -565,7 +552,12 @@ describe("StakerIncentivesCalculator", () => {
     }
 
     beforeEach(() => {
-      jest.spyOn(calculator, "fetchUserFeeTransfers").mockResolvedValue([]);
+      // These cases stub `fetchOnchainData`, so the transfers themselves are unused. One placeholder
+      // still stands in for a real fetch, since an empty result means a misconfigured period rather
+      // than a quiet one and is rejected before any reward is derived.
+      jest
+        .spyOn(calculator, "fetchUserFeeTransfers")
+        .mockResolvedValue([generateTestTokenTransfer(0, stakerA, stakerB)]);
     });
 
     it("should not apply the fee rebate cap when uncapped reward is below both stake cap and own fees", async () => {
@@ -886,6 +878,79 @@ describe("StakerIncentivesCalculator", () => {
         fees: 150n,
         refereeFees: 850n,
       });
+    });
+  });
+
+  /**
+   * The rebate cap compares a reward against the wallet's own fees, so both have to be in one unit even
+   * when AmirX collects a 2-decimal token and rewards settle in an 18-decimal one.
+   */
+  describe("fee and reward tokens with different decimals", () => {
+    const payer = getAddress("0x1111111111111111111111111111111111111aaa");
+    const referrer = getAddress("0x0000000000000000000000000000000000000bbb");
+    // 5,000.00 legacy TEL in 2-decimal base units
+    const legacyFee = 500_000n;
+    const scaledFee = 5_000n * 10n ** 18n;
+
+    it("scales each fee into reward-token units when parsing swaps", () => {
+      const transfer = {
+        ...generateTestTokenTransfer(0, referrer, payer),
+        amount: legacyFee,
+      };
+      expect(transfer.token.decimals).toBe(2n);
+
+      const swaps = calculator["parseToUserFeeSwaps"]([transfer]);
+
+      expect(swaps).toHaveLength(2);
+      for (const swap of swaps) expect(swap.userFee).toBe(scaledFee);
+    });
+
+    it("caps an 18-decimal reward at the wallet's real fees rather than at its 2-decimal base units", async () => {
+      // the production incentive: 3,205,128.20 TEL in 18 decimals
+      const incentive = 320512820n * 10n ** 16n;
+      const v3Calculator = new StakerIncentivesCalculator(
+        mockTokenTransferHistorys,
+        stakingModules,
+        testTanIssuanceHistories,
+        amirXs,
+        executorRegistry,
+        incentive,
+        { [ChainId.Polygon]: arbitraryStartBlock },
+        { [ChainId.Polygon]: arbitraryEndBlock },
+      );
+
+      const transfer = {
+        ...generateTestTokenTransfer(0, referrer, payer),
+        amount: legacyFee,
+      };
+      jest
+        .spyOn(v3Calculator, "fetchUserFeeTransfers")
+        .mockResolvedValue([transfer]);
+      // the payer holds 1,000,000 sTEL for the whole period; the referrer never staked
+      jest
+        .spyOn(v3Calculator, "fetchVoteCheckpoints")
+        .mockImplementation(async (_client, account) =>
+          account === payer
+            ? [
+                {
+                  blockNumber: arbitraryStartBlock - 1n,
+                  votes: 1_000_000n * 10n ** 18n,
+                },
+              ]
+            : [],
+        );
+      jest
+        .spyOn(v3Calculator, "fetchCumulativeRewardsAtBlock")
+        .mockResolvedValue(0n);
+
+      const result = await v3Calculator.calculateRewardsPerStaker();
+      const entry = result.get(payer);
+
+      // the sole payer earns the whole incentive uncapped, the stake cap is 1,000,000 TEL, and the
+      // rebate cap is the 5,000 TEL actually paid, which binds
+      expect(entry).toBeDefined();
+      expect(entry!.metadata.fees).toBe(scaledFee);
+      expect(entry!.reward).toBe(scaledFee);
     });
   });
 });

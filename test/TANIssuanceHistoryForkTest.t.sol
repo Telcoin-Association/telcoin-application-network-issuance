@@ -28,8 +28,6 @@ contract TANIssuanceHistoryForkTest is Test {
     // testing addresses
     address public defiAgg;
     address public user;
-    // used only to source funds for `user` and `defiAgg` in forked environment
-    address public existingTelHolder;
 
     uint256 issuanceAmount;
     uint256 scalingFactor;
@@ -45,7 +43,7 @@ contract TANIssuanceHistoryForkTest is Test {
         deployments = abi.decode(data, (Deployments));
 
         plugin = ISimplePlugin(deployments.TANIssuancePlugin);
-        tanIssuanceHistory = TANIssuanceHistory(deployments.TANIssuanceHistory);
+        tanIssuanceHistory = TANIssuanceHistory(payable(deployments.TANIssuanceHistory));
 
         amirX = MockAmirX(deployments.mockAmirX);
         tel = ERC20(deployments.polygonTEL);
@@ -53,7 +51,6 @@ contract TANIssuanceHistoryForkTest is Test {
         tanSafe = deployments.TANSafe;
         executor = deployments.admin;
         user = address(0xabc);
-        existingTelHolder = 0x2ff79955Aad11fA93B84d79D45F504E6168935BC;
 
         issuanceAmount = 3_000_000;
         // calculator uses a very large scaling factor to address arithmetic decimal precision
@@ -67,10 +64,10 @@ contract TANIssuanceHistoryForkTest is Test {
 
         defiAgg = amirX.defiAggIntermediary();
 
-        // (fork tests only) fund user with TEL from existing holder
+        // (fork tests only) mint TEL to the user directly. Legacy TEL holders drain as they migrate to
+        // TelcoinV3, so no fixed holder can be relied on to fund a fork at chain head
         uint256 userFeeVolume = 100;
-        vm.prank(existingTelHolder);
-        tel.transfer(user, userFeeVolume);
+        deal(address(tel), user, tel.balanceOf(user) + userFeeVolume);
 
         // first stake for incentive eligibility (shown for visibility)
         vm.startPrank(user);
@@ -80,8 +77,7 @@ contract TANIssuanceHistoryForkTest is Test {
         vm.stopPrank();
 
         // (fork testing only): fund `defiAgg` who then approves tokens to `amirX`
-        vm.prank(existingTelHolder);
-        tel.transfer(defiAgg, userFeeVolume);
+        deal(address(tel), defiAgg, tel.balanceOf(defiAgg) + userFeeVolume);
         vm.prank(defiAgg);
         tel.approve(address(amirX), userFeeVolume);
 
@@ -118,20 +114,22 @@ contract TANIssuanceHistoryForkTest is Test {
         endBlock = block.number;
 
         // distribute rewards (funds come from TAN safe)
+        uint256 historyBalanceBefore = tel.balanceOf(address(tanIssuanceHistory));
+        uint256 pluginBalanceBefore = tel.balanceOf(address(plugin));
         vm.prank(tanSafe);
         tel.transfer(address(tanIssuanceHistory), userFeeVolume);
 
-        // pre-settlement sanity asserts
-        assertEq(tel.balanceOf(address(tanIssuanceHistory)), userFeeVolume);
-        assertEq(tel.balanceOf(address(plugin)), 0);
+        // pre-settlement sanity assert
+        assertEq(tel.balanceOf(address(tanIssuanceHistory)), historyBalanceBefore + userFeeVolume);
 
         // owner of TANIssuanceHistory contract is configured as TAN safe
         vm.prank(tanSafe);
         tanIssuanceHistory.increaseClaimableByBatch(rewards, endBlock);
 
-        // asserts
-        assertEq(tel.balanceOf(address(tanIssuanceHistory)), 0);
-        assertEq(tel.balanceOf(address(plugin)), userFeeVolume);
+        /// @dev the fork runs against live state at whatever block it was created at, so balances are
+        /// asserted as deltas rather than absolutes
+        assertEq(tel.balanceOf(address(tanIssuanceHistory)), historyBalanceBefore);
+        assertEq(tel.balanceOf(address(plugin)), pluginBalanceBefore + userFeeVolume);
         assertEq(tanIssuanceHistory.lastSettlementBlock(), endBlock);
         assertEq(tanIssuanceHistory.cumulativeRewards(user), userReward);
     }

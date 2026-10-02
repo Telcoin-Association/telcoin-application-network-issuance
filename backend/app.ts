@@ -4,21 +4,25 @@ dotenv.config();
 import { existsSync } from "fs";
 import { LocalFileExecutorRegistry } from "./datasources/ExecutorRegistry";
 import { BlocksDatabase } from "./datasources/persistent/BlocksDatabase";
-import { ChainId, config } from "./config";
 import {
+  assertTelTokensConfigured,
+  chainIdForNetwork,
+  config,
+  feeTokenFor,
+} from "./config";
+import {
+  assertHistorySettlesInRewardToken,
   parseAndSanitizeCLIArgs,
   validateStartAndEndBlocks,
   writeIncentivesToExcel,
   writeIncentivesToFile,
 } from "./helpers";
-import { SimplePlugin } from "./datasources/SimplePlugin";
 import { TokenTransferHistory } from "./datasources/TokenTransferHistory";
 import { StakerIncentivesCalculator } from "./calculators/StakerIncentivesCalculator";
 import { amirXs } from "./data/amirXs";
 import { stakingModules } from "./data/stakingModules";
 import { tanIssuanceHistories } from "./data/tanIssuanceHistories";
-import { Address, createPublicClient, http } from "viem";
-import { polygon } from "viem/chains";
+import { createPublicClient, http, PublicClient } from "viem";
 import { UserRewardEntry } from "calculators/ICalculator";
 
 // Track active database connections
@@ -51,10 +55,36 @@ async function main() {
   }
 
   const networks = parseAndSanitizeCLIArgs(networkArgs);
+
+  // a period settles against one history contract, and that contract bounds its settlement block by
+  // the block number of its own chain, so a run cannot straddle two chains
+  if (networks.length !== 1) {
+    console.error(
+      `Expected exactly one network, got ${networks.length}. ` +
+        `A period settles on a single chain.`,
+    );
+    process.exit(1);
+  }
+  const targetNetwork = networks[0]!;
+  const targetChain = chainIdForNetwork(targetNetwork.network);
+  if (targetChain === undefined) {
+    console.error(`Unsupported network: ${targetNetwork.network}`);
+    process.exit(1);
+  }
+
+  // fail before any RPC work if the reward token address is still unpopulated, since an unset
+  // address would match no transfers and quietly yield an empty reward set
+  assertTelTokensConfigured([targetChain]);
+  // and fail before any RPC-heavy work if the history would read caps in a different token
+  await assertHistorySettlesInRewardToken(targetChain);
+
   await validateStartAndEndBlocks(networks);
-  const polygonConfig = networks.find(
-    (networkConfig) => networkConfig.network === "polygon"
-  );
+
+  const viemChain = config.chains.find((chain) => chain.id === targetChain);
+  if (!viemChain) {
+    console.error(`No viem chain is configured for ${targetNetwork.network}`);
+    process.exit(1);
+  }
 
   /**
    * @dev Initialize Datasources
@@ -66,33 +96,23 @@ async function main() {
 
   // TokenTransferHistory fetches and stores ERC20 transfer events
   console.log("Initializing token transfer history...");
+  // `viemChain` is a union across the supported chains, so the inferred client type is a union too;
+  // the datasources take the chain-agnostic `PublicClient`
   const optimizededPublicClient = createPublicClient({
     batch: { multicall: true },
-    chain: polygon,
-    transport: http(config.rpcUrls[ChainId.Polygon], { batch: true }),
-  });
-  const polygonTokenTransferHistory = new TokenTransferHistory(
-    config.telToken[ChainId.Polygon],
-    polygonConfig!.startBlock,
-    polygonConfig!.endBlock,
+    chain: viemChain,
+    transport: http(config.rpcUrls[targetChain], { batch: true }),
+  }) as PublicClient;
+  // fee volume is the token AmirX collects, which can lag the reward token across a cutover
+  const tokenTransferHistory = new TokenTransferHistory(
+    feeTokenFor(targetChain),
+    targetNetwork.startBlock,
+    targetNetwork.endBlock,
     optimizededPublicClient
   );
 
   console.log("Fetching token transfers...");
-  await polygonTokenTransferHistory.init();
-
-  // SimplePlugin fetches claimableIncreased events from a SimplePlugin contract for the referral calculator
-  console.log("Initializing simple plugins...");
-  const polygonSimplePlugins = config.simplePlugins[ChainId.Polygon].map(
-    (address) =>
-      new SimplePlugin(
-        ChainId.Polygon,
-        address,
-        polygonConfig!.startBlock,
-        polygonConfig!.endBlock
-      )
-  );
-  await Promise.all(polygonSimplePlugins.map((plugin) => plugin.init()));
+  await tokenTransferHistory.init();
 
   /**
    * @dev Initialize Calculators
@@ -101,18 +121,18 @@ async function main() {
   // StakerIncentivesCalculator
   // This calculator calculates the referrals incentives for each staker
   console.log("Initializing stakers incentives calculator...");
-  const polygonStakerIncentivesCalculator = new StakerIncentivesCalculator(
-    [polygonTokenTransferHistory],
+  const stakerIncentivesCalculator = new StakerIncentivesCalculator(
+    [tokenTransferHistory],
     stakingModules,
     tanIssuanceHistories,
     amirXs,
     executorRegistry,
     config.incentivesAmounts.stakerIncentivesAmount,
     {
-      [ChainId.Polygon]: polygonConfig!.startBlock,
+      [targetChain]: targetNetwork.startBlock,
     },
     {
-      [ChainId.Polygon]: polygonConfig!.endBlock,
+      [targetChain]: targetNetwork.endBlock,
     }
   );
 
@@ -121,10 +141,9 @@ async function main() {
    */
 
   console.log("Calculating staker referrals incentives...");
-  const polygonStakerIncentives =
-    await polygonStakerIncentivesCalculator.calculate();
+  const stakerIncentives = await stakerIncentivesCalculator.calculate();
 
-  const totalIssuance = Array.from(polygonStakerIncentives.values()).reduce(
+  const totalIssuance = Array.from(stakerIncentives.values()).reduce(
     (accumulator: bigint, currentEntry: UserRewardEntry) => {
       return accumulator + currentEntry.reward;
     },
@@ -135,18 +154,10 @@ async function main() {
   );
 
   // write incentives to `./rewards/staker_rewards_period_<n>.json`
-  await writeIncentivesToFile(
-    polygonStakerIncentives,
-    networks,
-    rewardsFilePath
-  );
+  await writeIncentivesToFile(stakerIncentives, networks, rewardsFilePath);
 
   // write incentives to `./staker_incentives.xlsx` (sheet keyed by block range)
-  writeIncentivesToExcel(
-    polygonStakerIncentives,
-    networks,
-    "staker_incentives.xlsx"
-  );
+  writeIncentivesToExcel(stakerIncentives, networks, "staker_incentives.xlsx");
 }
 
 /**
