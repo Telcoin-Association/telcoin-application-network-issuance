@@ -202,10 +202,6 @@ contract MockPlugin is ISimplePlugin {
         return true;
     }
 
-    function supportsInterface(bytes4) external pure returns (bool) {
-        return true;
-    }
-
     /// @dev Native funding arrives with the call; ERC20 funding is pulled from the caller.
     function _receiveFunding(uint256 amount) private {
         if (isNative()) {

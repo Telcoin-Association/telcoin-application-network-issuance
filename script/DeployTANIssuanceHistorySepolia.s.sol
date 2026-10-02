@@ -12,8 +12,9 @@ import { MockAmirX } from "../test/mocks/MockImplementations.sol";
 
 /// @notice Stands up the TAN issuance rehearsal environment on Ethereum Sepolia.
 ///
-/// @dev Sepolia is the only chain where a real V3 `StakingModule` and `SimplePlugin` exist, so it is
-/// where the V3 issuance path gets exercised end to end before Polygon has a V3 stack. Two pieces are
+/// @dev Sepolia carries a real V3 `StakingModule` and `SimplePlugin` with a history we own and can
+/// settle freely, so it is where the V3 issuance path gets exercised end to end before any settlement
+/// is proposed against the production Polygon stack. Two pieces are
 /// deployed here: `TANIssuanceHistory` bound to the live plugin, and a `MockAmirX` standing in for
 /// AmirX, which Sepolia has no deployment of and which the staker calculator needs as a fee sink.
 ///
@@ -23,7 +24,7 @@ import { MockAmirX } from "../test/mocks/MockImplementations.sol";
 /// Everything the owner can do afterwards is proposed through `script/safe/TANIssuanceSafeOps.s.sol`.
 ///
 /// Usage:
-///   FOUNDRY_PROFILE=sepolia forge script script/DeployTANIssuanceHistorySepolia.s.sol \
+///   FOUNDRY_PROFILE=cancun forge script script/DeployTANIssuanceHistorySepolia.s.sol \
 ///     --rpc-url $ETH_SEPOLIA_RPC_URL --private-key $PRIVATE_KEY --broadcast -vvvv
 contract DeployTANIssuanceHistorySepolia is Script {
     string constant DEPLOYMENTS_PATH = "/deployments/eth-sepolia.json";

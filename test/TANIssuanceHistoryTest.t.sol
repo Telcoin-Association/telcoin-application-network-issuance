@@ -43,7 +43,7 @@ contract TANIssuanceHistoryTest is Test {
         tel.mint(address(tanIssuanceHistory), 1e30);
     }
 
-    /// @dev Useful as a benchmark for the maximum batch size which is ~15000 users
+    /// @dev Settles batches of fuzzed size against the mock plugin and checks every account's history
     function testFuzz_increaseClaimableByBatch(uint16 numUsers) public {
         // settlement is proposed in 300-recipient chunks, and a batch far beyond a few thousand would not
         // fit in a block, so the bound covers several times the production chunk without exhausting the
@@ -73,6 +73,8 @@ contract TANIssuanceHistoryTest is Test {
         MockPlugin(address(mockPlugin)).setDeactivated(true);
 
         TANIssuanceHistory.IssuanceReward[] memory rewards = new TANIssuanceHistory.IssuanceReward[](2);
+        rewards[0] = TANIssuanceHistory.IssuanceReward(user1, 100);
+        rewards[1] = TANIssuanceHistory.IssuanceReward(user2, 200);
 
         vm.prank(owner);
         vm.expectRevert(abi.encodeWithSelector(MockPlugin.Deactivated.selector));
@@ -400,21 +402,30 @@ contract TANIssuanceHistoryTest is Test {
         assertEq(tel.balanceOf(address(mockPlugin)), 0);
     }
 
-    /// @dev A chunked backfill must be safe to retry, so an account that already carries history is
-    /// left untouched rather than overwritten.
-    function testBackfillNeverOverwritesExistingHistory() public {
+    /// @dev While unsealed every checkpoint is a seed, so retrying a chunk is a no-op and restating an
+    /// account corrects its seed in place rather than stacking a second checkpoint.
+    function testBackfillRetryIsNoOpAndRestateCorrectsSeed() public {
+        uint256 atBlock = block.number;
         (address[] memory accounts, uint256[] memory amounts) = _pair(user1, 1000, user2, 2500);
 
         vm.startPrank(owner);
-        tanIssuanceHistory.backfillCumulativeRewards(accounts, amounts, block.number);
+        tanIssuanceHistory.backfillCumulativeRewards(accounts, amounts, atBlock);
 
+        // an identical retry writes nothing
+        vm.recordLogs();
+        tanIssuanceHistory.backfillCumulativeRewards(accounts, amounts, atBlock);
+        assertEq(vm.getRecordedLogs().length, 0);
+
+        // a corrected value replaces the seed, including a correction down to zero
         amounts[0] = 999_999;
-        amounts[1] = 999_999;
-        tanIssuanceHistory.backfillCumulativeRewards(accounts, amounts, block.number);
+        amounts[1] = 0;
+        tanIssuanceHistory.backfillCumulativeRewards(accounts, amounts, atBlock);
         vm.stopPrank();
 
-        assertEq(tanIssuanceHistory.cumulativeRewards(user1), 1000);
-        assertEq(tanIssuanceHistory.cumulativeRewards(user2), 2500);
+        assertEq(tanIssuanceHistory.cumulativeRewards(user1), 999_999);
+        assertEq(tanIssuanceHistory.cumulativeRewards(user2), 0);
+        assertEq(tanIssuanceHistory.cumulativeRewardsAtBlock(user1, atBlock), 999_999);
+        assertEq(tanIssuanceHistory.backfillBlock(), atBlock);
     }
 
     /// @dev Settling creates history, and the backfill skips accounts that already carry history. A
@@ -456,20 +467,51 @@ contract TANIssuanceHistoryTest is Test {
         assertEq(tanIssuanceHistory.cumulativeRewards(user1), 1000);
     }
 
+    /// @dev The first backfill keys must not precede a gap already closed by an empty settlement.
     function testBackfillRejectsBlockBeforeLastSettlement() public {
-        uint256 firstBlock = block.number + 100;
-        vm.roll(firstBlock + 1);
+        uint256 gapBlock = block.number + 100;
+        vm.roll(gapBlock + 1);
 
         (address[] memory accounts, uint256[] memory amounts) = _pair(user1, 1000, user2, 2500);
 
         vm.startPrank(owner);
-        tanIssuanceHistory.backfillCumulativeRewards(accounts, amounts, firstBlock);
-        assertEq(tanIssuanceHistory.lastSettlementBlock(), firstBlock);
+        tanIssuanceHistory.increaseClaimableByBatch(new TANIssuanceHistory.IssuanceReward[](0), gapBlock);
 
-        (address[] memory more, uint256[] memory moreAmounts) = _pair(referrer, 1000, user, 2500);
-        vm.expectRevert(abi.encodeWithSelector(TANIssuanceHistory.InvalidBlock.selector, firstBlock - 1));
-        tanIssuanceHistory.backfillCumulativeRewards(more, moreAmounts, firstBlock - 1);
+        vm.expectRevert(abi.encodeWithSelector(TANIssuanceHistory.InvalidBlock.selector, gapBlock - 1));
+        tanIssuanceHistory.backfillCumulativeRewards(accounts, amounts, gapBlock - 1);
         vm.stopPrank();
+    }
+
+    /// @dev Every chunk shares the first chunk's key, so a mistyped block is refused rather than
+    /// splitting the seed across two keys.
+    function testBackfillPinsEveryChunkToOneBlock() public {
+        uint256 atBlock = block.number + 100;
+        vm.roll(atBlock + 10);
+
+        (address[] memory accounts, uint256[] memory amounts) = _pair(user1, 1000, user2, 2500);
+        (address[] memory more, uint256[] memory moreAmounts) = _pair(referrer, 1000, user, 2500);
+
+        vm.startPrank(owner);
+        tanIssuanceHistory.backfillCumulativeRewards(accounts, amounts, atBlock);
+
+        vm.expectRevert(abi.encodeWithSelector(TANIssuanceHistory.BackfillBlockMismatch.selector, atBlock, atBlock + 1));
+        tanIssuanceHistory.backfillCumulativeRewards(more, moreAmounts, atBlock + 1);
+
+        // a gap close after the first chunk does not strand the remaining chunks
+        tanIssuanceHistory.increaseClaimableByBatch(new TANIssuanceHistory.IssuanceReward[](0), atBlock + 5);
+        tanIssuanceHistory.backfillCumulativeRewards(more, moreAmounts, atBlock);
+        vm.stopPrank();
+
+        assertEq(tanIssuanceHistory.cumulativeRewardsAtBlock(referrer, atBlock), 1000);
+        assertEq(tanIssuanceHistory.lastSettlementBlock(), atBlock + 5);
+    }
+
+    function testBackfillRejectsBlockZero() public {
+        (address[] memory accounts, uint256[] memory amounts) = _pair(user1, 1000, user2, 2500);
+
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(TANIssuanceHistory.InvalidBlock.selector, 0));
+        tanIssuanceHistory.backfillCumulativeRewards(accounts, amounts, 0);
     }
 
     function testBackfillRejectsFutureBlock() public {
@@ -505,7 +547,7 @@ contract TANIssuanceHistoryTest is Test {
         (address[] memory accounts, uint256[] memory amounts) = _pair(user1, 1000, user2, 2500);
 
         vm.prank(user);
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user));
         tanIssuanceHistory.backfillCumulativeRewards(accounts, amounts, block.number);
     }
 
@@ -517,8 +559,11 @@ contract TANIssuanceHistoryTest is Test {
         tanIssuanceHistory.sealBackfill();
         assertTrue(tanIssuanceHistory.backfillSealed());
 
-        // sealing twice is a no-op rather than a revert, so a retried seal transaction is harmless
+        // sealing twice is a no-op rather than a revert, so a retried seal transaction is harmless, and it
+        // emits nothing the second time
+        vm.recordLogs();
         tanIssuanceHistory.sealBackfill();
+        assertEq(vm.getRecordedLogs().length, 0);
         assertTrue(tanIssuanceHistory.backfillSealed());
 
         vm.expectRevert(abi.encodeWithSelector(TANIssuanceHistory.BackfillIsSealed.selector));
@@ -543,6 +588,190 @@ contract TANIssuanceHistoryTest is Test {
         assertEq(tanIssuanceHistory.cumulativeRewards(user1), 1500);
         // only the newly settled amount is funded onto the plugin
         assertEq(MockPlugin(address(mockPlugin)).claimable(user1), 500);
+    }
+
+    /**
+     * Zero rows, backfill boundary, and replay
+     */
+
+    /// @dev A batch whose rows are all zero credits nobody, so it neither calls the plugin nor seals.
+    function testAllZeroBatchNeitherCallsPluginNorSeals() public {
+        // a deactivated plugin reverts on any call, proving the plugin is never reached
+        MockPlugin(address(mockPlugin)).setDeactivated(true);
+
+        TANIssuanceHistory.IssuanceReward[] memory rewards = new TANIssuanceHistory.IssuanceReward[](2);
+        rewards[0] = TANIssuanceHistory.IssuanceReward(user1, 0);
+        rewards[1] = TANIssuanceHistory.IssuanceReward(user2, 0);
+
+        vm.roll(block.number + 10);
+        vm.prank(owner);
+        tanIssuanceHistory.increaseClaimableByBatch(rewards, block.number);
+
+        assertFalse(tanIssuanceHistory.backfillSealed());
+        assertEq(tanIssuanceHistory.lastSettlementBlock(), block.number);
+        assertEq(tanIssuanceHistory.cumulativeRewards(user1), 0);
+    }
+
+    /// @dev A credit keyed at the backfill block would merge into the seed and hide it from a read one
+    /// block earlier, so the first crediting settlement has to end after it.
+    function testCreditingSettlementAtBackfillBlockReverts() public {
+        uint256 atBlock = block.number + 10;
+        vm.roll(atBlock + 10);
+        (address[] memory accounts, uint256[] memory amounts) = _pair(user1, 1000, user2, 2500);
+
+        TANIssuanceHistory.IssuanceReward[] memory rewards = new TANIssuanceHistory.IssuanceReward[](1);
+        rewards[0] = TANIssuanceHistory.IssuanceReward(user1, 500);
+
+        vm.startPrank(owner);
+        tanIssuanceHistory.backfillCumulativeRewards(accounts, amounts, atBlock);
+
+        vm.expectRevert(abi.encodeWithSelector(TANIssuanceHistory.InvalidBlock.selector, atBlock));
+        tanIssuanceHistory.increaseClaimableByBatch(rewards, atBlock);
+
+        // an empty gap close at the backfill block is still allowed, since it writes no checkpoint
+        tanIssuanceHistory.increaseClaimableByBatch(new TANIssuanceHistory.IssuanceReward[](0), atBlock);
+
+        tanIssuanceHistory.increaseClaimableByBatch(rewards, atBlock + 1);
+        vm.stopPrank();
+
+        assertEq(tanIssuanceHistory.cumulativeRewardsAtBlock(user1, atBlock), 1000);
+        assertEq(tanIssuanceHistory.cumulativeRewardsAtBlock(user1, atBlock + 1), 1500);
+    }
+
+    /// @dev Re-executing an identical chunk would credit both ledgers twice, so it is refused.
+    function testReplayedChunkReverts() public {
+        TANIssuanceHistory.IssuanceReward[] memory rewards = new TANIssuanceHistory.IssuanceReward[](2);
+        rewards[0] = TANIssuanceHistory.IssuanceReward(user1, 100);
+        rewards[1] = TANIssuanceHistory.IssuanceReward(user2, 200);
+        uint256 endBlock = block.number;
+
+        vm.startPrank(owner);
+        tanIssuanceHistory.increaseClaimableByBatch(rewards, endBlock);
+
+        bytes32 chunkId = keccak256(abi.encode(rewards, endBlock));
+        assertTrue(tanIssuanceHistory.settledChunks(chunkId));
+
+        vm.expectRevert(abi.encodeWithSelector(TANIssuanceHistory.ChunkAlreadySettled.selector, chunkId));
+        tanIssuanceHistory.increaseClaimableByBatch(rewards, endBlock);
+        vm.stopPrank();
+
+        assertEq(tanIssuanceHistory.cumulativeRewards(user1), 100);
+        assertEq(MockPlugin(address(mockPlugin)).claimable(user1), 100);
+    }
+
+    /**
+     * Settlement bounds and events
+     */
+
+    function testSettlementRejectsFutureEndBlock() public {
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(TANIssuanceHistory.InvalidBlock.selector, block.number + 1));
+        tanIssuanceHistory.increaseClaimableByBatch(new TANIssuanceHistory.IssuanceReward[](0), block.number + 1);
+    }
+
+    function testSettlementRejectsEndBlockBeforeLastSettlement() public {
+        vm.roll(block.number + 10);
+
+        vm.startPrank(owner);
+        tanIssuanceHistory.increaseClaimableByBatch(new TANIssuanceHistory.IssuanceReward[](0), block.number);
+
+        vm.expectRevert(abi.encodeWithSelector(TANIssuanceHistory.InvalidBlock.selector, block.number - 1));
+        tanIssuanceHistory.increaseClaimableByBatch(new TANIssuanceHistory.IssuanceReward[](0), block.number - 1);
+        vm.stopPrank();
+    }
+
+    function testSettlementEmitsSettled() public {
+        TANIssuanceHistory.IssuanceReward[] memory rewards = new TANIssuanceHistory.IssuanceReward[](2);
+        rewards[0] = TANIssuanceHistory.IssuanceReward(user1, 100);
+        rewards[1] = TANIssuanceHistory.IssuanceReward(user2, 0);
+
+        vm.expectEmit(address(tanIssuanceHistory));
+        emit TANIssuanceHistory.Settled(block.number, 100, 2);
+
+        vm.prank(owner);
+        tanIssuanceHistory.increaseClaimableByBatch(rewards, block.number);
+    }
+
+    function testSetTanIssuancePluginEmitsUpdate() public {
+        MockPlugin newPlugin = new MockPlugin(IERC20(address(tel)));
+
+        vm.expectEmit(address(tanIssuanceHistory));
+        emit TANIssuanceHistory.TanIssuancePluginUpdated(address(mockPlugin), address(newPlugin));
+
+        vm.prank(owner);
+        tanIssuanceHistory.setTanIssuancePlugin(ISimplePlugin(address(newPlugin)));
+    }
+
+    /**
+     * Access control
+     */
+
+    function testWritersAreOnlyOwner() public {
+        bytes memory unauthorized = abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user);
+
+        vm.startPrank(user);
+        vm.expectRevert(unauthorized);
+        tanIssuanceHistory.increaseClaimableByBatch(new TANIssuanceHistory.IssuanceReward[](0), block.number);
+
+        vm.expectRevert(unauthorized);
+        tanIssuanceHistory.setTanIssuancePlugin(mockPlugin);
+
+        vm.expectRevert(unauthorized);
+        tanIssuanceHistory.sealBackfill();
+
+        vm.expectRevert(unauthorized);
+        tanIssuanceHistory.rescueTokens(IERC20(address(tel)), user);
+
+        vm.expectRevert(unauthorized);
+        tanIssuanceHistory.renounceOwnership();
+        vm.stopPrank();
+    }
+
+    function testRenounceOwnershipIsDisabled() public {
+        vm.prank(owner);
+        vm.expectRevert(TANIssuanceHistory.RenounceOwnershipDisabled.selector);
+        tanIssuanceHistory.renounceOwnership();
+
+        assertEq(tanIssuanceHistory.owner(), owner);
+    }
+
+    /// @dev A transfer only takes effect once the new owner accepts, so a mistyped address cannot
+    /// strand the contract.
+    function testOwnershipTransferIsTwoStep() public {
+        vm.prank(owner);
+        tanIssuanceHistory.transferOwnership(user);
+
+        assertEq(tanIssuanceHistory.owner(), owner);
+        assertEq(tanIssuanceHistory.pendingOwner(), user);
+
+        vm.prank(user);
+        tanIssuanceHistory.acceptOwnership();
+        assertEq(tanIssuanceHistory.owner(), user);
+    }
+
+    /**
+     * Rescue
+     */
+
+    function testRescueTokensSweepsErc20Balance() public {
+        uint256 balance = tel.balanceOf(address(tanIssuanceHistory));
+
+        vm.prank(owner);
+        tanIssuanceHistory.rescueTokens(IERC20(address(tel)), user);
+
+        assertEq(tel.balanceOf(address(tanIssuanceHistory)), 0);
+        assertEq(tel.balanceOf(user), balance);
+    }
+
+    function testRescueTokensSweepsNativeBalance() public {
+        (TANIssuanceHistory nativeHistory,) = _deployNative();
+        vm.deal(address(nativeHistory), 5 ether);
+
+        vm.prank(owner);
+        nativeHistory.rescueTokens(IERC20(address(0x0)), user);
+
+        assertEq(address(nativeHistory).balance, 0);
+        assertEq(user.balance, 5 ether);
     }
 
     /// @dev The cap the offchain calculator applies: stake held over the period, less rewards

@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
-
 /**
  * @title ISimplePlugin
  * @notice The subset of the V3 `SimplePlugin` surface that `TANIssuanceHistory` depends on.
@@ -14,8 +12,11 @@ import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
  *
  * `rewardToken()` returns either an ERC-20 address or the native sentinel
  * `0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE`.
+ *
+ * The deployed plugin implements ERC-165 for `IPlugin` and `IERC165` only, not for this subset, so this
+ * interface does not extend `IERC165` and nothing should query support for its id.
  */
-interface ISimplePlugin is IERC165 {
+interface ISimplePlugin {
     /// @notice Credit a single `account` by `amount`, funded by one inbound transfer.
     function increaseClaimableBy(address account, uint256 amount) external payable returns (bool);
 

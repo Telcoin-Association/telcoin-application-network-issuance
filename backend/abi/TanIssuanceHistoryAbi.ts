@@ -35,6 +35,26 @@ export default [
   },
   {
     type: "function",
+    name: "acceptOwnership",
+    inputs: [],
+    outputs: [],
+    stateMutability: "nonpayable"
+  },
+  {
+    type: "function",
+    name: "backfillBlock",
+    inputs: [],
+    outputs: [
+      {
+        type: "uint256",
+        name: "",
+        internalType: "uint256"
+      }
+    ],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
     name: "backfillCumulativeRewards",
     inputs: [
       {
@@ -174,19 +194,19 @@ export default [
       {
         type: "tuple[]",
         name: "rewards",
-        internalType: "struct TANIssuanceHistory.IssuanceReward[]",
         components: [
           {
-            type: "address",
             name: "account",
+            type: "address",
             internalType: "address"
           },
           {
-            type: "uint256",
             name: "amount",
+            type: "uint256",
             internalType: "uint256"
           }
-        ]
+        ],
+        internalType: "struct TANIssuanceHistory.IssuanceReward[]"
       },
       {
         type: "uint256",
@@ -225,10 +245,23 @@ export default [
   },
   {
     type: "function",
+    name: "pendingOwner",
+    inputs: [],
+    outputs: [
+      {
+        type: "address",
+        name: "",
+        internalType: "address"
+      }
+    ],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
     name: "renounceOwnership",
     inputs: [],
     outputs: [],
-    stateMutability: "nonpayable"
+    stateMutability: "view"
   },
   {
     type: "function",
@@ -267,6 +300,25 @@ export default [
     ],
     outputs: [],
     stateMutability: "nonpayable"
+  },
+  {
+    type: "function",
+    name: "settledChunks",
+    inputs: [
+      {
+        type: "bytes32",
+        name: "",
+        internalType: "bytes32"
+      }
+    ],
+    outputs: [
+      {
+        type: "bool",
+        name: "",
+        internalType: "bool"
+      }
+    ],
+    stateMutability: "view"
   },
   {
     type: "function",
@@ -328,31 +380,6 @@ export default [
   },
   {
     type: "event",
-    name: "ClaimableIncreased",
-    inputs: [
-      {
-        type: "address",
-        name: "account",
-        indexed: true,
-        internalType: "address"
-      },
-      {
-        type: "uint256",
-        name: "oldClaimable",
-        indexed: false,
-        internalType: "uint256"
-      },
-      {
-        type: "uint256",
-        name: "newClaimable",
-        indexed: false,
-        internalType: "uint256"
-      }
-    ],
-    anonymous: false
-  },
-  {
-    type: "event",
     name: "CumulativeRewardsBackfilled",
     inputs: [
       {
@@ -378,6 +405,25 @@ export default [
   },
   {
     type: "event",
+    name: "OwnershipTransferStarted",
+    inputs: [
+      {
+        type: "address",
+        name: "previousOwner",
+        indexed: true,
+        internalType: "address"
+      },
+      {
+        type: "address",
+        name: "newOwner",
+        indexed: true,
+        internalType: "address"
+      }
+    ],
+    anonymous: false
+  },
+  {
+    type: "event",
     name: "OwnershipTransferred",
     inputs: [
       {
@@ -394,6 +440,66 @@ export default [
       }
     ],
     anonymous: false
+  },
+  {
+    type: "event",
+    name: "Settled",
+    inputs: [
+      {
+        type: "uint256",
+        name: "endBlock",
+        indexed: true,
+        internalType: "uint256"
+      },
+      {
+        type: "uint256",
+        name: "totalAmount",
+        indexed: false,
+        internalType: "uint256"
+      },
+      {
+        type: "uint256",
+        name: "recipients",
+        indexed: false,
+        internalType: "uint256"
+      }
+    ],
+    anonymous: false
+  },
+  {
+    type: "event",
+    name: "TanIssuancePluginUpdated",
+    inputs: [
+      {
+        type: "address",
+        name: "oldPlugin",
+        indexed: true,
+        internalType: "address"
+      },
+      {
+        type: "address",
+        name: "newPlugin",
+        indexed: true,
+        internalType: "address"
+      }
+    ],
+    anonymous: false
+  },
+  {
+    type: "error",
+    name: "BackfillBlockMismatch",
+    inputs: [
+      {
+        type: "uint256",
+        name: "backfillBlock",
+        internalType: "uint256"
+      },
+      {
+        type: "uint256",
+        name: "atBlock",
+        internalType: "uint256"
+      }
+    ]
   },
   {
     type: "error",
@@ -420,6 +526,17 @@ export default [
     type: "error",
     name: "CheckpointUnorderedInsertion",
     inputs: []
+  },
+  {
+    type: "error",
+    name: "ChunkAlreadySettled",
+    inputs: [
+      {
+        type: "bytes32",
+        name: "chunkId",
+        internalType: "bytes32"
+      }
+    ]
   },
   {
     type: "error",
@@ -495,6 +612,11 @@ export default [
         internalType: "address"
       }
     ]
+  },
+  {
+    type: "error",
+    name: "RenounceOwnershipDisabled",
+    inputs: []
   },
   {
     type: "error",

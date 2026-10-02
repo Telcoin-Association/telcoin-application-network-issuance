@@ -39,9 +39,9 @@ interface IStakingModuleV3 {
 /**
  * @notice Exercises `TANIssuanceHistory` against the live V3 staking stack on Ethereum Sepolia.
  *
- * @dev Sepolia is the only chain with a deployed V3 `StakingModule` and `SimplePlugin`, so it is the
- * only place the V3 settlement path can be driven against real bytecode rather than mocks. Every
- * assertion here therefore covers something the unit tests structurally cannot: that the plugin's
+ * @dev Sepolia carries a deployed V3 `StakingModule` and `SimplePlugin` with a history we own and can
+ * settle freely, so it is where the V3 settlement path is driven end to end against real bytecode,
+ * claims included. Every assertion here therefore covers something the unit tests structurally cannot: that the plugin's
  * real `rewardToken()` wiring satisfies the constructor, that the real batch entry point accepts what
  * we encode, that the real module pays the credit back out, and that the real vote checkpoints carry
  * the stake history the off-chain calculator reads.
@@ -51,7 +51,7 @@ interface IStakingModuleV3 {
  * deployed here can only ever be driven with Sepolia block numbers.
  *
  * Run with:
- *   FOUNDRY_PROFILE=sepolia forge test --match-path test/TANIssuanceHistorySepoliaForkTest.t.sol -vv
+ *   FOUNDRY_PROFILE=cancun forge test --match-path test/TANIssuanceHistorySepoliaForkTest.t.sol -vv
  */
 contract TANIssuanceHistorySepoliaForkTest is Test {
     string ETH_SEPOLIA_RPC_URL = vm.envOr("ETH_SEPOLIA_RPC_URL", string(""));
@@ -76,8 +76,8 @@ contract TANIssuanceHistorySepoliaForkTest is Test {
 
     function setUp() public {
         // the live V3 bytecode carries Cancun opcodes, which revert under the repo's default shanghai
-        // target, so this suite only runs under the `sepolia` profile and skips under any other
-        vm.skip(!_isSepoliaProfile());
+        // target, so this suite only runs under the `cancun` profile and skips under any other
+        vm.skip(!_isCancunProfile());
 
         vm.createSelectFork(ETH_SEPOLIA_RPC_URL);
 
@@ -159,18 +159,17 @@ contract TANIssuanceHistorySepoliaForkTest is Test {
 
     /// @dev Chunked backfills are retried in practice, so a repeat of an already-applied chunk must
     /// be inert rather than additive.
-    function testForkBackfillNeverOverwritesExistingHistory() public {
+    function testForkBackfillRestatesSeedWhileUnsealed() public {
         (address[] memory accounts, uint256[] memory amounts) = _threeAccounts(100 * TEL, 250 * TEL, 0);
 
         vm.startPrank(owner);
         history.backfillCumulativeRewards(accounts, amounts, block.number);
 
         amounts[0] = 999 * TEL;
-        amounts[1] = 999 * TEL;
         history.backfillCumulativeRewards(accounts, amounts, block.number);
         vm.stopPrank();
 
-        assertEq(history.cumulativeRewards(alice), 100 * TEL);
+        assertEq(history.cumulativeRewards(alice), 999 * TEL);
         assertEq(history.cumulativeRewards(bob), 250 * TEL);
     }
 
@@ -279,6 +278,8 @@ contract TANIssuanceHistorySepoliaForkTest is Test {
         (address[] memory accounts, uint256[] memory amounts) = _threeAccounts(100 * TEL, 250 * TEL, 0);
         vm.prank(owner);
         history.backfillCumulativeRewards(accounts, amounts, block.number);
+        // a crediting settlement has to end after the backfill block
+        vm.roll(block.number + 1);
 
         uint256 aliceReward = 12 * TEL;
         _fundHistory(aliceReward + 8 * TEL);
@@ -381,7 +382,7 @@ contract TANIssuanceHistorySepoliaForkTest is Test {
         vm.stopPrank();
     }
 
-    function _isSepoliaProfile() internal view returns (bool) {
-        return keccak256(bytes(vm.envOr("FOUNDRY_PROFILE", string("")))) == keccak256("sepolia");
+    function _isCancunProfile() internal view returns (bool) {
+        return keccak256(bytes(vm.envOr("FOUNDRY_PROFILE", string("")))) == keccak256("cancun");
     }
 }
