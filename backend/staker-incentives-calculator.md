@@ -114,13 +114,17 @@ For each validated user fee transfer, the `fetchUserFeeTransfers()` function als
 
 #### **Staking Contract**
 
-- Locks staked TEL for all `Stakers` and `Referrers`:
+- V3 `StakingModule` proxy, which is itself the sTEL ERC20 whose vote checkpoints carry each account's stake history:
+  - `0x573105BE2148B8621F202a6d510016a2Aa825731`
+- Predecessor V2 `StakingModule`, read only for periods settled before the Tel V3 cutover:
   - `0x92e43Aec69207755CB1E6A8Dc589aAE630476330`
 
 #### **Staking Plugins**
 
-- `0xCAa823Fd48bec0134c8285Fd3C34F9D95CF3280f`
+- V3 `SimplePlugin_TAN`, paying rewards in TelcoinV3: `0x57318C8dac7283D7e7F4294152e13d30C631Def1`
+- Predecessor V2 plugin: `0xCAa823Fd48bec0134c8285Fd3C34F9D95CF3280f`
 
 #### **TANIssuanceHistory**
 
-- `0xE533911F00f1C3B58BB8D821131C9B6E2452Fc27`
+- V3: recorded in `deployments/polygon.json` once deployed
+- Predecessor V2, the backfill source: `0xE533911F00f1C3B58BB8D821131C9B6E2452Fc27`

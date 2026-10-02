@@ -26,8 +26,8 @@
     "build": "tsc",
     "start": "node ./dist/app.js",
     "sync": "node ./dist/sync.js",
-    "dev": "ts-node ./src/app.ts",
-    "dev-sync": "ts-node ./src/sync.ts",
+    "dev": "ts-node ./backend/app.ts",
+    "dev-sync": "ts-node ./backend/sync.ts",
     "test": "jest"
   },
   "devDependencies": {

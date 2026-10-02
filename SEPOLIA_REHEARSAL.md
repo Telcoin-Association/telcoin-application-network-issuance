@@ -30,7 +30,7 @@ emits the same TEL transfer the staker calculator keys fee volume off of.
 |---|---|---|
 | `TANIssuanceHistory` | `0x2f7d9e2a275d3c454Cb8B7A838C4FC31D84cd607` | Safe-owned, verified |
 | `MockAmirX` | `0xA519514b3820327FC2275b5C02D12D0be7a00ffa` | fee sink, EOA-owned, verified |
-| `StakingModule` (sTEL) | `0x5deE96cA2358112907493d651f58AA889b8EBFA0` | V3 proxy, migration window open until 2026-08-29 |
+| `StakingModule` (sTEL) | `0x5deE96cA2358112907493d651f58AA889b8EBFA0` | V3 proxy |
 | `SimplePlugin` (TEL) | `0xEBeca686a6B7CAb725C75C3b7A2b49b839Ecd416` | registered on the module, `rewardToken()` is TelV3 |
 | TelV3 | `0x6B46d2f2a27f16dC1ef29a71C38A7E274132C7E7` | 18 decimals |
 | Safe | `0x765327d1AeA74cC360B1C6Cc567200d7e4baC3fD` | Safe 1.4.1. Owns the history and the plugin, and holds `DEFAULT_ADMIN_ROLE` on the module |
@@ -49,10 +49,10 @@ impersonates the plugin owner to take over the `increaser` slot, and drives back
 a claim back out through the real `StakingModule`.
 
 ```
-FOUNDRY_PROFILE=sepolia forge test --match-path test/TANIssuanceHistorySepoliaForkTest.t.sol -vv
+FOUNDRY_PROFILE=cancun forge test --match-path test/TANIssuanceHistorySepoliaForkTest.t.sol -vv
 ```
 
-The `sepolia` profile exists because the live V3 bytecode was compiled for a post-Cancun target, and
+The `cancun` profile exists because the live V3 bytecode was compiled for a post-Cancun target, and
 executing it under the repo default of `shanghai` hits an invalid opcode.
 
 The TypeScript suite reads the live module and checks the V3 stake reader against the chain's own
@@ -63,13 +63,13 @@ yarn test backend/test/StakerIncentivesCalculatorSepoliaFork.test.ts
 ```
 
 Both need `ETH_SEPOLIA_RPC_URL`. The TypeScript suite skips itself without one. The Solidity suite
-skips itself under any profile other than `sepolia`, so a plain `forge test` stays green, and fails
+skips itself under any profile other than `cancun`, so a plain `forge test` stays green, and fails
 without the RPC URL when the profile is set.
 
 ## Deploying the rehearsal contracts
 
 ```
-FOUNDRY_PROFILE=sepolia forge script script/DeployTANIssuanceHistorySepolia.s.sol \
+FOUNDRY_PROFILE=cancun forge script script/DeployTANIssuanceHistorySepolia.s.sol \
   --rpc-url $ETH_SEPOLIA_RPC_URL --private-key $PRIVATE_KEY --broadcast -vvvv
 ```
 
@@ -95,13 +95,13 @@ signs and posts to the Safe Transaction Service instead.
 |---|---|
 | `verify()` | nothing; prints the wiring every other entrypoint depends on |
 | `setIncreaser()` | `SimplePlugin.setIncreaser(history)`, which is what unblocks settlement |
-| `backfillChunk(string,uint256)` | one `backfillCumulativeRewards` chunk at the cutover block |
+| `backfillChunk(string)` | one `backfillCumulativeRewards` chunk, keyed at the block in the builder's manifest |
 | `sealBackfill()` | `sealBackfill()`, one way |
 | `settleChunk(string,uint256)` | a TEL transfer plus `increaseClaimableByBatch`, batched |
 | `settleGap(uint256)` | an empty batch, to advance `lastSettlementBlock` across a period that pays nobody |
 
 ```
-FOUNDRY_PROFILE=sepolia forge script script/safe/TANIssuanceSafeOps.s.sol \
+FOUNDRY_PROFILE=cancun forge script script/safe/TANIssuanceSafeOps.s.sol \
   --sig "setIncreaser()" --rpc-url $ETH_SEPOLIA_RPC_URL --ffi -vvvv
 ```
 
@@ -126,9 +126,9 @@ Simulation is unaffected and works anywhere.
 yarn dev sepolia=<startBlock>:<endBlock> --period=<n>
 ```
 
-The app now resolves its chain from the network argument instead of assuming Polygon, and it rejects
-a run naming more than one network for the block-domain reason above. `assertTelTokensConfigured` is
-scoped to the chain being run, so Polygon's still-unset TelV3 address does not block a Sepolia run.
+The app resolves its chain from the network argument instead of assuming Polygon, and it rejects a
+run naming more than one network for the block-domain reason above. Token and history checks are
+scoped to the chain being run, so Polygon's still-undeployed V3 history does not block a Sepolia run.
 
 Before the first period we need fee volume to exist. `MockAmirX.defiSwap` pulls its fee from the
 address recorded as `feeSimulator`, so that address has to hold TelV3 and have approved the mock.
