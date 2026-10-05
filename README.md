@@ -157,21 +157,53 @@ Because the TANIssuanceHistory contract is owned by the Telcoin Application Netw
 
 **The TAN Safe to use is deployed to `0x8Dcf8d134F22aC625A7aFb39514695801CD705b5` on Polygon and the transaction should target the `TANIssuanceHistory` contract's `increaseClaimableByBatch()` function, which is also deployed on Polygon at `0xe533911f00f1c3b58bb8d821131c9b6e2452fc27`.**
 
-The TANIssuanceHistory ABI can be found in `backend/abi/TanIssuanceHistoryAbi.ts` or fetched from PolygonScan
+### Distribution after the TEL migration
 
-The `backend/safeTxArrayBuilder.ts` script builds the function parameters which must be supplied to the Safe UI for distribution. These are:
+TEL migrated to `0x7E13B43065380aCdeC1c2d138c579cbBbafA0731` (18 decimals, same address on all chains). Old and new TEL are 1:1. Calculations and the onchain reward record stay in old-TEL (2 decimal) units, because stake, user fees and `TANIssuanceHistory` cumulative rewards are all old TEL. Rewards are **paid in new TEL by direct transfer** (`amount × 10^16`) instead of through the SimplePlugin claim flow.
 
-- an array of Solidity `IssuanceReward` structs defined within `TANIssuanceHistory.sol`, called `rewards`
-- the settlement chain's end block used for the period's calculation run, aptly called `endBlock`
+`TANIssuanceHistory` and the StakingModule's plugins are bound to old TEL, so the history is pointed at `src/issuance/RecordOnlyPlugin.sol`: a plugin that reports old TEL and records without moving tokens.
 
-The builder script prints the total amount of TEL needed to be transferred from the TANSafe to the history contract (and then to the plugin), as well as the `endBlock` for all networks in `rewards/staker_rewards_period_x.json`. The `rewards` array parameter is often too long to view in a terminal and sometimes too long to perform the period's distribution in a single transaction, so it is written to a series of chunks at`backend/temp/safe_param_period_x_chunk_y.json` file for the corresponding period number.
+One-time setup:
 
-NOTE: tokens must be transferred to the TANIssuanceHistory contract - `increaseClaimableByBatch()` does not pull tokens (which would require an approval)
+1. Deploy the stub: `forge script script/DeployRecordOnlyPlugin.s.sol --rpc-url $POLYGON_RPC_URL --private-key $ADMIN_PK --verify --broadcast`
+2. Build the setup batch: `yarn ts-node backend/safeTxArrayBuilder.ts --setup-stub <RecordOnlyPlugin address>`
+   The builder first checks onchain that the address is a correctly wired RecordOnlyPlugin (`tel()`, `increaser()`, `totalClaimable()`, ERC165) and is not already set.
+3. Import `backend/temp/safe_batch_tan_setup_record_only_plugin.json` into the TAN Safe Transaction Builder and execute (`setTanIssuancePlugin(stub)`).
+4. Set `RECORD_ONLY_PLUGIN` in `backend/newTelDistribution.ts` to the stub address. TAN runs refuse to build until it is set.
 
-To run the script, use:
+Rolling back with `setTanIssuancePlugin(<original plugin>)` restores the pre-migration flow, which again requires funding the history with old TEL every period.
+
+Each period:
 
 `yarn ts-node backend/safeTxArrayBuilder.ts --period $DESIRED_PERIOD --tan`
 
+This writes Safe Transaction Builder files to `backend/temp/safe_batch_period_x_tan_y.json`. Each file is one Safe tx containing:
+
+- `TANIssuanceHistory.increaseClaimableByBatch(rewards, endBlock)` with old-TEL amounts and the Polygon `endBlock` from the rewards file
+- one `newTEL.transfer(rewardee, amount × 10^16)` per rewardee in that record call
+
+Add `--check` to run every check and print each file's sha256 without writing anything. Files are deterministic, so anyone with the same rewards file and chain state gets identical bytes and hashes.
+
+Before writing anything the builder:
+
+- requires the rewards file to hold exactly one polygon block range, with rewards and blocks as decimal strings
+- caps the period total at `config.incentivesAmounts.stakerIncentivesAmount`
+- runs onchain preflight checks against Polygon:
+  - the history's plugin is `RECORD_ONLY_PLUGIN` and wired correctly, and the history holds no old TEL
+  - the rewards file continues from the last settlement (`startBlock == lastSettlementBlock + 1`), or the period is partly settled and every recorded chunk matches the file; recorded amounts that don't match (a chunk executed twice, or a changed rewards file) refuse the build, a later settled period refuses the build
+  - for each rewardee, reward + cumulative rewards before the period ≤ the highest stake held during the period (an upper bound on the calculator's stake cap)
+  - new TEL reports 18 decimals and the TAN Safe holds enough new TEL for the pending chunks
+- deletes earlier `safe_batch_period_x_tan_*` files so stale chunks cannot be imported
+
+For a partly settled period only the chunks not yet recorded onchain are built, under their original file names and hashes. A fully settled period builds nothing.
+
+After writing, it reads the files back (rejecting a wrong chain or Safe), decodes every transaction and runs the accounting check: records must equal the rewards file, each file's transfers must equal its records × 10^16, and totals must agree in both units. Any failure while writing or verifying removes every file of the run.
+
+**Each file pays every time it executes.** The checks run when files are built, so execute each file exactly once and never queue the same file twice; re-run with `--check` before executing if time has passed.
+
+Do **not** transfer old TEL to the TANIssuanceHistory anymore.
+
+Existing claimable old TEL on the original SimplePlugin remains claimable through the StakingModule as before.
 
 ## Running with Docker and Makefile
 
