@@ -74,4 +74,10 @@ export const config = {
     }, 
    */
   },
+  // post-migration TEL, same address on all chains; rewards are paid in this token while
+  // measurements and onchain reward records stay in old-TEL (`telToken`) units
+  rewardTelToken: {
+    address: getAddress("0x7E13B43065380aCdeC1c2d138c579cbBbafA0731"),
+    decimals: 18n,
+  },
 } as const;
